@@ -112,7 +112,7 @@
 - [x] #65 NSEvent+Keyboard.swift (Hebrew layout detection)
 - [x] #66 RTL text editing in snippet editor
 - [x] #67 RTL menu items
-- [ ] #68 Hebrew abbreviations support
+- [x] #68 Hebrew abbreviations support
 
 ### Localization
 - [x] #69 en.lproj/Localizable.strings

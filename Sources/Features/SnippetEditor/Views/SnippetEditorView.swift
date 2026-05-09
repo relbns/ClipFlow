@@ -178,9 +178,13 @@ struct SnippetDetailView: View {
             return (false, "Cannot contain spaces")
         }
 
-        let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".;/_-"))
+        // Allow alphanumerics (includes Hebrew), special chars, and Hebrew letters explicitly
+        var allowedCharacters = CharacterSet.alphanumerics
+        allowedCharacters.formUnion(CharacterSet(charactersIn: ".;/_-"))
+        allowedCharacters.formUnion(CharacterSet(charactersIn: "א...ת"))  // Hebrew letters range
+
         if abbr.rangeOfCharacter(from: allowedCharacters.inverted) != nil {
-            return (false, "Only letters, numbers, and ._-/; allowed")
+            return (false, "Only letters, numbers, Hebrew, and ._-/; allowed")
         }
 
         let duplicate = allSnippets.first { otherSnippet in
