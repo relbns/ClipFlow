@@ -20,7 +20,7 @@
 - [x] #5 Write core documentation files (CLAUDE.md, README, CREDITS)
 - [x] #6 Create Xcode project with SPM (Swift 6.0, macOS 14+)
 - [x] #7 Setup .github/workflows: ci.yml (build + test)
-- [ ] #8 Add SwiftLint configuration
+- [x] #8 Add SwiftLint configuration
 
 ### Core Data Models
 - [x] #9 Create Core Data model: ClipItem, Snippet, SnippetGroup
@@ -77,27 +77,27 @@
 - [x] #40 3-panel layout: Sidebar, Editor, Inspector
 - [x] #41 Sidebar: groups + snippets, drag & drop reorder
 - [x] #42 Content editor: title, abbreviation, content
-- [ ] #43 Variable insertion buttons
+- [x] #43 Variable insertion buttons
 - [x] #44 Inspector panel: trigger settings, app rules
-- [ ] #45 Real-time abbreviation validation
+- [x] #45 Real-time abbreviation validation
 - [x] #46 Statistics display (uses, time saved)
-- [ ] #47 Duplicate snippet feature
-- [ ] #48 Search/filter in sidebar
+- [x] #47 Duplicate snippet feature
+- [x] #48 Search/filter in sidebar
 
 ### Settings UI (Complete)
-- [ ] #49 General settings tab
-- [ ] #50 Appearance settings tab (Simple vs Organized mode)
-- [ ] #51 Text Expansion settings tab
+- [x] #49 General settings tab
+- [x] #50 Appearance settings tab (Simple vs Organized mode)
+- [x] #51 Text Expansion settings tab
 - [ ] #52 Hotkeys settings tab
 - [ ] #53 Sync settings tab
 - [ ] #54 Advanced settings tab
-- [ ] #55 Accessibility permission check + open System Settings
+- [x] #55 Accessibility permission check + open System Settings
 
 ### MenuBar UI (Both Modes)
 - [ ] #56 Simple mode (flat list)
 - [ ] #57 Organized mode (folders)
 - [ ] #58 Search bar with instant filter
-- [ ] #59 RTL support for Hebrew items
+- [x] #59 RTL support for Hebrew items
 - [ ] #60 Image thumbnails
 - [ ] #61 Color code preview
 - [ ] #62 Keyboard shortcuts (1-9, 0)
@@ -107,16 +107,16 @@
 ## Phase 4: Hebrew & i18n (Week 10)
 
 ### Hebrew Support
-- [ ] #63 String+Hebrew.swift (isHebrew, isRTL detection)
-- [ ] #64 Date+Hebrew.swift (Hebrew calendar formatting)
-- [ ] #65 NSEvent+Keyboard.swift (Hebrew layout detection)
-- [ ] #66 RTL text editing in snippet editor
-- [ ] #67 RTL menu items
+- [x] #63 String+Hebrew.swift (isHebrew, isRTL detection)
+- [x] #64 Date+Hebrew.swift (Hebrew calendar formatting)
+- [x] #65 NSEvent+Keyboard.swift (Hebrew layout detection)
+- [x] #66 RTL text editing in snippet editor
+- [x] #67 RTL menu items
 - [ ] #68 Hebrew abbreviations support
 
 ### Localization
-- [ ] #69 en.lproj/Localizable.strings
-- [ ] #70 he.lproj/Localizable.strings
+- [x] #69 en.lproj/Localizable.strings
+- [x] #70 he.lproj/Localizable.strings
 - [ ] #71 All UI strings localized
 - [ ] #72 Settings for language preference
 
