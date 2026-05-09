@@ -148,6 +148,62 @@ actor SnippetExporter {
 
         return ImportResult(imported: imported, skipped: skipped, conflicts: conflicts)
     }
+
+    /// Export to TextExpander-compatible XML format
+    func exportToXML() async throws -> Data {
+        let request: NSFetchRequest<SnippetGroup> = SnippetGroup.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \SnippetGroup.sortOrder, ascending: true)]
+
+        guard let groups = try? context.fetch(request) else {
+            throw ExportError.fetchFailed
+        }
+
+        var xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <array>
+        """
+
+        for group in groups {
+            xml += "\n  <dict>"
+            xml += "\n    <key>snippetsPlain</key>"
+            xml += "\n    <array>"
+
+            for snippet in group.sortedSnippets {
+                xml += "\n      <dict>"
+                xml += "\n        <key>abbreviation</key>"
+                xml += "\n        <string>\(xmlEscape(snippet.abbreviation))</string>"
+                xml += "\n        <key>label</key>"
+                xml += "\n        <string>\(xmlEscape(snippet.title))</string>"
+                xml += "\n        <key>plainText</key>"
+                xml += "\n        <string>\(xmlEscape(snippet.content))</string>"
+                xml += "\n      </dict>"
+            }
+
+            xml += "\n    </array>"
+            xml += "\n    <key>name</key>"
+            xml += "\n    <string>\(xmlEscape(group.name))</string>"
+            xml += "\n  </dict>"
+        }
+
+        xml += "\n</array>\n</plist>"
+
+        guard let data = xml.data(using: .utf8) else {
+            throw ExportError.encodingFailed
+        }
+
+        return data
+    }
+
+    private func xmlEscape(_ string: String) -> String {
+        return string
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+    }
 }
 
 enum MergeStrategy {

@@ -3,14 +3,25 @@ import UniformTypeIdentifiers
 
 struct SyncSettingsView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @AppStorage("iCloudSyncEnabled") private var iCloudEnabled = false
-    @State private var lastSyncDate: Date?
-    @State private var isSyncing = false
+    @AppStorage("iCloudSyncEnabled") private var iCloudEnabled = false {
+        didSet {
+            if iCloudEnabled {
+                iCloudService.enableAutoSync()
+            } else {
+                iCloudService.disableAutoSync()
+            }
+        }
+    }
+    @StateObject private var iCloudService: iCloudSyncService
     @State private var showingExportPicker = false
     @State private var showingImportPicker = false
     @State private var exportData: Data?
     @State private var importResult: ImportResult?
     @State private var showingImportAlert = false
+
+    init() {
+        _iCloudService = StateObject(wrappedValue: iCloudSyncService(context: CoreDataStack.shared.viewContext))
+    }
 
     var body: some View {
         Form {
@@ -20,11 +31,11 @@ struct SyncSettingsView: View {
                 if iCloudEnabled {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Image(systemName: isSyncing ? "arrow.triangle.2.circlepath" : "checkmark.circle.fill")
-                                .foregroundColor(isSyncing ? .orange : .green)
-                                .symbolEffect(.pulse, isActive: isSyncing)
+                            Image(systemName: iCloudService.isSyncing ? "arrow.triangle.2.circlepath" : "checkmark.circle.fill")
+                                .foregroundColor(iCloudService.isSyncing ? .orange : .green)
+                                .symbolEffect(.pulse, isActive: iCloudService.isSyncing)
 
-                            if let lastSync = lastSyncDate {
+                            if let lastSync = iCloudService.lastSyncDate {
                                 Text("Last synced: \(lastSync.formatted(.relative(presentation: .named)))")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -35,10 +46,23 @@ struct SyncSettingsView: View {
                             }
                         }
 
-                        Button(action: syncNow) {
-                            Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                        HStack {
+                            Button(action: syncNow) {
+                                Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            .disabled(iCloudService.isSyncing)
+
+                            Button(action: restoreFromiCloud) {
+                                Label("Restore from iCloud", systemImage: "arrow.down.circle")
+                            }
+                            .disabled(iCloudService.isSyncing)
                         }
-                        .disabled(isSyncing)
+
+                        if let error = iCloudService.syncError {
+                            Text(error.localizedDescription)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
                     }
                 }
 
@@ -83,13 +107,17 @@ struct SyncSettingsView: View {
     }
 
     private func syncNow() {
-        isSyncing = true
         Task {
-            // Simulate sync
-            try? await Task.sleep(for: .seconds(2))
-            await MainActor.run {
-                lastSyncDate = Date()
-                isSyncing = false
+            await iCloudService.sync()
+        }
+    }
+
+    private func restoreFromiCloud() {
+        Task {
+            do {
+                try await iCloudService.restoreFromiCloud()
+            } catch {
+                print("❌ Restore failed: \(error)")
             }
         }
     }
