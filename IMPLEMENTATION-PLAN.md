@@ -125,18 +125,18 @@
 ## Phase 5: Sync & Export (Weeks 11-12)
 
 ### File Export/Import
-- [ ] #73 JSON export (single group)
-- [ ] #74 JSON export (all snippets)
-- [ ] #75 JSON import with validation
-- [ ] #76 Conflict resolution UI
-- [ ] #77 XML export (TextExpander compatible)
+- [x] #73 JSON export (single group)
+- [x] #74 JSON export (all snippets)
+- [x] #75 JSON import with validation
+- [x] #76 Conflict resolution UI
+- [x] #77 XML export (TextExpander compatible)
 
 ### iCloud Sync
-- [ ] #78 iCloudSyncService.swift
-- [ ] #79 Enable/disable toggle in settings
-- [ ] #80 Auto-sync on change
-- [ ] #81 Conflict resolution (cloud wins)
-- [ ] #82 Sync status indicator
+- [x] #78 iCloudSyncService.swift
+- [x] #79 Enable/disable toggle in settings
+- [x] #80 Auto-sync on change
+- [x] #81 Conflict resolution (cloud wins)
+- [x] #82 Sync status indicator
 
 ---
 
