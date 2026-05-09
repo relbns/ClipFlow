@@ -1,0 +1,85 @@
+name: Task
+description: Implementation task from IMPLEMENTATION-PLAN.md
+title: "[TASK] "
+labels: ["type:task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for tasks from the implementation plan.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Task Description
+      description: Copy from IMPLEMENTATION-PLAN.md
+      placeholder: Implement...
+    validations:
+      required: true
+
+  - type: input
+    id: task_number
+    attributes:
+      label: Task Number
+      description: Task number from IMPLEMENTATION-PLAN.md
+      placeholder: "#42"
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      description: Which phase is this task in?
+      options:
+        - Phase 1 - Foundation
+        - Phase 2 - Text Expansion
+        - Phase 3 - UI & Polish
+        - Phase 4 - Hebrew & i18n
+        - Phase 5 - Sync & Export
+        - Phase 6 - Testing & Release
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component does this affect?
+      options:
+        - Core Services
+        - Data Models
+        - UI - MenuBar
+        - UI - Snippet Editor
+        - UI - Settings
+        - Text Expansion
+        - Sync
+        - Hebrew/i18n
+        - Testing
+        - CI/CD
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Estimated Effort
+      description: How long will this take?
+      options:
+        - XS (< 1 hour)
+        - S (1-4 hours)
+        - M (0.5-1 day)
+        - L (1-3 days)
+        - XL (3+ days)
+
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      description: Check when complete
+      options:
+        - label: Code written
+        - label: Tests passing
+        - label: No SwiftLint warnings
+        - label: Documented (if public API)
+        - label: Reviewed
+        - label: Merged to main
+        - label: Checkbox in IMPLEMENTATION-PLAN.md checked

@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(swift:*)",
+      "Bash(swiftlint:*)",
+      "Read(/Users/benesh/Projects/ClipFlow/**)"
+    ],
+    "deny": [],
+    "additionalDirectories": [
+      "/Users/benesh/Projects/ClipFlow/.claude"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "branch=$(git -C \"$CLAUDE_PROJECT_DIR\" branch --show-current 2>/dev/null); if [ \"$branch\" = \"main\" ] || [ \"$branch\" = \"master\" ]; then echo \"BLOCKED: Direct edit on '$branch' not allowed. Create a feat/* branch first.\"; exit 2; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

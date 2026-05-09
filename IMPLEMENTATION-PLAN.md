@@ -1,0 +1,169 @@
+# ClipFlow Implementation Plan
+
+**Current Phase**: Phase 1 - Foundation
+
+**Rules:**
+1. Work tasks in phase order - never skip ahead
+2. Check the box ONLY after code is merged to main
+3. Create GitHub issue for each task before starting
+4. Never work on main - always use feat/* branch
+
+---
+
+## Phase 1: Foundation (Weeks 1-3)
+
+### Setup & Architecture
+- [x] #1 Create new repo: `gh repo create relbns/ClipFlow --public`
+- [ ] #2 Setup GitHub labels (type, priority, effort, phase, component)
+- [ ] #3 Create 3 project boards: MVP, Phase 2, Backlog
+- [ ] #4 Setup .claude/ folder: commands, skills, hooks, settings.json
+- [ ] #5 Write core documentation files
+- [ ] #6 Create Xcode project with SPM (Swift 6.0, macOS 14+)
+- [ ] #7 Setup .github/workflows: ci.yml (build + test)
+- [ ] #8 Add SwiftLint configuration
+
+### Core Data Models
+- [ ] #9 Create Core Data model: ClipItem, Snippet, SnippetGroup, Variable
+- [ ] #10 Implement CoreDataStack with migrations
+- [ ] #11 Create Snippet model with abbreviation, trigger, variables
+- [ ] #12 Create SnippetGroup model with sync metadata
+- [ ] #13 Create Variable model (date, time, clipboard, custom)
+- [ ] #14 Add Statistics model (use count, last used)
+
+### Core Services (Phase 1)
+- [ ] #15 ClipboardMonitor.swift (Combine-based, NSPasteboard)
+- [ ] #16 PasteEngine.swift (async/await, Cmd+V simulation)
+- [ ] #17 HotkeyManager.swift (KeyboardShortcuts framework)
+- [ ] #18 AppContextMonitor.swift (NSWorkspace, frontmost app)
+
+### Basic UI (AppKit/SwiftUI Hybrid)
+- [ ] #19 ClipFlowApp.swift (@main, SwiftUI entry)
+- [ ] #20 AppDelegate.swift (MenuBar setup, status item)
+- [ ] #21 MenuBarController.swift (menu building, AppKit bridge)
+- [ ] #22 Basic clipboard menu (text items only)
+- [ ] #23 Settings window skeleton (SwiftUI tabs)
+
+---
+
+## Phase 2: Text Expansion (Weeks 4-6)
+
+### Text Expansion Engine
+- [ ] #24 KeystrokeMonitor.swift (CGEventTap, buffer management)
+- [ ] #25 TextExpansionEngine.swift (abbreviation matching)
+- [ ] #26 VariableProcessor.swift ({date}, {time}, {clipboard})
+- [ ] #27 Trigger detection (space, delimiter, any char)
+- [ ] #28 Backspace deletion before paste
+- [ ] #29 Sound feedback on expansion
+- [ ] #30 Statistics tracking (use count, chars saved)
+
+### Advanced Variables
+- [ ] #31 Date formatting ({date:yyyy-MM-dd}, {date:hebrew})
+- [ ] #32 Time formatting ({time:HH:mm})
+- [ ] #33 Clipboard variable ({clipboard})
+- [ ] #34 Cursor positioning ({cursor})
+- [ ] #35 Custom variables with prompts
+- [ ] #36 Fill-in fields dialog (NSAlert with text fields)
+
+### App-Specific Rules
+- [ ] #37 App rule system (bundle ID matching)
+- [ ] #38 UI for selecting apps in snippet editor
+- [ ] #39 Filter expansion based on frontmost app
+
+---
+
+## Phase 3: UI & Polish (Weeks 7-9)
+
+### Snippet Editor (Full Featured)
+- [ ] #40 3-panel layout: Sidebar, Editor, Inspector
+- [ ] #41 Sidebar: groups + snippets, drag & drop reorder
+- [ ] #42 Content editor: title, abbreviation, content
+- [ ] #43 Variable insertion buttons
+- [ ] #44 Inspector panel: trigger settings, app rules
+- [ ] #45 Real-time abbreviation validation
+- [ ] #46 Statistics display (uses, time saved)
+- [ ] #47 Duplicate snippet feature
+- [ ] #48 Search/filter in sidebar
+
+### Settings UI (Complete)
+- [ ] #49 General settings tab
+- [ ] #50 Appearance settings tab (Simple vs Organized mode)
+- [ ] #51 Text Expansion settings tab
+- [ ] #52 Hotkeys settings tab
+- [ ] #53 Sync settings tab
+- [ ] #54 Advanced settings tab
+- [ ] #55 Accessibility permission check + open System Settings
+
+### MenuBar UI (Both Modes)
+- [ ] #56 Simple mode (flat list)
+- [ ] #57 Organized mode (folders)
+- [ ] #58 Search bar with instant filter
+- [ ] #59 RTL support for Hebrew items
+- [ ] #60 Image thumbnails
+- [ ] #61 Color code preview
+- [ ] #62 Keyboard shortcuts (1-9, 0)
+
+---
+
+## Phase 4: Hebrew & i18n (Week 10)
+
+### Hebrew Support
+- [ ] #63 String+Hebrew.swift (isHebrew, isRTL detection)
+- [ ] #64 Date+Hebrew.swift (Hebrew calendar formatting)
+- [ ] #65 NSEvent+Keyboard.swift (Hebrew layout detection)
+- [ ] #66 RTL text editing in snippet editor
+- [ ] #67 RTL menu items
+- [ ] #68 Hebrew abbreviations support
+
+### Localization
+- [ ] #69 en.lproj/Localizable.strings
+- [ ] #70 he.lproj/Localizable.strings
+- [ ] #71 All UI strings localized
+- [ ] #72 Settings for language preference
+
+---
+
+## Phase 5: Sync & Export (Weeks 11-12)
+
+### File Export/Import
+- [ ] #73 JSON export (single group)
+- [ ] #74 JSON export (all snippets)
+- [ ] #75 JSON import with validation
+- [ ] #76 Conflict resolution UI
+- [ ] #77 XML export (TextExpander compatible)
+
+### iCloud Sync
+- [ ] #78 iCloudSyncService.swift
+- [ ] #79 Enable/disable toggle in settings
+- [ ] #80 Auto-sync on change
+- [ ] #81 Conflict resolution (cloud wins)
+- [ ] #82 Sync status indicator
+
+---
+
+## Phase 6: Testing & Release (Weeks 13-14)
+
+### Testing
+- [ ] #83 Unit tests: VariableProcessor
+- [ ] #84 Unit tests: TextExpansionEngine
+- [ ] #85 Unit tests: ClipboardMonitor
+- [ ] #86 UI tests: Snippet Editor
+- [ ] #87 UI tests: Settings
+- [ ] #88 Manual testing checklist
+
+### Release Preparation
+- [ ] #89 App icon design (Big Sur style)
+- [ ] #90 MenuBar icon (monochrome + color variants)
+- [ ] #91 README.md with screenshots
+- [ ] #92 CREDITS.md (thank Clipy)
+- [ ] #93 LICENSE files (MIT + CLIPY-LICENSE)
+- [ ] #94 GitHub Release workflow
+- [ ] #95 Notarization script
+- [ ] #96 Sparkle updates integration
+- [ ] #97 Homebrew formula
+- [ ] #98 Demo video
+
+---
+
+**Total MVP tasks**: ~77 (Phases 1-5)
+**Total with testing & release**: ~98
+**Estimated time**: 14 weeks (3.5 months)
