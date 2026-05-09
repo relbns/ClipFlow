@@ -33,14 +33,14 @@
 ### Core Services (Phase 1)
 - [x] #15 ClipboardMonitor.swift (Combine-based, NSPasteboard)
 - [x] #16 PasteEngine.swift (async/await, Cmd+V simulation)
-- [ ] #17 HotkeyManager.swift (KeyboardShortcuts framework)
-- [ ] #18 AppContextMonitor.swift (NSWorkspace, frontmost app)
+- [x] #17 HotkeyManager.swift (KeyboardShortcuts framework)
+- [x] #18 AppContextMonitor.swift (NSWorkspace, frontmost app)
 
 ### Basic UI (AppKit/SwiftUI Hybrid)
 - [x] #19 ClipFlowApp.swift (@main, SwiftUI entry)
 - [x] #20 AppDelegate.swift (MenuBar setup, status item)
-- [ ] #21 MenuBarController.swift (menu building, AppKit bridge)
-- [ ] #22 Basic clipboard menu (text items only)
+- [x] #21 MenuBarController.swift (menu building, AppKit bridge)
+- [x] #22 Basic clipboard menu (text items only)
 - [x] #23 Settings window skeleton (SwiftUI tabs)
 
 ---
