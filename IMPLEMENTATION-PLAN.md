@@ -48,18 +48,18 @@
 ## Phase 2: Text Expansion (Weeks 4-6)
 
 ### Text Expansion Engine
-- [ ] #24 KeystrokeMonitor.swift (CGEventTap, buffer management)
-- [ ] #25 TextExpansionEngine.swift (abbreviation matching)
-- [ ] #26 VariableProcessor.swift ({date}, {time}, {clipboard})
-- [ ] #27 Trigger detection (space, delimiter, any char)
-- [ ] #28 Backspace deletion before paste
-- [ ] #29 Sound feedback on expansion
-- [ ] #30 Statistics tracking (use count, chars saved)
+- [x] #24 KeystrokeMonitor.swift (CGEventTap, buffer management)
+- [x] #25 TextExpansionEngine.swift (abbreviation matching)
+- [x] #26 VariableProcessor.swift ({date}, {time}, {clipboard})
+- [x] #27 Trigger detection (space, delimiter, any char)
+- [x] #28 Backspace deletion before paste
+- [x] #29 Sound feedback on expansion
+- [x] #30 Statistics tracking (use count, chars saved)
 
 ### Advanced Variables
-- [ ] #31 Date formatting ({date:yyyy-MM-dd}, {date:hebrew})
-- [ ] #32 Time formatting ({time:HH:mm})
-- [ ] #33 Clipboard variable ({clipboard})
+- [x] #31 Date formatting ({date:yyyy-MM-dd}, {date:hebrew})
+- [x] #32 Time formatting ({time:HH:mm})
+- [x] #33 Clipboard variable ({clipboard})
 - [ ] #34 Cursor positioning ({cursor})
 - [ ] #35 Custom variables with prompts
 - [ ] #36 Fill-in fields dialog (NSAlert with text fields)
@@ -74,13 +74,13 @@
 ## Phase 3: UI & Polish (Weeks 7-9)
 
 ### Snippet Editor (Full Featured)
-- [ ] #40 3-panel layout: Sidebar, Editor, Inspector
-- [ ] #41 Sidebar: groups + snippets, drag & drop reorder
-- [ ] #42 Content editor: title, abbreviation, content
+- [x] #40 3-panel layout: Sidebar, Editor, Inspector
+- [x] #41 Sidebar: groups + snippets, drag & drop reorder
+- [x] #42 Content editor: title, abbreviation, content
 - [ ] #43 Variable insertion buttons
-- [ ] #44 Inspector panel: trigger settings, app rules
+- [x] #44 Inspector panel: trigger settings, app rules
 - [ ] #45 Real-time abbreviation validation
-- [ ] #46 Statistics display (uses, time saved)
+- [x] #46 Statistics display (uses, time saved)
 - [ ] #47 Duplicate snippet feature
 - [ ] #48 Search/filter in sidebar
 
