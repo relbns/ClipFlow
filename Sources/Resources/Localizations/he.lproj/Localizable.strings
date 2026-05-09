@@ -36,3 +36,93 @@
 "cancel" = "ביטול";
 "delete" = "מחק";
 "enabled" = "מופעל";
+"duplicate" = "שכפל";
+"more" = "עוד";
+
+/* Snippet Editor */
+"snippets" = "קטעי טקסט";
+"new_group" = "קבוצה חדשה";
+"new_snippet" = "קטע טקסט חדש";
+"select_snippet" = "בחר קטע טקסט לעריכה";
+"basic" = "בסיסי";
+"title" = "כותרת";
+"abbreviation" = "קיצור";
+"abbreviation_help" = "הקלד את זה כדי להרחיב את הקטע (למשל, .cdsh)";
+"content" = "תוכן";
+"use_variables" = "השתמש במשתנים לתוכן דינמי";
+"expansion" = "הרחבה";
+"case_sensitive" = "רגיש לאותיות גדולות/קטנות";
+"play_sound_expansion" = "השמע צליל בהרחבה";
+"statistics" = "סטטיסטיקה";
+"times_used" = "פעמים בשימוש";
+"last_used" = "שימוש אחרון";
+
+/* Variable Buttons */
+"insert_date" = "תאריך";
+"insert_time" = "שעה";
+"insert_clipboard" = "לוח";
+"insert_cursor" = "סמן";
+
+/* Validation Messages */
+"abbreviation_empty" = "הקיצור לא יכול להיות ריק";
+"abbreviation_prefix" = "חייב להתחיל ב-. או ; או /";
+"abbreviation_no_spaces" = "לא יכול להכיל רווחים";
+"abbreviation_invalid_chars" = "רק אותיות, מספרים, ו-._-/; מותרים";
+"abbreviation_duplicate" = "קיצור זה כבר קיים";
+"abbreviation_valid" = "קיצור תקין";
+
+/* Settings - Hotkeys */
+"global_hotkeys" = "קיצורי מקשים גלובליים";
+"main_menu" = "תפריט ראשי";
+"snippets_menu" = "תפריט קטעי טקסט";
+"snippet_editor" = "עורך קטעי טקסט";
+"clear_history" = "נקה היסטוריה";
+"open_clipboard_menu" = "פתח תפריט היסטוריית לוח";
+"open_snippets_menu" = "פתח תפריט קטעי טקסט";
+"open_snippet_editor" = "פתח חלון עורך קטעי טקסט";
+"clear_clipboard_history" = "נקה היסטוריית לוח";
+"paste_modifiers" = "משנה הדבקה";
+"paste_plain_text" = "החזק ⌥ Option בזמן הדבקה כדי להדביק כטקסט רגיל";
+"paste_no_history" = "החזק ⌘ Command בזמן הדבקה כדי להדביק בלי להוסיף להיסטוריה";
+"tips" = "טיפים";
+"tip_escape" = "• לחץ Escape כדי לסגור תפריט";
+"tip_numbers" = "• השתמש במקשי מספרים 1-9, 0 לבחירה מהירה";
+
+/* Settings - Sync */
+"icloud_sync" = "סנכרון iCloud";
+"sync_snippets" = "סנכרן קטעי טקסט דרך iCloud";
+"last_synced" = "סונכרן לאחרונה";
+"never_synced" = "מעולם לא סונכרן";
+"sync_now" = "סנכרן עכשיו";
+"syncs_all_devices" = "מסנכרן את כל קטעי הטקסט והקבוצות בין המכשירים שלך";
+"export_import" = "יצוא / יבוא";
+"export_all" = "יצא את כל קטעי הטקסט...";
+"import_snippets" = "יבא קטעי טקסט...";
+"export_format" = "יצוא לפורמט JSON (בקרוב)";
+"advanced_sync" = "סנכרון מתקדם";
+"github_gist" = "אינטגרציה עם GitHub Gist (בקרוב)";
+"google_drive" = "סנכרון Google Drive (בקרוב)";
+"sync_coming_soon" = "אפשרויות סנכרון נוספות יהיו זמינות בעדכונים עתידיים";
+
+/* Settings - Advanced */
+"performance" = "ביצועים";
+"clipboard_interval" = "מרווח בדיקת לוח:";
+"interval_note" = "ערכים נמוכים = יותר מהיר, שימוש CPU גבוה יותר";
+"storage" = "אחסון";
+"database_location" = "מיקום בסיס נתונים:";
+"storage_size" = "גודל אחסון:";
+"clean_up_data" = "נקה נתונים ישנים...";
+"clean_up_note" = "הסר פריטי לוח מעל 30 יום";
+"privacy" = "פרטיות";
+"store_locally" = "שמור היסטוריית לוח מקומית";
+"never_sync_passwords" = "לעולם אל תסנכרן סיסמאות/מפתחות";
+"clear_on_quit" = "נקה היסטוריה ביציאה";
+"clear_on_quit_note" = "כאשר מופעל, כל היסטוריית הלוח נמחקת כאשר ClipFlow נסגר";
+"updates" = "עדכונים";
+"auto_check_updates" = "בדוק עדכונים אוטומטית";
+"check_now" = "בדוק עכשיו";
+"version" = "גרסה";
+"debug" = "דיבאג";
+"reset_settings" = "אפס את כל ההגדרות";
+"open_logs" = "פתח קבצי לוג...";
+"troubleshooting" = "לפתרון בעיות";
