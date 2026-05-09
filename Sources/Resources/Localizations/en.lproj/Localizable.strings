@@ -1,0 +1,38 @@
+/* Menu items */
+"clipboard_history" = "Clipboard History";
+"snippets" = "Snippets";
+"clear_history" = "Clear History";
+"preferences" = "Preferences";
+"snippet_editor" = "Snippet Editor";
+"quit" = "Quit ClipFlow";
+
+/* Settings */
+"general" = "General";
+"appearance" = "Appearance";
+"text_expansion" = "Text Expansion";
+"hotkeys" = "Hotkeys";
+"sync" = "Sync";
+
+/* View modes */
+"simple_mode" = "Simple (Flycut-style)";
+"organized_mode" = "Organized (Folders)";
+
+/* Expansion */
+"text_expansion_enabled" = "Enable text expansion";
+"expand_after" = "Expand after:";
+"any_character" = "Any character";
+"delimiter" = "Delimiter (space, tab, punctuation)";
+"space" = "Space only";
+"tab" = "Tab only";
+"enter" = "Enter only";
+
+/* Variables */
+"date" = "Date";
+"time" = "Time";
+"clipboard" = "Clipboard";
+
+/* Common */
+"save" = "Save";
+"cancel" = "Cancel";
+"delete" = "Delete";
+"enabled" = "Enabled";

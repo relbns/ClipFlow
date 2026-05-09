@@ -87,7 +87,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openSnippetEditor() {
-        // TODO: Implement snippet editor window
-        print("📝 Opening snippet editor...")
+        let editorView = SnippetEditorView()
+            .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
+
+        let hostingController = NSHostingController(rootView: editorView)
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Snippet Editor"
+        window.setContentSize(NSSize(width: 900, height: 650))
+        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        window.makeKeyAndOrderFront(nil)
+        window.center()
+
+        NSApp.activate(ignoringOtherApps: true)
     }
 }

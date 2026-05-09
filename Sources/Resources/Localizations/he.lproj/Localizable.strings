@@ -1,0 +1,38 @@
+/* Menu items */
+"clipboard_history" = "היסטוריית לוח";
+"snippets" = "קטעי טקסט";
+"clear_history" = "נקה היסטוריה";
+"preferences" = "העדפות";
+"snippet_editor" = "עורך קטעי טקסט";
+"quit" = "יציאה מ-ClipFlow";
+
+/* Settings */
+"general" = "כללי";
+"appearance" = "מראה";
+"text_expansion" = "הרחבת טקסט";
+"hotkeys" = "קיצורי מקשים";
+"sync" = "סנכרון";
+
+/* View modes */
+"simple_mode" = "תצוגה פשוטה (Flycut)";
+"organized_mode" = "תצוגה מאורגנת (תיקיות)";
+
+/* Expansion */
+"text_expansion_enabled" = "הפעל הרחבת טקסט";
+"expand_after" = "הרחב אחרי:";
+"any_character" = "כל תו";
+"delimiter" = "תו הפרדה (רווח, טאב, פיסוק)";
+"space" = "רווח בלבד";
+"tab" = "טאב בלבד";
+"enter" = "Enter בלבד";
+
+/* Variables */
+"date" = "תאריך";
+"time" = "שעה";
+"clipboard" = "לוח";
+
+/* Common */
+"save" = "שמור";
+"cancel" = "ביטול";
+"delete" = "מחק";
+"enabled" = "מופעל";

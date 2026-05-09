@@ -7,8 +7,18 @@ struct SettingsView: View {
                 .tabItem {
                     Label("General", systemImage: "gear")
                 }
+
+            AppearanceSettingsView()
+                .tabItem {
+                    Label("Appearance", systemImage: "paintbrush")
+                }
+
+            TextExpansionSettingsView()
+                .tabItem {
+                    Label("Text Expansion", systemImage: "text.cursor")
+                }
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 550, height: 450)
     }
 }
 
