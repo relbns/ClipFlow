@@ -22,4 +22,8 @@ extension SnippetGroup {
     var sortedSnippets: [Snippet] {
         snippets.sorted { ($0.title) < ($1.title) }
     }
+
+    @nonobjc class func fetchRequest() -> NSFetchRequest<SnippetGroup> {
+        return NSFetchRequest<SnippetGroup>(entityName: "SnippetGroup")
+    }
 }

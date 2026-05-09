@@ -28,6 +28,10 @@ extension Snippet {
     var expandTriggerType: ExpandTrigger {
         ExpandTrigger(rawValue: expandTrigger) ?? .delimiter
     }
+
+    @nonobjc class func fetchRequest() -> NSFetchRequest<Snippet> {
+        return NSFetchRequest<Snippet>(entityName: "Snippet")
+    }
 }
 
 enum ExpandTrigger: String, Codable {
