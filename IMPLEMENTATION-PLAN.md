@@ -1,6 +1,6 @@
 # ClipFlow Implementation Plan
 
-**Current Phase**: Phase 1 - Foundation
+**Current Phase**: Phase 4 - Hebrew & i18n (Phase 3 UI Complete!)
 
 **Rules:**
 1. Work tasks in phase order - never skip ahead
@@ -88,9 +88,9 @@
 - [x] #49 General settings tab
 - [x] #50 Appearance settings tab (Simple vs Organized mode)
 - [x] #51 Text Expansion settings tab
-- [ ] #52 Hotkeys settings tab
-- [ ] #53 Sync settings tab
-- [ ] #54 Advanced settings tab
+- [x] #52 Hotkeys settings tab
+- [x] #53 Sync settings tab
+- [x] #54 Advanced settings tab
 - [x] #55 Accessibility permission check + open System Settings
 
 ### MenuBar UI (Both Modes)
