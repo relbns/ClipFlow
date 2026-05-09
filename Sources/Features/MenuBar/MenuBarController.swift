@@ -69,10 +69,28 @@ class MenuBarController {
             let keyEquiv = index < 9 ? "\(index + 1)" : ""
 
             let item = NSMenuItem(
-                title: title,
+                title: "",
                 action: #selector(pasteClip(_:)),
                 keyEquivalent: keyEquiv
             )
+
+            // Create attributed string with RTL support
+            let isRTL = clip.content.isRTL
+            let attributedTitle = NSMutableAttributedString(string: title)
+
+            if isRTL {
+                let paragraphStyle = NSMutableParagraphStyle()
+                paragraphStyle.alignment = .right
+                paragraphStyle.baseWritingDirection = .rightToLeft
+
+                attributedTitle.addAttribute(
+                    .paragraphStyle,
+                    value: paragraphStyle,
+                    range: NSRange(location: 0, length: attributedTitle.length)
+                )
+            }
+
+            item.attributedTitle = attributedTitle
             item.representedObject = clip
             menu.addItem(item)
         }
