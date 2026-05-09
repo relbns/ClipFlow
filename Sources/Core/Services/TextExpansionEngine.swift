@@ -20,7 +20,10 @@ actor TextExpansionEngine {
     }
 
     /// Find matching snippet in the typed buffer
-    func findMatch(in buffer: String, triggerChar: Character?) -> Match? {
+    func findMatch(in buffer: String, triggerChar: Character?) async -> Match? {
+        // Get frontmost app bundle ID
+        let frontmostApp = await getFrontmostAppBundleID()
+
         // Fetch all enabled snippets
         let request: NSFetchRequest<Snippet> = Snippet.fetchRequest()
         request.predicate = NSPredicate(format: "isEnabled == YES")
@@ -36,6 +39,14 @@ actor TextExpansionEngine {
             // Check if buffer ends with abbreviation
             guard buffer.hasSuffix(abbrev) else { continue }
 
+            // Check app-specific rules
+            if snippet.restrictToApps {
+                let allowedApps = snippet.appRules?.compactMap { $0.bundleIdentifier } ?? []
+                if !allowedApps.isEmpty && !allowedApps.contains(frontmostApp) {
+                    continue // Skip this snippet for current app
+                }
+            }
+
             // Check trigger character
             guard let trigger = triggerChar else { continue }
 
@@ -46,6 +57,14 @@ actor TextExpansionEngine {
         }
 
         return nil
+    }
+
+    @MainActor
+    private func getFrontmostAppBundleID() async -> String {
+        if let app = NSWorkspace.shared.frontmostApplication {
+            return app.bundleIdentifier ?? ""
+        }
+        return ""
     }
 
     /// Expand a matched snippet

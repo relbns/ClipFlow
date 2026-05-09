@@ -22,6 +22,10 @@ public class Snippet: NSManagedObject, Identifiable {
 
     // Relationships
     @NSManaged public var group: SnippetGroup?
+    @NSManaged public var appRules: Set<AppRule>?
+
+    // App-specific expansion
+    @NSManaged public var restrictToApps: Bool // If true, only expand in specified apps
 }
 
 extension Snippet {

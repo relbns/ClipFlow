@@ -274,12 +274,49 @@ struct SnippetDetailView: View {
                     Text("Delimiter (space, tab, punct)").tag("delimiter")
                     Text("Space only").tag("space")
                     Text("Any character").tag("any")
-                    Text("Tab only").tag("tab")
-                    Text("Enter only").tag("enter")
+                    Text("Tab only").tag("enter")
                 }
 
                 Toggle("Case sensitive", isOn: $snippet.caseSensitive)
                 Toggle("Play sound on expansion", isOn: $snippet.playSound)
+            }
+
+            Section("App-Specific Rules") {
+                Toggle("Restrict to specific apps", isOn: $snippet.restrictToApps)
+
+                if snippet.restrictToApps {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let rules = snippet.appRules, !rules.isEmpty {
+                            ForEach(Array(rules), id: \.id) { rule in
+                                HStack {
+                                    Image(systemName: "app.fill")
+                                        .foregroundColor(.blue)
+                                    Text(rule.appName)
+                                    Spacer()
+                                    Button(action: { removeAppRule(rule) }) {
+                                        Image(systemName: "minus.circle.fill")
+                                            .foregroundColor(.red)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        } else {
+                            Text("No apps selected. This snippet will not expand anywhere.")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+
+                        Button(action: addAppRule) {
+                            Label("Add App", systemImage: "plus.circle")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+
+                    Text("Snippet will only expand in selected applications")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             if snippet.useCount > 0 {
@@ -348,6 +385,42 @@ struct SnippetDetailView: View {
 
     private func deleteSnippet() {
         viewContext.delete(snippet)
+        try? viewContext.save()
+    }
+
+    private func addAppRule() {
+        // Open app picker
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+
+            // Get bundle identifier
+            if let bundle = Bundle(url: url) {
+                let bundleID = bundle.bundleIdentifier ?? url.lastPathComponent
+                let appName = bundle.object(forInfoDictionaryKey: "CFBundleName") as? String ?? url.deletingPathExtension().lastPathComponent
+
+                let rule = AppRule.create(in: viewContext, bundleID: bundleID, appName: appName)
+                rule.snippet = snippet
+
+                if snippet.appRules == nil {
+                    snippet.appRules = Set()
+                }
+                snippet.appRules?.insert(rule)
+
+                try? viewContext.save()
+            }
+        }
+    }
+
+    private func removeAppRule(_ rule: AppRule) {
+        snippet.appRules?.remove(rule)
+        viewContext.delete(rule)
         try? viewContext.save()
     }
 }
