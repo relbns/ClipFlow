@@ -117,8 +117,8 @@
 ### Localization
 - [x] #69 en.lproj/Localizable.strings
 - [x] #70 he.lproj/Localizable.strings
-- [ ] #71 All UI strings localized
-- [ ] #72 Settings for language preference
+- [ ] #71 All UI strings localized (strings ready, UI needs updates)
+- [x] #72 Settings for language preference
 
 ---
 
