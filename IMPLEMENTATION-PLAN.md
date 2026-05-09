@@ -94,13 +94,13 @@
 - [x] #55 Accessibility permission check + open System Settings
 
 ### MenuBar UI (Both Modes)
-- [ ] #56 Simple mode (flat list)
-- [ ] #57 Organized mode (folders)
-- [ ] #58 Search bar with instant filter
+- [x] #56 Simple mode (flat list)
+- [x] #57 Organized mode (folders)
+- [x] #58 Search bar with instant filter
 - [x] #59 RTL support for Hebrew items
-- [ ] #60 Image thumbnails
-- [ ] #61 Color code preview
-- [ ] #62 Keyboard shortcuts (1-9, 0)
+- [x] #60 Image thumbnails
+- [x] #61 Color code preview
+- [x] #62 Keyboard shortcuts (1-9, 0)
 
 ---
 
