@@ -21,7 +21,15 @@ let package = Package(
                 "KeyboardShortcuts",
                 "Sparkle"
             ],
-            path: "Sources"
+            path: "Sources",
+            exclude: [
+                "Resources/Info.plist"
+            ],
+            resources: [
+                .process("Resources/Assets.xcassets"),
+                .process("Resources/Localizations"),
+                .process("Core/Storage/ClipFlow.xcdatamodeld")
+            ]
         ),
         .testTarget(
             name: "ClipFlowTests",

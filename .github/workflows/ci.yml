@@ -16,13 +16,13 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Select Xcode
-      run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
     - name: Build
-      run: xcodebuild -scheme ClipFlow -destination 'platform=macOS' build
+      run: swift build -c release
 
     - name: Run tests
-      run: xcodebuild -scheme ClipFlow -destination 'platform=macOS' test
+      run: swift test
 
     - name: SwiftLint
       run: |
