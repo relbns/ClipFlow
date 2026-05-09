@@ -12,6 +12,7 @@
 "text_expansion" = "הרחבת טקסט";
 "hotkeys" = "קיצורי מקשים";
 "sync" = "סנכרון";
+"advanced" = "מתקדם";
 
 /* View modes */
 "simple_mode" = "תצוגה פשוטה (Flycut)";

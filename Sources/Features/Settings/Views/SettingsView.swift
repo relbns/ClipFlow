@@ -5,32 +5,32 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsView()
                 .tabItem {
-                    Label("General", systemImage: "gear")
+                    Label(L("general"), systemImage: "gear")
                 }
 
             AppearanceSettingsView()
                 .tabItem {
-                    Label("Appearance", systemImage: "paintbrush")
+                    Label(L("appearance"), systemImage: "paintbrush")
                 }
 
             TextExpansionSettingsView()
                 .tabItem {
-                    Label("Text Expansion", systemImage: "text.cursor")
+                    Label(L("text_expansion"), systemImage: "text.cursor")
                 }
 
             HotkeySettingsView()
                 .tabItem {
-                    Label("Hotkeys", systemImage: "command")
+                    Label(L("hotkeys"), systemImage: "command")
                 }
 
             SyncSettingsView()
                 .tabItem {
-                    Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                    Label(L("sync"), systemImage: "arrow.triangle.2.circlepath")
                 }
 
             AdvancedSettingsView()
                 .tabItem {
-                    Label("Advanced", systemImage: "gearshape.2")
+                    Label(L("advanced"), systemImage: "gearshape.2")
                 }
         }
         .frame(width: 550, height: 500)

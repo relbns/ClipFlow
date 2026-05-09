@@ -12,6 +12,7 @@
 "text_expansion" = "Text Expansion";
 "hotkeys" = "Hotkeys";
 "sync" = "Sync";
+"advanced" = "Advanced";
 
 /* View modes */
 "simple_mode" = "Simple (Flycut-style)";
