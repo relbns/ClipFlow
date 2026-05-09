@@ -127,6 +127,17 @@ class MenuBarController {
                 image?.size = NSSize(width: 32, height: 32)
                 item.image = image
             }
+            // Add color swatch for hex colors
+            else if showThumbnails, let color = extractHexColor(from: clip.content) {
+                let colorImage = NSImage(size: NSSize(width: 32, height: 32))
+                colorImage.lockFocus()
+                color.setFill()
+                NSBezierPath(roundedRect: NSRect(x: 4, y: 4, width: 24, height: 24), xRadius: 6, yRadius: 6).fill()
+                NSColor.black.withAlphaComponent(0.2).setStroke()
+                NSBezierPath(roundedRect: NSRect(x: 4, y: 4, width: 24, height: 24), xRadius: 6, yRadius: 6).stroke()
+                colorImage.unlockFocus()
+                item.image = colorImage
+            }
 
             menu.addItem(item)
         }
@@ -240,6 +251,17 @@ class MenuBarController {
             image?.size = NSSize(width: 24, height: 24)
             item.image = image
         }
+        // Add color swatch for hex colors
+        else if showThumbnails, let color = extractHexColor(from: clip.content) {
+            let colorImage = NSImage(size: NSSize(width: 24, height: 24))
+            colorImage.lockFocus()
+            color.setFill()
+            NSBezierPath(roundedRect: NSRect(x: 2, y: 2, width: 20, height: 20), xRadius: 4, yRadius: 4).fill()
+            NSColor.black.withAlphaComponent(0.2).setStroke()
+            NSBezierPath(roundedRect: NSRect(x: 2, y: 2, width: 20, height: 20), xRadius: 4, yRadius: 4).stroke()
+            colorImage.unlockFocus()
+            item.image = colorImage
+        }
 
         return item
     }
@@ -250,6 +272,36 @@ class MenuBarController {
         case "url": return "🔗"
         default: return "📝"
         }
+    }
+
+    private func extractHexColor(from text: String) -> NSColor? {
+        // Match #RGB, #RGBA, #RRGGBB, #RRGGBBAA
+        let pattern = #"#([0-9A-Fa-f]{3,8})\b"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+
+        let range = NSRange(text.startIndex..., in: text)
+        guard let match = regex.firstMatch(in: text, range: range) else { return nil }
+
+        let hexString = (text as NSString).substring(with: match.range(at: 1))
+
+        // Convert hex to color
+        var hex = hexString
+        if hex.count == 3 {
+            // RGB -> RRGGBB
+            hex = String(hex.map { "\($0)\($0)" }.joined())
+        }
+
+        guard hex.count == 6 || hex.count == 8 else { return nil }
+
+        var rgb: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&rgb)
+
+        let r = CGFloat((rgb >> 16) & 0xFF) / 255.0
+        let g = CGFloat((rgb >> 8) & 0xFF) / 255.0
+        let b = CGFloat(rgb & 0xFF) / 255.0
+        let a = hex.count == 8 ? CGFloat((rgb >> 24) & 0xFF) / 255.0 : 1.0
+
+        return NSColor(red: r, green: g, blue: b, alpha: a)
     }
 
     @objc private func pasteClip(_ sender: NSMenuItem) {
