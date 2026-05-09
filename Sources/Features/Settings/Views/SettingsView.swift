@@ -17,8 +17,23 @@ struct SettingsView: View {
                 .tabItem {
                     Label("Text Expansion", systemImage: "text.cursor")
                 }
+
+            HotkeySettingsView()
+                .tabItem {
+                    Label("Hotkeys", systemImage: "command")
+                }
+
+            SyncSettingsView()
+                .tabItem {
+                    Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                }
+
+            AdvancedSettingsView()
+                .tabItem {
+                    Label("Advanced", systemImage: "gearshape.2")
+                }
         }
-        .frame(width: 550, height: 450)
+        .frame(width: 550, height: 500)
     }
 }
 
