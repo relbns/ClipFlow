@@ -14,34 +14,34 @@
 
 ### Setup & Architecture
 - [x] #1 Create new repo: `gh repo create relbns/ClipFlow --public`
-- [ ] #2 Setup GitHub labels (type, priority, effort, phase, component)
-- [ ] #3 Create 3 project boards: MVP, Phase 2, Backlog
-- [ ] #4 Setup .claude/ folder: commands, skills, hooks, settings.json
-- [ ] #5 Write core documentation files
-- [ ] #6 Create Xcode project with SPM (Swift 6.0, macOS 14+)
-- [ ] #7 Setup .github/workflows: ci.yml (build + test)
+- [x] #2 Setup GitHub labels (type, priority, effort, phase, component)
+- [ ] #3 Create 3 project boards: MVP, Phase 2, Backlog (needs auth)
+- [x] #4 Setup .claude/ folder: commands, skills, hooks, settings.json
+- [x] #5 Write core documentation files (CLAUDE.md, README, CREDITS)
+- [x] #6 Create Xcode project with SPM (Swift 6.0, macOS 14+)
+- [x] #7 Setup .github/workflows: ci.yml (build + test)
 - [ ] #8 Add SwiftLint configuration
 
 ### Core Data Models
-- [ ] #9 Create Core Data model: ClipItem, Snippet, SnippetGroup, Variable
-- [ ] #10 Implement CoreDataStack with migrations
-- [ ] #11 Create Snippet model with abbreviation, trigger, variables
-- [ ] #12 Create SnippetGroup model with sync metadata
+- [x] #9 Create Core Data model: ClipItem, Snippet, SnippetGroup
+- [x] #10 Implement CoreDataStack with migrations
+- [x] #11 Create Snippet model with abbreviation, trigger
+- [x] #12 Create SnippetGroup model with sync metadata
 - [ ] #13 Create Variable model (date, time, clipboard, custom)
 - [ ] #14 Add Statistics model (use count, last used)
 
 ### Core Services (Phase 1)
-- [ ] #15 ClipboardMonitor.swift (Combine-based, NSPasteboard)
-- [ ] #16 PasteEngine.swift (async/await, Cmd+V simulation)
+- [x] #15 ClipboardMonitor.swift (Combine-based, NSPasteboard)
+- [x] #16 PasteEngine.swift (async/await, Cmd+V simulation)
 - [ ] #17 HotkeyManager.swift (KeyboardShortcuts framework)
 - [ ] #18 AppContextMonitor.swift (NSWorkspace, frontmost app)
 
 ### Basic UI (AppKit/SwiftUI Hybrid)
-- [ ] #19 ClipFlowApp.swift (@main, SwiftUI entry)
-- [ ] #20 AppDelegate.swift (MenuBar setup, status item)
+- [x] #19 ClipFlowApp.swift (@main, SwiftUI entry)
+- [x] #20 AppDelegate.swift (MenuBar setup, status item)
 - [ ] #21 MenuBarController.swift (menu building, AppKit bridge)
 - [ ] #22 Basic clipboard menu (text items only)
-- [ ] #23 Settings window skeleton (SwiftUI tabs)
+- [x] #23 Settings window skeleton (SwiftUI tabs)
 
 ---
 
