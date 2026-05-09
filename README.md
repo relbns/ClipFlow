@@ -1,13 +1,23 @@
 # ClipFlow
 
-> Modern Clipboard Manager + Text Expander for macOS
+<div align="center">
 
-ClipFlow combines powerful clipboard history management with real-time text expansion, supporting variables, Hebrew RTL, and cloud sync.
+<img src="docs/assets/icon-rounded.png" width="128" height="128" alt="ClipFlow Icon" />
+
+### Modern Clipboard Manager + Text Expander for macOS
+
+*Powerful clipboard history • Real-time text expansion • Hebrew RTL support • Cloud sync*
 
 [![CI](https://github.com/relbns/ClipFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/relbns/ClipFlow/actions)
-[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
-[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue.svg)](https://www.apple.com/macos/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Swift Version](https://img.shields.io/badge/Swift-6.0-orange.svg?logo=swift)](https://swift.org)
+[![Platform](https://img.shields.io/badge/macOS-14.0%2B-blue.svg?logo=apple)](https://www.apple.com/macos/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Made with Claude](https://img.shields.io/badge/Made%20with-Claude%20Code-blueviolet.svg)](https://claude.ai/code)
+
+[Features](#-features) • [Installation](#-getting-started) • [Usage](#-usage-examples) • [Development](#️-development) • [Credits](#-credits)
+
+</div>
 
 ---
 
@@ -326,26 +336,47 @@ swift package clean
 
 ---
 
-## 🙏 Credits
+## 🙏 Credits & Inspiration
 
-ClipFlow is built on the foundation of [Clipy](https://github.com/Clipy/Clipy) by [@econa77](https://github.com/econa77).
+ClipFlow builds upon the excellent work of the macOS clipboard manager community.
 
-**What we kept from Clipy:**
-- Clipboard monitoring architecture (ClipService concept)
-- Snippet data models (enhanced with text expansion)
-- Menu bar UI patterns
+### Primary Foundation
+- **[Clipy](https://github.com/Clipy/Clipy)** by [@econa77](https://github.com/econa77) - Core clipboard monitoring architecture
+  - ClipService concept and NSPasteboard polling
+  - Snippet data model structure
+  - Menu bar UI patterns and keyboard shortcuts
 
-**What's new in ClipFlow:**
-- Real-time text expansion engine
-- Modern SwiftUI interface
-- Hebrew RTL support
-- Cloud sync (iCloud, JSON export)
-- TextExpander-compatible variables
-- Swift 6.0 & macOS 14+ native
-- Custom variables with prompts
-- App-specific expansion rules
+### Inspiration
+- **[Flycut](https://github.com/TermiT/Flycut)** - Simple, keyboard-driven interface design
+  - Minimalist UI approach
+  - Numbered menu items (1-9, 0)
+  - Focus on speed and efficiency
 
-See [CREDITS.md](CREDITS.md) for full attribution.
+- **[TextExpander](https://textexpander.com/)** - Text expansion mechanics
+  - Variable syntax and processing
+  - Trigger character detection
+  - Fill-in field concept
+
+### What ClipFlow Adds
+- ✨ Real-time text expansion engine with CGEventTap
+- 🎨 Modern SwiftUI + AppKit hybrid interface
+- 🇮🇱 Full Hebrew RTL support (first clipboard manager with this!)
+- ☁️ iCloud sync and cross-device snippet sharing
+- 🔤 TextExpander-compatible variable system
+- 🎯 App-specific expansion rules
+- 💬 Custom variables with runtime prompts
+- 🌈 Color code preview and hex swatch rendering
+- 📦 JSON/XML export with conflict resolution
+- ⚡ Swift 6.0 strict concurrency and macOS 14+ native
+
+### Contributors
+This project was developed with [Claude Code](https://claude.ai/code), Anthropic's AI-powered development assistant.
+
+### Open Source Dependencies
+- [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) by [@sindresorhus](https://github.com/sindresorhus) - Global hotkey management
+- [Sparkle](https://github.com/sparkle-project/Sparkle) - App update framework
+
+See [CREDITS.md](CREDITS.md) for full attribution and licensing details.
 
 ---
 
