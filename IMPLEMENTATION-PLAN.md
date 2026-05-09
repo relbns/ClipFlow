@@ -60,14 +60,14 @@
 - [x] #31 Date formatting ({date:yyyy-MM-dd}, {date:hebrew})
 - [x] #32 Time formatting ({time:HH:mm})
 - [x] #33 Clipboard variable ({clipboard})
-- [ ] #34 Cursor positioning ({cursor})
+- [x] #34 Cursor positioning ({cursor})
 - [ ] #35 Custom variables with prompts
 - [ ] #36 Fill-in fields dialog (NSAlert with text fields)
 
 ### App-Specific Rules
-- [ ] #37 App rule system (bundle ID matching)
-- [ ] #38 UI for selecting apps in snippet editor
-- [ ] #39 Filter expansion based on frontmost app
+- [x] #37 App rule system (bundle ID matching)
+- [x] #38 UI for selecting apps in snippet editor
+- [x] #39 Filter expansion based on frontmost app
 
 ---
 
