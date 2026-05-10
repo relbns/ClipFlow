@@ -1,34 +1,16 @@
 import AppKit
 import Combine
-import CoreData
 
 /// Monitors the system clipboard for changes
 @MainActor
 class ClipboardMonitor: ObservableObject {
-    @Published var clipHistory: [ClipItem] = []
+    @Published var clipHistory: [SimpleClipItem] = []
 
     private var timer: Timer?
     private var lastChangeCount: Int = 0
     private let pasteboard = NSPasteboard.general
     private var cancellables = Set<AnyCancellable>()
     private let maxHistorySize = 30
-    private var inMemoryContext: NSManagedObjectContext?
-
-    init() {
-        // Create in-memory context that works even if persistent store fails
-        let container = NSPersistentContainer(name: "ClipFlow")
-        let description = NSPersistentStoreDescription()
-        description.type = NSInMemoryStoreType
-        container.persistentStoreDescriptions = [description]
-
-        container.loadPersistentStores { _, error in
-            if let error = error {
-                print("⚠️ In-memory store failed: \(error)")
-            }
-        }
-
-        inMemoryContext = container.viewContext
-    }
 
     func startMonitoring() {
         lastChangeCount = pasteboard.changeCount
@@ -62,11 +44,6 @@ class ClipboardMonitor: ObservableObject {
     }
 
     private func handleNewClip(content: String, type: ClipType, imageData: Data? = nil) async {
-        guard let context = inMemoryContext else {
-            print("⚠️ No context available for clip storage")
-            return
-        }
-
         print("📋 New clip detected: \(content.prefix(50))")
 
         // Check for duplicates
@@ -77,14 +54,11 @@ class ClipboardMonitor: ObservableObject {
         }
 
         // Create new clip item
-        let clipItem = ClipItem(context: context)
-        clipItem.id = UUID()
-        clipItem.content = content
-        clipItem.type = type.rawValue
-        clipItem.createdAt = Date()
-        clipItem.dataHash = contentHash
-        clipItem.isPinned = false
-        clipItem.imageData = imageData
+        let clipItem = SimpleClipItem(
+            content: content,
+            type: type,
+            imageData: imageData
+        )
 
         // Add to history (newest first)
         clipHistory.insert(clipItem, at: 0)

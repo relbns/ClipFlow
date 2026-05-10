@@ -93,7 +93,7 @@ class MenuBarController {
         // Menu will be rebuilt on next open
     }
 
-    private var filteredClips: [ClipItem] {
+    private var filteredClips: [SimpleClipItem] {
         let clips = clipboardMonitor.clipHistory
 
         if searchText.isEmpty {
@@ -191,9 +191,9 @@ class MenuBarController {
         }
 
         // Group by type
-        var textClips: [ClipItem] = []
-        var imageClips: [ClipItem] = []
-        var urlClips: [ClipItem] = []
+        var textClips: [SimpleClipItem] = []
+        var imageClips: [SimpleClipItem] = []
+        var urlClips: [SimpleClipItem] = []
 
         for clip in clips {
             if clip.type == "image" {
@@ -252,7 +252,7 @@ class MenuBarController {
         }
     }
 
-    private func createMenuItem(for clip: ClipItem, index: Int) -> NSMenuItem {
+    private func createMenuItem(for clip: SimpleClipItem, index: Int) -> NSMenuItem {
         let titleText = clip.content.prefix(Int(maxTitleLength)).trimmingCharacters(in: .whitespacesAndNewlines)
         let keyEquiv = menuItemsNumbered && index < 9 ? "\(index + 1)" : (index == 9 ? "0" : "")
 
@@ -342,7 +342,7 @@ class MenuBarController {
     }
 
     @objc private func pasteClip(_ sender: NSMenuItem) {
-        guard let clip = sender.representedObject as? ClipItem else { return }
+        guard let clip = sender.representedObject as? SimpleClipItem else { return }
 
         Task {
             let pasteEngine = PasteEngine()
