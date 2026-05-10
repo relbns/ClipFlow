@@ -67,6 +67,11 @@
 "build" = "בנייה";
 "view_on_github" = "צפה ב-GitHub";
 
+/* About Window */
+"credits" = "קרדיטים";
+"full_credits" = "קרדיטים מלאים";
+"about_clipflow" = "אודות ClipFlow";
+
 /* Snippet Editor */
 "snippets" = "קטעי טקסט";
 "new_group" = "קבוצה חדשה";

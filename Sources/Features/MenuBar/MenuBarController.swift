@@ -59,6 +59,14 @@ class MenuBarController {
         preferencesItem.target = self
         menu.addItem(preferencesItem)
 
+        let aboutItem = NSMenuItem(
+            title: L("about_clipflow"),
+            action: #selector(openAbout),
+            keyEquivalent: ""
+        )
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let clearHistoryItem = NSMenuItem(
@@ -345,6 +353,17 @@ class MenuBarController {
         if let appDelegate = appDelegate {
             print("✅ Got AppDelegate, calling openSnippetEditor()")
             appDelegate.openSnippetEditor()
+        } else {
+            print("❌ AppDelegate is nil")
+        }
+    }
+
+    @objc func openAbout() {
+        print("ℹ️ Open about called")
+        // Forward to AppDelegate
+        if let appDelegate = appDelegate {
+            print("✅ Got AppDelegate, calling openAbout()")
+            appDelegate.openAbout()
         } else {
             print("❌ AppDelegate is nil")
         }

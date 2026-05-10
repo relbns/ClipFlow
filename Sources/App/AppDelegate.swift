@@ -10,6 +10,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var appContextMonitor: AppContextMonitor?
     private var snippetEditorWindow: NSWindow?
     private var settingsWindow: NSWindow?
+    private var aboutWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize services
@@ -131,5 +132,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         snippetEditorWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         print("✅ Editor window should be visible now")
+    }
+
+    @objc func openAbout() {
+        print("ℹ️ AppDelegate.openAbout() called")
+        if aboutWindow == nil {
+            print("📝 Creating new about window")
+            let aboutView = AboutView()
+            let hostingController = NSHostingController(rootView: aboutView)
+
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = L("about_clipflow")
+            window.setContentSize(NSSize(width: 480, height: 600))
+            window.styleMask = [.titled, .closable]
+            window.center()
+
+            aboutWindow = window
+            print("✅ About window created")
+        } else {
+            print("♻️ Reusing existing about window")
+        }
+
+        aboutWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        print("✅ About window should be visible now")
     }
 }

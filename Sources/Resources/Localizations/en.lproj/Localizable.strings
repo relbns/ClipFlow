@@ -67,6 +67,11 @@
 "build" = "Build";
 "view_on_github" = "View on GitHub";
 
+/* About Window */
+"credits" = "Credits";
+"full_credits" = "Full Credits";
+"about_clipflow" = "About ClipFlow";
+
 /* Snippet Editor */
 "snippets" = "Snippets";
 "new_group" = "New Group";
