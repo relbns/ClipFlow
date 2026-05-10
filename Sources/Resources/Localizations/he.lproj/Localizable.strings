@@ -17,6 +17,15 @@
 /* View modes */
 "simple_mode" = "תצוגה פשוטה (Flycut)";
 "organized_mode" = "תצוגה מאורגנת (תיקיות)";
+"menu_style" = "סגנון תפריט";
+"view_mode" = "מצב תצוגה:";
+"view_mode_description" = "בחר בין רשימה שטוחה פשוטה או תיקיות מאורגנות";
+"menu_items" = "פריטי תפריט";
+"show_icons" = "הצג אייקונים";
+"show_thumbnails" = "הצג תמונות ממוזערות לתמונות";
+"number_menu_items" = "מספר פריטי תפריט (1-9, 0)";
+"max_title_length" = "אורך כותרת מקסימלי";
+"characters" = "תווים";
 
 /* Expansion */
 "text_expansion_enabled" = "הפעל הרחבת טקסט";
@@ -39,6 +48,24 @@
 "enabled" = "מופעל";
 "duplicate" = "שכפל";
 "more" = "עוד";
+
+/* General Settings */
+"app_tagline" = "מנהל לוח מודרני + מרחיב טקסט";
+"language" = "שפה";
+"interface_language" = "שפת ממשק:";
+"system_default" = "ברירת מחדל של המערכת";
+"english" = "English (אנגלית)";
+"hebrew" = "עברית";
+"restart_required" = "נדרש הפעלה מחדש כדי להחיל שינויי שפה";
+"maximum_items" = "מקסימום פריטים:";
+"remove_duplicates" = "הסר כפילויות אוטומטית";
+"move_used_to_top" = "העבר פריטים בשימוש לראש";
+"startup" = "הפעלה";
+"launch_at_login" = "הפעל בהתחברות";
+"start_monitoring" = "התחל ניטור בהפעלה";
+"about" = "אודות";
+"build" = "בנייה";
+"view_on_github" = "צפה ב-GitHub";
 
 /* Snippet Editor */
 "snippets" = "קטעי טקסט";

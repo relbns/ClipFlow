@@ -47,25 +47,25 @@ struct GeneralSettingsView: View {
             Section {
                 Text("ClipFlow")
                     .font(.largeTitle)
-                Text("Modern Clipboard Manager + Text Expander")
+                Text(L("app_tagline"))
                     .foregroundColor(.secondary)
             }
 
-            Section("Language") {
-                Picker("Interface Language:", selection: $preferredLanguage) {
-                    Text("System Default").tag("system")
-                    Text("English").tag("en")
-                    Text("עברית (Hebrew)").tag("he")
+            Section(L("language")) {
+                Picker(L("interface_language"), selection: $preferredLanguage) {
+                    Text(L("system_default")).tag("system")
+                    Text(L("english")).tag("en")
+                    Text(L("hebrew")).tag("he")
                 }
 
-                Text("Restart required to apply language changes")
+                Text(L("restart_required"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            Section("Clipboard History") {
+            Section(L("clipboard_history")) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Maximum items:")
+                    Text(L("maximum_items"))
 
                     HStack {
                         Slider(value: $maxHistoryItems, in: 10...100, step: 5)
@@ -74,19 +74,19 @@ struct GeneralSettingsView: View {
                     }
                 }
 
-                Toggle("Remove duplicates automatically", isOn: .constant(true))
-                Toggle("Move used items to top", isOn: .constant(true))
+                Toggle(L("remove_duplicates"), isOn: .constant(true))
+                Toggle(L("move_used_to_top"), isOn: .constant(true))
             }
 
-            Section("Startup") {
-                Toggle("Launch at login", isOn: $launchAtLogin)
-                Toggle("Start monitoring on launch", isOn: .constant(true))
+            Section(L("startup")) {
+                Toggle(L("launch_at_login"), isOn: $launchAtLogin)
+                Toggle(L("start_monitoring"), isOn: .constant(true))
             }
 
-            Section("About") {
-                LabeledContent("Version", value: "1.0.0 (1)")
-                LabeledContent("Build", value: "Alpha")
-                Button("View on GitHub") {
+            Section(L("about")) {
+                LabeledContent(L("version"), value: "1.0.0 (1)")
+                LabeledContent(L("build"), value: "Alpha")
+                Button(L("view_on_github")) {
                     if let url = URL(string: "https://github.com/relbns/ClipFlow") {
                         NSWorkspace.shared.open(url)
                     }

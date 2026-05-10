@@ -17,6 +17,15 @@
 /* View modes */
 "simple_mode" = "Simple (Flycut-style)";
 "organized_mode" = "Organized (Folders)";
+"menu_style" = "Menu Style";
+"view_mode" = "View Mode:";
+"view_mode_description" = "Choose between a simple flat list or organized folders";
+"menu_items" = "Menu Items";
+"show_icons" = "Show icons";
+"show_thumbnails" = "Show thumbnails for images";
+"number_menu_items" = "Number menu items (1-9, 0)";
+"max_title_length" = "Max title length";
+"characters" = "characters";
 
 /* Expansion */
 "text_expansion_enabled" = "Enable text expansion";
@@ -39,6 +48,24 @@
 "enabled" = "Enabled";
 "duplicate" = "Duplicate";
 "more" = "More";
+
+/* General Settings */
+"app_tagline" = "Modern Clipboard Manager + Text Expander";
+"language" = "Language";
+"interface_language" = "Interface Language:";
+"system_default" = "System Default";
+"english" = "English";
+"hebrew" = "עברית (Hebrew)";
+"restart_required" = "Restart required to apply language changes";
+"maximum_items" = "Maximum items:";
+"remove_duplicates" = "Remove duplicates automatically";
+"move_used_to_top" = "Move used items to top";
+"startup" = "Startup";
+"launch_at_login" = "Launch at login";
+"start_monitoring" = "Start monitoring on launch";
+"about" = "About";
+"build" = "Build";
+"view_on_github" = "View on GitHub";
 
 /* Snippet Editor */
 "snippets" = "Snippets";

@@ -9,25 +9,25 @@ struct AppearanceSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Menu Style") {
-                Picker("View Mode:", selection: $viewMode) {
-                    Text("Simple (Flycut-style)").tag("simple")
-                    Text("Organized (Folders)").tag("organized")
+            Section(L("menu_style")) {
+                Picker(L("view_mode"), selection: $viewMode) {
+                    Text(L("simple_mode")).tag("simple")
+                    Text(L("organized_mode")).tag("organized")
                 }
                 .pickerStyle(.radioGroup)
 
-                Text("Choose between a simple flat list or organized folders")
+                Text(L("view_mode_description"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            Section("Menu Items") {
-                Toggle("Show icons", isOn: $showIcons)
-                Toggle("Show thumbnails for images", isOn: $showThumbnails)
-                Toggle("Number menu items (1-9, 0)", isOn: $menuItemsNumbered)
+            Section(L("menu_items")) {
+                Toggle(L("show_icons"), isOn: $showIcons)
+                Toggle(L("show_thumbnails"), isOn: $showThumbnails)
+                Toggle(L("number_menu_items"), isOn: $menuItemsNumbered)
 
                 VStack(alignment: .leading) {
-                    Text("Max title length: \(Int(maxTitleLength)) characters")
+                    Text("\(L("max_title_length")): \(Int(maxTitleLength)) \(L("characters"))")
                         .font(.caption)
 
                     Slider(value: $maxTitleLength, in: 20...100, step: 5)
