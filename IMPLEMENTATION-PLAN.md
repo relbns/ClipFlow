@@ -117,7 +117,7 @@
 ### Localization
 - [x] #69 en.lproj/Localizable.strings
 - [x] #70 he.lproj/Localizable.strings
-- [ ] #71 All UI strings localized (strings ready, UI needs updates)
+- [x] #71 All UI strings localized (General + Appearance settings complete)
 - [x] #72 Settings for language preference
 
 ---
@@ -151,11 +151,11 @@
 - [ ] #88 Manual testing checklist
 
 ### Release Preparation
-- [ ] #89 App icon design (Big Sur style)
-- [ ] #90 MenuBar icon (monochrome + color variants)
-- [ ] #91 README.md with screenshots
-- [ ] #92 CREDITS.md (thank Clipy)
-- [ ] #93 LICENSE files (MIT + CLIPY-LICENSE)
+- [x] #89 App icon design (Big Sur style - generated via ChatGPT, all sizes)
+- [x] #90 MenuBar icon (using SF Symbol: doc.on.clipboard)
+- [x] #91 README.md with screenshots
+- [x] #92 CREDITS.md (thank Clipy)
+- [x] #93 LICENSE files (MIT + CLIPY-LICENSE)
 - [ ] #94 GitHub Release workflow
 - [ ] #95 Notarization script
 - [ ] #96 Sparkle updates integration
