@@ -46,7 +46,7 @@ struct AboutView: View {
                 // Created By
                 creditRow(
                     icon: "person.circle.fill",
-                    title: "Ben Eshel",
+                    title: "Ariel Benesh",
                     description: "Creator & Developer",
                     link: "https://github.com/relbns"
                 )
@@ -71,20 +71,6 @@ struct AboutView: View {
                     title: "Flycut",
                     description: "UI/UX inspiration",
                     link: "https://github.com/TermiT/Flycut"
-                )
-
-                creditRow(
-                    icon: "text.cursor",
-                    title: "TextExpander",
-                    description: "Text expansion concept",
-                    link: "https://textexpander.com"
-                )
-
-                creditRow(
-                    icon: "cpu",
-                    title: "Claude Code",
-                    description: "AI-powered development",
-                    link: "https://claude.ai/code"
                 )
             }
             .padding(.horizontal, 30)
