@@ -18,7 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create menu bar controller
         if let monitor = clipboardMonitor {
-            menuBarController = MenuBarController(clipboardMonitor: monitor)
+            menuBarController = MenuBarController(clipboardMonitor: monitor, appDelegate: self)
         }
 
         // Setup hotkeys
@@ -84,7 +84,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openPreferences() {
+        print("🔧 AppDelegate.openPreferences() called")
         if settingsWindow == nil {
+            print("📝 Creating new settings window")
             let settingsView = SettingsView()
             let hostingController = NSHostingController(rootView: settingsView)
 
@@ -95,14 +97,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.center()
 
             settingsWindow = window
+            print("✅ Settings window created")
+        } else {
+            print("♻️ Reusing existing settings window")
         }
 
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        print("✅ Settings window should be visible now")
     }
 
     @objc func openSnippetEditor() {
+        print("📋 AppDelegate.openSnippetEditor() called")
         if snippetEditorWindow == nil {
+            print("📝 Creating new editor window")
             let editorView = SnippetEditorView()
                 .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
 
@@ -115,9 +123,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.center()
 
             snippetEditorWindow = window
+            print("✅ Editor window created")
+        } else {
+            print("♻️ Reusing existing editor window")
         }
 
         snippetEditorWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        print("✅ Editor window should be visible now")
     }
 }

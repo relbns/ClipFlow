@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 class MenuBarController {
     private let clipboardMonitor: ClipboardMonitor
+    private weak var appDelegate: AppDelegate?
 
     // Settings from AppStorage
     @AppStorage("viewMode") private var viewMode = "organized"
@@ -13,8 +14,9 @@ class MenuBarController {
     @AppStorage("menuItemsNumbered") private var menuItemsNumbered = true
     @AppStorage("maxTitleLength") private var maxTitleLength = 50.0
 
-    init(clipboardMonitor: ClipboardMonitor) {
+    init(clipboardMonitor: ClipboardMonitor, appDelegate: AppDelegate) {
         self.clipboardMonitor = clipboardMonitor
+        self.appDelegate = appDelegate
     }
 
     func buildMainMenu() -> NSMenu {
@@ -321,21 +323,30 @@ class MenuBarController {
         }
     }
 
-    @objc private func clearHistory() {
+    @objc func clearHistory() {
+        print("🗑️ Clear history called")
         clipboardMonitor.clearHistory()
     }
 
-    @objc private func openPreferences() {
+    @objc func openPreferences() {
+        print("⚙️ Open preferences called")
         // Forward to AppDelegate
-        if let appDelegate = NSApp.delegate as? AppDelegate {
+        if let appDelegate = appDelegate {
+            print("✅ Got AppDelegate, calling openPreferences()")
             appDelegate.openPreferences()
+        } else {
+            print("❌ AppDelegate is nil")
         }
     }
 
-    @objc private func openSnippetEditor() {
+    @objc func openSnippetEditor() {
+        print("📝 Open snippet editor called")
         // Forward to AppDelegate
-        if let appDelegate = NSApp.delegate as? AppDelegate {
+        if let appDelegate = appDelegate {
+            print("✅ Got AppDelegate, calling openSnippetEditor()")
             appDelegate.openSnippetEditor()
+        } else {
+            print("❌ AppDelegate is nil")
         }
     }
 }
