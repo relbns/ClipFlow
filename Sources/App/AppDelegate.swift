@@ -53,7 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.showMenu()
                 }
             },
-            onSnippetsMenu: { [weak self] in
+            onSnippetsMenu: {
                 print("📋 Snippets menu")
             },
             onSnippetEditor: { [weak self] in

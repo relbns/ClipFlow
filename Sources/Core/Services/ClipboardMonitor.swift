@@ -16,8 +16,9 @@ class ClipboardMonitor: ObservableObject {
 
         // Poll every 750 microseconds (0.00075 seconds)
         timer = Timer.scheduledTimer(withTimeInterval: 0.00075, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                await self?.checkClipboard()
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                await self.checkClipboard()
             }
         }
     }

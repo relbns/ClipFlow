@@ -22,8 +22,9 @@ class iCloudSyncService: ObservableObject {
         guard syncTimer == nil else { return }
 
         syncTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                await self?.sync()
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                await self.sync()
             }
         }
 

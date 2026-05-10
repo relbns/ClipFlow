@@ -20,8 +20,9 @@ class AppContextMonitor: ObservableObject {
     func startMonitoring() {
         // Monitor active app changes
         observation = NSWorkspace.shared.observe(\.frontmostApplication, options: [.new]) { [weak self] workspace, change in
-            Task { @MainActor in
-                self?.updateCurrentApp()
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.updateCurrentApp()
             }
         }
 
