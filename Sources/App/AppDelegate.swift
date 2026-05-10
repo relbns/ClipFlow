@@ -88,7 +88,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("🔧 AppDelegate.openPreferences() called")
         if settingsWindow == nil {
             print("📝 Creating new settings window")
+            let languageManager = LanguageManager.shared
             let settingsView = SettingsView()
+                .environment(\.layoutDirection, languageManager.layoutDirection)
+                .environmentObject(languageManager)
+
             let hostingController = NSHostingController(rootView: settingsView)
 
             let window = NSWindow(contentViewController: hostingController)
@@ -112,8 +116,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("📋 AppDelegate.openSnippetEditor() called")
         if snippetEditorWindow == nil {
             print("📝 Creating new editor window")
+            let languageManager = LanguageManager.shared
             let editorView = SnippetEditorView()
                 .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
+                .environment(\.layoutDirection, languageManager.layoutDirection)
+                .environmentObject(languageManager)
 
             let hostingController = NSHostingController(rootView: editorView)
 
@@ -138,7 +145,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("ℹ️ AppDelegate.openAbout() called")
         if aboutWindow == nil {
             print("📝 Creating new about window")
+            let languageManager = LanguageManager.shared
             let aboutView = AboutView()
+                .environment(\.layoutDirection, languageManager.layoutDirection)
+                .environmentObject(languageManager)
+
             let hostingController = NSHostingController(rootView: aboutView)
 
             let window = NSWindow(contentViewController: hostingController)

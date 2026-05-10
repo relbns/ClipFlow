@@ -1,22 +1,32 @@
 import Foundation
 
 /// Helper for localized strings
+@MainActor
 func L(_ key: String) -> String {
-    // Try Bundle.main first (Xcode), then Bundle.module (SPM)
-    let bundles = [Bundle.main, Bundle.module]
+    let languageManager = LanguageManager.shared
+    let bundle = languageManager.bundle
 
-    for bundle in bundles {
-        let localized = NSLocalizedString(key, bundle: bundle, comment: "")
-        // If we got a translation (not the key itself), return it
-        if localized != key {
-            return localized
+    let localized = NSLocalizedString(key, bundle: bundle, comment: "")
+
+    // If we got a translation (not the key itself), return it
+    if localized != key {
+        return localized
+    }
+
+    // Fallback: try other bundles
+    let fallbackBundles = [Bundle.main, Bundle.module]
+    for fallbackBundle in fallbackBundles {
+        let fallbackLocalized = NSLocalizedString(key, bundle: fallbackBundle, comment: "")
+        if fallbackLocalized != key {
+            return fallbackLocalized
         }
     }
 
-    // Fallback: return the key itself
+    // Last resort: return the key itself
     return key
 }
 
+@MainActor
 func L(_ key: String, _ args: CVarArg...) -> String {
     let format = L(key)
     return String(format: format, arguments: args)

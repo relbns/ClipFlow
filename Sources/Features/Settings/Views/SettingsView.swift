@@ -38,6 +38,7 @@ struct SettingsView: View {
 }
 
 struct GeneralSettingsView: View {
+    @EnvironmentObject private var languageManager: LanguageManager
     @AppStorage("preferredLanguage") private var preferredLanguage = "system"
     @AppStorage("launchAtLogin") private var launchAtLogin = false
     @AppStorage("maxHistoryItems") private var maxHistoryItems = 30.0
@@ -57,10 +58,19 @@ struct GeneralSettingsView: View {
                     Text(L("english")).tag("en")
                     Text(L("hebrew")).tag("he")
                 }
+                .onChange(of: preferredLanguage) { _, newValue in
+                    languageManager.setLanguage(newValue)
+                }
 
-                Text(L("restart_required"))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if languageManager.currentLanguage.hasPrefix("he") {
+                    Text("✅ השפה שונתה לעברית - כל הטקסטים צריכים להיות בעברית עכשיו")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                } else {
+                    Text(L("restart_required"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Section(L("clipboard_history")) {
