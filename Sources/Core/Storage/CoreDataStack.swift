@@ -1,10 +1,20 @@
 import CoreData
+import Foundation
 
 class CoreDataStack {
     static let shared = CoreDataStack()
 
     lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: "ClipFlow")
+        // Find the model file in the bundle
+        guard let modelURL = Bundle.main.url(forResource: "ClipFlow", withExtension: "momd") else {
+            fatalError("Unable to find ClipFlow.momd in bundle")
+        }
+
+        guard let managedObjectModel = NSManagedObjectModel(contentsOf: modelURL) else {
+            fatalError("Unable to load model from \(modelURL)")
+        }
+
+        let container = NSPersistentContainer(name: "ClipFlow", managedObjectModel: managedObjectModel)
 
         container.loadPersistentStores { description, error in
             if let error = error {
