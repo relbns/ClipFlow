@@ -1,7 +1,17 @@
 import SwiftUI
 import CoreData
 
+/// Public wrapper that checks Core Data availability
 struct SnippetEditorView: View {
+    var body: some View {
+        CoreDataAvailabilityWrapper {
+            SnippetEditorContentView()
+        }
+    }
+}
+
+/// Internal view with Core Data dependencies
+private struct SnippetEditorContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
     @FetchRequest(
@@ -124,7 +134,7 @@ struct SnippetEditorView: View {
     }
 }
 
-struct SnippetRow: View {
+private struct SnippetRow: View {
     @ObservedObject var snippet: Snippet
 
     var body: some View {
@@ -152,7 +162,7 @@ struct SnippetRow: View {
     }
 }
 
-struct SnippetDetailView: View {
+private struct SnippetDetailView: View {
     @ObservedObject var snippet: Snippet
     @Environment(\.managedObjectContext) private var viewContext
 

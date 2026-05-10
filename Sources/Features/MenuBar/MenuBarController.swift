@@ -60,7 +60,7 @@ class MenuBarController {
         menu.addItem(preferencesItem)
 
         let aboutItem = NSMenuItem(
-            title: L("about_clipflow"),
+            title: L("about"),
             action: #selector(openAbout),
             keyEquivalent: ""
         )

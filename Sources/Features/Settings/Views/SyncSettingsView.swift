@@ -1,7 +1,17 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Public wrapper that checks Core Data availability
 struct SyncSettingsView: View {
+    var body: some View {
+        CoreDataAvailabilityWrapper {
+            SyncSettingsContentView()
+        }
+    }
+}
+
+/// Internal view with Core Data dependencies
+private struct SyncSettingsContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @AppStorage("iCloudSyncEnabled") private var iCloudEnabled = false {
         didSet {
@@ -159,7 +169,7 @@ struct SyncSettingsView: View {
     }
 }
 
-extension SyncSettingsView {
+extension SyncSettingsContentView {
     var exportFilePickerView: some View {
         EmptyView()
             .fileExporter(
@@ -231,4 +241,5 @@ struct JSONDocument: FileDocument {
 
 #Preview {
     SyncSettingsView()
+        .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
 }
