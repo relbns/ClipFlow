@@ -318,12 +318,16 @@ class MenuBarController {
     }
 
     @objc private func openPreferences() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        NSApp.activate(ignoringOtherApps: true)
+        // Forward to AppDelegate
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.openPreferences()
+        }
     }
 
     @objc private func openSnippetEditor() {
-        // TODO: Implement snippet editor window
-        print("📝 Opening snippet editor...")
+        // Forward to AppDelegate
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            appDelegate.openSnippetEditor()
+        }
     }
 }

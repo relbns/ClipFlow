@@ -8,6 +8,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
     private var hotkeyManager: HotkeyManager?
     private var appContextMonitor: AppContextMonitor?
+    private var snippetEditorWindow: NSWindow?
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize services
@@ -82,22 +84,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openPreferences() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        if settingsWindow == nil {
+            let settingsView = SettingsView()
+            let hostingController = NSHostingController(rootView: settingsView)
+
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = L("preferences")
+            window.setContentSize(NSSize(width: 550, height: 500))
+            window.styleMask = [.titled, .closable, .miniaturizable]
+            window.center()
+
+            settingsWindow = window
+        }
+
+        settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc func openSnippetEditor() {
-        let editorView = SnippetEditorView()
-            .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
+        if snippetEditorWindow == nil {
+            let editorView = SnippetEditorView()
+                .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
 
-        let hostingController = NSHostingController(rootView: editorView)
-        let window = NSWindow(contentViewController: hostingController)
-        window.title = "Snippet Editor"
-        window.setContentSize(NSSize(width: 900, height: 650))
-        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-        window.makeKeyAndOrderFront(nil)
-        window.center()
+            let hostingController = NSHostingController(rootView: editorView)
 
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = L("snippet_editor")
+            window.setContentSize(NSSize(width: 900, height: 650))
+            window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+            window.center()
+
+            snippetEditorWindow = window
+        }
+
+        snippetEditorWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 }
