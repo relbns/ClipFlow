@@ -8,37 +8,34 @@ class CoreDataStack {
         // Find the model file in the bundle
         // SPM copies .xcdatamodeld directory, not compiled .momd
         let bundles = [Bundle.module, Bundle.main]
-        var modelURL: URL?
+        var managedObjectModel: NSManagedObjectModel?
 
         for bundle in bundles {
             // Try compiled versions first (.momd, .mom)
-            if let url = bundle.url(forResource: "ClipFlow", withExtension: "momd") {
-                modelURL = url
-                print("📦 Found compiled model (.momd)")
+            if let url = bundle.url(forResource: "ClipFlow", withExtension: "momd"),
+               let model = NSManagedObjectModel(contentsOf: url) {
+                managedObjectModel = model
+                print("📦 Loaded compiled model (.momd)")
                 break
-            } else if let url = bundle.url(forResource: "ClipFlow", withExtension: "mom") {
-                modelURL = url
-                print("📦 Found compiled model (.mom)")
+            } else if let url = bundle.url(forResource: "ClipFlow", withExtension: "mom"),
+                      let model = NSManagedObjectModel(contentsOf: url) {
+                managedObjectModel = model
+                print("📦 Loaded compiled model (.mom)")
                 break
             }
             // Try source .xcdatamodeld directory (SPM with swift run)
             else if let xcdatamodeldURL = bundle.url(forResource: "ClipFlow", withExtension: "xcdatamodeld") {
-                // Look for .xcdatamodel inside the directory
-                let xcdatamodelURL = xcdatamodeldURL.appendingPathComponent("ClipFlow.xcdatamodel")
-                if FileManager.default.fileExists(atPath: xcdatamodelURL.path) {
-                    modelURL = xcdatamodelURL
-                    print("📦 Found source model (.xcdatamodel in .xcdatamodeld)")
+                // Use mergedModel to load uncompiled model directory
+                if let model = NSManagedObjectModel.mergedModel(from: [bundle]) {
+                    managedObjectModel = model
+                    print("📦 Loaded source model using mergedModel from \(bundle.bundleIdentifier ?? "bundle")")
                     break
                 }
             }
         }
 
-        guard let modelURL = modelURL else {
-            fatalError("Unable to find ClipFlow Core Data model in any bundle")
-        }
-
-        guard let managedObjectModel = NSManagedObjectModel(contentsOf: modelURL) else {
-            fatalError("Unable to load model from \(modelURL)")
+        guard let managedObjectModel = managedObjectModel else {
+            fatalError("Unable to load ClipFlow Core Data model from any bundle")
         }
 
         let container = NSPersistentContainer(name: "ClipFlow", managedObjectModel: managedObjectModel)
