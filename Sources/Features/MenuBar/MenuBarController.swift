@@ -6,6 +6,7 @@ import SwiftUI
 class MenuBarController {
     private let clipboardMonitor: ClipboardMonitor
     private weak var appDelegate: AppDelegate?
+    private var searchText: String = ""
 
     // Settings from AppStorage
     @AppStorage("viewMode") private var viewMode = "organized"
@@ -24,10 +25,11 @@ class MenuBarController {
 
         // Header with search
         if viewMode == "organized" {
-            // Search field (TODO: implement search functionality)
             let searchItem = NSMenuItem()
             let searchField = NSSearchField(frame: NSRect(x: 0, y: 0, width: 200, height: 22))
             searchField.placeholderString = "Search..."
+            searchField.target = self
+            searchField.action = #selector(searchFieldChanged(_:))
             searchItem.view = searchField
             menu.addItem(searchItem)
             menu.addItem(NSMenuItem.separator())
@@ -86,9 +88,26 @@ class MenuBarController {
         return menu
     }
 
+    @objc private func searchFieldChanged(_ sender: NSSearchField) {
+        searchText = sender.stringValue
+        // Menu will be rebuilt on next open
+    }
+
+    private var filteredClips: [ClipItem] {
+        let clips = clipboardMonitor.clipHistory
+
+        if searchText.isEmpty {
+            return Array(clips)
+        }
+
+        return clips.filter { clip in
+            clip.content.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
     // Simple mode: flat list (Flycut-style)
     private func addSimpleClipboardHistory(to menu: NSMenu) {
-        let clips = clipboardMonitor.clipHistory.prefix(Int(maxTitleLength))
+        let clips = filteredClips.prefix(Int(maxTitleLength))
 
         if clips.isEmpty {
             let item = NSMenuItem(title: "No clipboard history", action: nil, keyEquivalent: "")
@@ -162,7 +181,7 @@ class MenuBarController {
 
     // Organized mode: grouped by type
     private func addOrganizedClipboardHistory(to menu: NSMenu) {
-        let clips = Array(clipboardMonitor.clipHistory.prefix(30))
+        let clips = Array(filteredClips.prefix(30))
 
         if clips.isEmpty {
             let item = NSMenuItem(title: "No clipboard history", action: nil, keyEquivalent: "")
