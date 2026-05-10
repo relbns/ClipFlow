@@ -25,10 +25,20 @@ class CoreDataStack {
             }
             // Try source .xcdatamodeld directory (SPM with swift run)
             else if let xcdatamodeldURL = bundle.url(forResource: "ClipFlow", withExtension: "xcdatamodeld") {
-                // Use mergedModel to load uncompiled model directory
-                if let model = NSManagedObjectModel.mergedModel(from: [bundle]) {
+                // Look for .xcdatamodel inside, then load the contents file
+                let xcdatamodelURL = xcdatamodeldURL.appendingPathComponent("ClipFlow.xcdatamodel")
+                let contentsURL = xcdatamodelURL.appendingPathComponent("contents")
+
+                if FileManager.default.fileExists(atPath: contentsURL.path),
+                   let model = NSManagedObjectModel(contentsOf: contentsURL) {
                     managedObjectModel = model
-                    print("📦 Loaded source model using mergedModel from \(bundle.bundleIdentifier ?? "bundle")")
+                    print("📦 Loaded source model from contents file")
+                    break
+                }
+                // Fallback: try mergedModel
+                else if let model = NSManagedObjectModel.mergedModel(from: [bundle]) {
+                    managedObjectModel = model
+                    print("📦 Loaded source model using mergedModel")
                     break
                 }
             }
