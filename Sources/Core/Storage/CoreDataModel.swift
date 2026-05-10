@@ -75,7 +75,7 @@ extension NSManagedObjectModel {
         let clipItemFileURLs = NSAttributeDescription()
         clipItemFileURLs.name = "fileURLs"
         clipItemFileURLs.attributeType = .transformableAttributeType
-        clipItemFileURLs.valueTransformerName = NSValueTransformerName.secureUnarchiveFromDataTransformerName.rawValue
+        clipItemFileURLs.valueTransformerName = "NSSecureUnarchiveFromData"
         clipItemFileURLs.isOptional = true
         clipItemProperties.append(clipItemFileURLs)
 

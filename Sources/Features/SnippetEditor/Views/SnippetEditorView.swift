@@ -84,6 +84,7 @@ private struct SnippetEditorContentView: View {
     }
 
     private func createGroup() {
+        print("➕ Creating new group...")
         withAnimation {
             let newGroup = SnippetGroup(context: viewContext)
             newGroup.id = UUID()
@@ -92,12 +93,44 @@ private struct SnippetEditorContentView: View {
             newGroup.sortOrder = Int32(groups.count)
             newGroup.createdAt = Date()
 
-            try? viewContext.save()
+            do {
+                try viewContext.save()
+                print("✅ Group created successfully: \(newGroup.name)")
+            } catch {
+                print("❌ Failed to create group: \(error)")
+            }
         }
     }
 
     private func createSnippet() {
-        guard let group = selectedGroup ?? groups.first else { return }
+        print("➕ Creating new snippet...")
+
+        guard let group = selectedGroup ?? groups.first else {
+            print("❌ No group available! groups.count = \(groups.count)")
+
+            // Create default group if none exists
+            print("📂 Creating default group first...")
+            let defaultGroup = SnippetGroup(context: viewContext)
+            defaultGroup.id = UUID()
+            defaultGroup.name = "Default"
+            defaultGroup.isEnabled = true
+            defaultGroup.sortOrder = 0
+            defaultGroup.createdAt = Date()
+
+            do {
+                try viewContext.save()
+                print("✅ Default group created")
+            } catch {
+                print("❌ Failed to create default group: \(error)")
+                return
+            }
+
+            // Try again with the new group
+            createSnippet()
+            return
+        }
+
+        print("📂 Using group: \(group.name)")
 
         withAnimation {
             let newSnippet = Snippet(context: viewContext)
@@ -114,8 +147,13 @@ private struct SnippetEditorContentView: View {
             newSnippet.useCount = 0
             newSnippet.group = group
 
-            try? viewContext.save()
-            selectedSnippet = newSnippet
+            do {
+                try viewContext.save()
+                selectedSnippet = newSnippet
+                print("✅ Snippet created successfully: \(newSnippet.title)")
+            } catch {
+                print("❌ Failed to create snippet: \(error)")
+            }
         }
     }
 
