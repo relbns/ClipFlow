@@ -6,8 +6,20 @@ class CoreDataStack {
 
     lazy var persistentContainer: NSPersistentContainer = {
         // Find the model file in the bundle
-        guard let modelURL = Bundle.main.url(forResource: "ClipFlow", withExtension: "momd") else {
-            fatalError("Unable to find ClipFlow.momd in bundle")
+        // Try module bundle first (for SPM), then main bundle (for built app)
+        let bundles = [Bundle.module, Bundle.main]
+        var modelURL: URL?
+
+        for bundle in bundles {
+            if let url = bundle.url(forResource: "ClipFlow", withExtension: "momd") {
+                modelURL = url
+                print("📦 Found Core Data model in bundle: \(bundle.bundlePath)")
+                break
+            }
+        }
+
+        guard let modelURL = modelURL else {
+            fatalError("Unable to find ClipFlow.momd in any bundle")
         }
 
         guard let managedObjectModel = NSManagedObjectModel(contentsOf: modelURL) else {
