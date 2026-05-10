@@ -41,25 +41,31 @@ class MenuBarController {
         menu.addItem(NSMenuItem.separator())
 
         // Actions
-        menu.addItem(NSMenuItem(
+        let snippetEditorItem = NSMenuItem(
             title: "Snippet Editor...",
             action: #selector(openSnippetEditor),
             keyEquivalent: "e"
-        ))
+        )
+        snippetEditorItem.target = self
+        menu.addItem(snippetEditorItem)
 
-        menu.addItem(NSMenuItem(
+        let preferencesItem = NSMenuItem(
             title: "Preferences...",
             action: #selector(openPreferences),
             keyEquivalent: ","
-        ))
+        )
+        preferencesItem.target = self
+        menu.addItem(preferencesItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        menu.addItem(NSMenuItem(
+        let clearHistoryItem = NSMenuItem(
             title: "Clear History",
             action: #selector(clearHistory),
             keyEquivalent: ""
-        ))
+        )
+        clearHistoryItem.target = self
+        menu.addItem(clearHistoryItem)
 
         menu.addItem(NSMenuItem(
             title: "Quit ClipFlow",
@@ -90,6 +96,7 @@ class MenuBarController {
                 action: #selector(pasteClip(_:)),
                 keyEquivalent: keyEquiv
             )
+            item.target = self
 
             // Build attributed title with optional icon/number
             var displayTitle = ""
@@ -225,6 +232,7 @@ class MenuBarController {
             action: #selector(pasteClip(_:)),
             keyEquivalent: keyEquiv
         )
+        item.target = self
 
         // Create attributed string with RTL support
         let isRTL = clip.content.isRTL
