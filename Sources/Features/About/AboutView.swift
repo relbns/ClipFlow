@@ -43,6 +43,22 @@ struct AboutView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
+                // Created By
+                creditRow(
+                    icon: "person.circle.fill",
+                    title: "Ben Eshel",
+                    description: "Creator & Developer",
+                    link: "https://github.com/relbns"
+                )
+
+                Divider()
+                    .padding(.vertical, 4)
+
+                Text("Built on the shoulders of giants:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.leading, 36)
+
                 creditRow(
                     icon: "scissors",
                     title: "Clipy",
