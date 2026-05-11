@@ -165,6 +165,7 @@ struct MenuBarPopover: View {
         NotificationCenter.default.post(name: NSNotification.Name("OpenPreferences"), object: nil)
     }
 
+    @MainActor
     private func clearClipboardHistory() {
         clipboardMonitor.clearHistory()
         isPresented = false
