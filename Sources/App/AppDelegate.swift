@@ -274,17 +274,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showAccessibilityAlert() {
-        let alert = NSAlert()
-        alert.messageText = "Accessibility Permission Required"
-        alert.informativeText = "ClipFlow needs Accessibility permission to enable text expansion. Please grant permission in System Settings."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Cancel")
+        // Defer alert to avoid being called during transaction
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Accessibility Permission Required"
+            alert.informativeText = "ClipFlow needs Accessibility permission to enable text expansion. Please grant permission in System Settings."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Cancel")
 
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                NSWorkspace.shared.open(url)
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                    NSWorkspace.shared.open(url)
+                }
             }
         }
     }
