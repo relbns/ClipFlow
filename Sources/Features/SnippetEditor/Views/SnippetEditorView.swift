@@ -303,6 +303,36 @@ private struct SnippetDetailView: View {
                 Toggle("Play sound on expansion", isOn: $snippet.playSound)
             }
 
+            Section("Statistics") {
+                // 2×2 Grid
+                HStack(spacing: 12) {
+                    VStack(spacing: 12) {
+                        CFStatCard(
+                            value: "\(snippet.useCount)",
+                            label: "TOTAL USES"
+                        )
+
+                        CFStatCard(
+                            value: "\(charsSaved)",
+                            label: "CHARS/USE"
+                        )
+                    }
+
+                    VStack(spacing: 12) {
+                        CFStatCard(
+                            value: formatTimeSaved(estimatedTimeSaved),
+                            label: "TIME SAVED"
+                        )
+
+                        CFStatCard(
+                            value: "\(charsSaved * Int(snippet.useCount))",
+                            label: "TOTAL SAVED"
+                        )
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+
             Section("App-Specific Rules") {
                 Toggle("Restrict to specific apps", isOn: $snippet.restrictToApps)
 
@@ -338,16 +368,6 @@ private struct SnippetDetailView: View {
                     Text("Snippet will only expand in selected applications")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                }
-            }
-
-            if snippet.useCount > 0 {
-                Section("Statistics") {
-                    LabeledContent("Times used:", value: "\(snippet.useCount)")
-
-                    if let lastUsed = snippet.lastUsed {
-                        LabeledContent("Last used:", value: lastUsed.formatted())
-                    }
                 }
             }
         }
@@ -444,6 +464,30 @@ private struct SnippetDetailView: View {
         snippet.appRules?.remove(rule)
         viewContext.delete(rule)
         try? viewContext.save()
+    }
+
+    // MARK: - Statistics Helpers
+    private var charsSaved: Int {
+        let contentLength = snippet.content.count
+        let abbreviationLength = snippet.abbreviation.count
+        return max(0, contentLength - abbreviationLength)
+    }
+
+    private func formatTimeSaved(_ seconds: Int) -> String {
+        if seconds < 60 {
+            return "\(seconds)s"
+        } else if seconds < 3600 {
+            let mins = seconds / 60
+            return "\(mins)m"
+        } else {
+            let hours = seconds / 3600
+            return "\(hours)h"
+        }
+    }
+
+    private var estimatedTimeSaved: Int {
+        // Estimate 2 seconds saved per expansion (typing time)
+        return Int(snippet.useCount) * 2
     }
 }
 
