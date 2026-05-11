@@ -43,28 +43,46 @@ private struct SnippetEditorContentView: View {
     }
 
     var body: some View {
-        ThreePanelLayout(
-            leftPanel: {
-                GroupsPanel(
-                    groups: groups,
-                    selectedGroup: $selectedGroup,
-                    onCreateGroup: createGroup
-                )
-            },
-            middlePanel: {
-                SnippetsPanel(
-                    group: selectedGroup,
-                    filteredGroups: filteredGroups,
-                    searchText: $searchText,
-                    selectedSnippet: $selectedSnippet,
-                    filteredSnippets: filteredSnippets,
-                    onCreateSnippet: createSnippet
-                )
-            },
-            rightPanel: {
-                EditorPanel(selectedSnippet: selectedSnippet)
-            }
-        )
+        VStack(spacing: 0) {
+            // Toolbar
+            EditorToolbar(
+                selectedSnippet: selectedSnippet,
+                onNew: createSnippet,
+                onDuplicate: duplicateSelectedSnippet,
+                onDelete: deleteSelectedSnippet
+            )
+
+            Divider()
+
+            // Main Content
+            ThreePanelLayout(
+                leftPanel: {
+                    GroupsPanel(
+                        groups: groups,
+                        selectedGroup: $selectedGroup,
+                        onCreateGroup: createGroup
+                    )
+                },
+                middlePanel: {
+                    SnippetsPanel(
+                        group: selectedGroup,
+                        filteredGroups: filteredGroups,
+                        searchText: $searchText,
+                        selectedSnippet: $selectedSnippet,
+                        filteredSnippets: filteredSnippets,
+                        onCreateSnippet: createSnippet
+                    )
+                },
+                rightPanel: {
+                    EditorPanel(selectedSnippet: selectedSnippet)
+                }
+            )
+
+            Divider()
+
+            // Status Bar
+            EditorStatusBar(selectedSnippet: selectedSnippet)
+        }
         .frame(minWidth: 980, minHeight: 640)
     }
 
@@ -153,6 +171,50 @@ private struct SnippetEditorContentView: View {
             snippet.title.localizedCaseInsensitiveContains(searchText) ||
             snippet.abbreviation.localizedCaseInsensitiveContains(searchText) ||
             snippet.content.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    private func duplicateSelectedSnippet() {
+        guard let original = selectedSnippet else { return }
+
+        withAnimation {
+            let duplicate = Snippet(context: viewContext)
+            duplicate.id = UUID()
+            duplicate.title = original.title + " (Copy)"
+            duplicate.abbreviation = original.abbreviation + "2"
+            duplicate.content = original.content
+            duplicate.isEnabled = original.isEnabled
+            duplicate.createdAt = Date()
+            duplicate.updatedAt = Date()
+            duplicate.expandTrigger = original.expandTrigger
+            duplicate.caseSensitive = original.caseSensitive
+            duplicate.playSound = original.playSound
+            duplicate.useCount = 0
+            duplicate.group = original.group
+
+            do {
+                try viewContext.save()
+                selectedSnippet = duplicate
+                print("✅ Snippet duplicated: \(duplicate.title)")
+            } catch {
+                print("❌ Failed to duplicate snippet: \(error)")
+            }
+        }
+    }
+
+    private func deleteSelectedSnippet() {
+        guard let snippet = selectedSnippet else { return }
+
+        withAnimation {
+            viewContext.delete(snippet)
+            selectedSnippet = nil
+
+            do {
+                try viewContext.save()
+                print("✅ Snippet deleted")
+            } catch {
+                print("❌ Failed to delete snippet: \(error)")
+            }
         }
     }
 }
@@ -303,6 +365,36 @@ private struct SnippetDetailView: View {
                 Toggle("Play sound on expansion", isOn: $snippet.playSound)
             }
 
+            Section("Statistics") {
+                // 2×2 Grid
+                HStack(spacing: 12) {
+                    VStack(spacing: 12) {
+                        CFStatCard(
+                            value: "\(snippet.useCount)",
+                            label: "TOTAL USES"
+                        )
+
+                        CFStatCard(
+                            value: "\(charsSaved)",
+                            label: "CHARS/USE"
+                        )
+                    }
+
+                    VStack(spacing: 12) {
+                        CFStatCard(
+                            value: formatTimeSaved(estimatedTimeSaved),
+                            label: "TIME SAVED"
+                        )
+
+                        CFStatCard(
+                            value: "\(charsSaved * Int(snippet.useCount))",
+                            label: "TOTAL SAVED"
+                        )
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+
             Section("App-Specific Rules") {
                 Toggle("Restrict to specific apps", isOn: $snippet.restrictToApps)
 
@@ -338,16 +430,6 @@ private struct SnippetDetailView: View {
                     Text("Snippet will only expand in selected applications")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                }
-            }
-
-            if snippet.useCount > 0 {
-                Section("Statistics") {
-                    LabeledContent("Times used:", value: "\(snippet.useCount)")
-
-                    if let lastUsed = snippet.lastUsed {
-                        LabeledContent("Last used:", value: lastUsed.formatted())
-                    }
                 }
             }
         }
@@ -445,6 +527,30 @@ private struct SnippetDetailView: View {
         viewContext.delete(rule)
         try? viewContext.save()
     }
+
+    // MARK: - Statistics Helpers
+    private var charsSaved: Int {
+        let contentLength = snippet.content.count
+        let abbreviationLength = snippet.abbreviation.count
+        return max(0, contentLength - abbreviationLength)
+    }
+
+    private func formatTimeSaved(_ seconds: Int) -> String {
+        if seconds < 60 {
+            return "\(seconds)s"
+        } else if seconds < 3600 {
+            let mins = seconds / 60
+            return "\(mins)m"
+        } else {
+            let hours = seconds / 3600
+            return "\(hours)h"
+        }
+    }
+
+    private var estimatedTimeSaved: Int {
+        // Estimate 2 seconds saved per expansion (typing time)
+        return Int(snippet.useCount) * 2
+    }
 }
 
 // MARK: - Three Panel Layout
@@ -483,6 +589,17 @@ private struct GroupsPanel: View {
     let onCreateGroup: () -> Void
 
     @Environment(\.cfTheme) var theme
+    @Environment(\.managedObjectContext) private var viewContext
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Snippet.lastUsed, ascending: false)],
+        predicate: NSPredicate(format: "lastUsed != nil"),
+        animation: .default)
+    private var recentSnippets: FetchedResults<Snippet>
+
+    private var recentSnippetsLimited: [Snippet] {
+        Array(recentSnippets.prefix(5))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -506,21 +623,94 @@ private struct GroupsPanel: View {
 
             Divider()
 
-            // Groups List
+            // Content
             ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(Array(groups), id: \.id) { group in
-                        GroupRow(
-                            group: group,
-                            isSelected: selectedGroup?.id == group.id
-                        ) {
-                            selectedGroup = group
+                VStack(spacing: 16) {
+                    // Library Section
+                    if !recentSnippetsLimited.isEmpty {
+                        VStack(spacing: 8) {
+                            CFSectionLabel("LIBRARY")
+                                .padding(.horizontal, 8)
+
+                            VStack(spacing: 2) {
+                                ForEach(recentSnippetsLimited, id: \.id) { snippet in
+                                    LibraryRow(
+                                        icon: .clock,
+                                        iconColor: Color(red: 0.78, green: 0.14, blue: 0.70),
+                                        title: snippet.title,
+                                        subtitle: snippet.abbreviation
+                                    ) {
+                                        // TODO: Navigate to snippet
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+
+                    // Groups Section
+                    VStack(spacing: 8) {
+                        CFSectionLabel("GROUPS")
+                            .padding(.horizontal, 8)
+
+                        VStack(spacing: 2) {
+                            ForEach(Array(groups), id: \.id) { group in
+                                GroupRow(
+                                    group: group,
+                                    isSelected: selectedGroup?.id == group.id
+                                ) {
+                                    selectedGroup = group
+                                }
+                            }
                         }
                     }
                 }
                 .padding(8)
             }
         }
+    }
+}
+
+private struct LibraryRow: View {
+    let icon: CFIcon.IconType
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+    let action: () -> Void
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(iconColor.opacity(0.18))
+                        .frame(width: 22, height: 22)
+
+                    CFIcon(type: icon, size: 12, stroke: 1.6)
+                        .foregroundColor(iconColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(theme.textStrong)
+                        .lineLimit(1)
+
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.textMuted)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.clear)
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -695,6 +885,138 @@ private struct EditorPanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+}
+
+// MARK: - Editor Toolbar
+private struct EditorToolbar: View {
+    let selectedSnippet: Snippet?
+    let onNew: () -> Void
+    let onDuplicate: () -> Void
+    let onDelete: () -> Void
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // New Button
+            Button(action: onNew) {
+                HStack(spacing: 6) {
+                    CFIcon(type: .plus, size: 12, stroke: 1.8)
+                    Text("New")
+                        .font(.system(size: 12))
+                    Text("⌘N")
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.textSubtle)
+                }
+                .foregroundColor(theme.textStrong)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(theme.fill2)
+                .cornerRadius(5)
+            }
+            .buttonStyle(.plain)
+
+            // Duplicate Button
+            Button(action: onDuplicate) {
+                HStack(spacing: 6) {
+                    CFIcon(type: .bracket, size: 12, stroke: 1.8)
+                    Text("Duplicate")
+                        .font(.system(size: 12))
+                }
+                .foregroundColor(selectedSnippet == nil ? theme.textFaint : theme.textStrong)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(theme.fill2)
+                .cornerRadius(5)
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedSnippet == nil)
+
+            Spacer()
+
+            // Synced Indicator
+            HStack(spacing: 6) {
+                CFIcon(type: .cloud, size: 12, stroke: 1.6)
+                    .foregroundColor(theme.textSubtle)
+
+                Text("Synced")
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textMuted)
+            }
+
+            Spacer()
+
+            // Delete Button
+            Button(action: onDelete) {
+                HStack(spacing: 6) {
+                    CFIcon(type: .trash, size: 12, stroke: 1.8)
+                    Text("Delete")
+                        .font(.system(size: 12))
+                    Text("⌘⌫")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color.red.opacity(0.7))
+                }
+                .foregroundColor(selectedSnippet == nil ? theme.textFaint : Color.red)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(theme.fill2)
+                .cornerRadius(5)
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedSnippet == nil)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(theme.fill1)
+    }
+}
+
+// MARK: - Editor Status Bar
+private struct EditorStatusBar: View {
+    let selectedSnippet: Snippet?
+
+    @Environment(\.cfTheme) var theme
+
+    private var contentStats: String {
+        guard let snippet = selectedSnippet else {
+            return "No snippet selected"
+        }
+
+        let chars = snippet.content.count
+        let words = snippet.content.split(separator: " ").count
+
+        return "\(chars) chars · \(words) words"
+    }
+
+    private var lastSynced: String {
+        if let snippet = selectedSnippet,
+           let group = snippet.group,
+           let lastSynced = group.lastSynced {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .short
+            return "Last synced \(formatter.localizedString(for: lastSynced, relativeTo: Date()))"
+        }
+        return "Not synced"
+    }
+
+    var body: some View {
+        HStack {
+            // Left: Content Stats
+            Text(contentStats)
+                .font(.system(size: 11))
+                .foregroundColor(theme.textMuted)
+
+            Spacer()
+
+            // Right: Last Synced
+            Text(lastSynced)
+                .font(.system(size: 11))
+                .foregroundColor(theme.textMuted)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(theme.fill1)
     }
 }
 
