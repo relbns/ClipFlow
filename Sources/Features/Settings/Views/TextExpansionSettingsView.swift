@@ -5,42 +5,100 @@ struct TextExpansionSettingsView: View {
     @AppStorage("expandAfter") private var expandAfter = "delimiter"
     @AppStorage("playSoundOnExpand") private var playSound = false
     @AppStorage("showNotificationOnExpand") private var showNotification = false
+    @AppStorage("backspaceCancels") private var backspaceCancels = true
+    @AppStorage("livePreview") private var livePreview = false
+
+    @Environment(\.cfTheme) var theme
 
     var body: some View {
-        Form {
-            Section("Text Expansion") {
-                Toggle("Enable text expansion", isOn: $expansionEnabled)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Header
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L("text_expansion"))
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(theme.textStrong)
 
-                Text("Automatically expand abbreviations as you type")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section("Trigger") {
-                Picker("Expand after:", selection: $expandAfter) {
-                    Text("Delimiter (space, tab, punctuation)").tag("delimiter")
-                    Text("Space only").tag("space")
-                    Text("Any character").tag("any")
-                    Text("Tab only").tag("tab")
-                    Text("Enter only").tag("enter")
+                    Text("Automatically expand abbreviations as you type")
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.textSubtle)
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
 
-                Text("Choose what character triggers snippet expansion")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+                // Settings Rows
+                VStack(spacing: 0) {
+                    CFSettingsRow(
+                        label: "Enable text expansion",
+                        hint: "Turn on/off snippet expansion globally"
+                    ) {
+                        CFToggle(isOn: $expansionEnabled)
+                    }
 
-            Section("Feedback") {
-                Toggle("Play sound on expansion", isOn: $playSound)
-                Toggle("Show brief notification", isOn: $showNotification)
-            }
+                    CFSettingsRow(
+                        label: "Expand after",
+                        hint: "Character that triggers snippet expansion"
+                    ) {
+                        CFSegmentedControl(
+                            selection: Binding(
+                                get: {
+                                    ["delimiter", "space", "tab", "enter", "any"].firstIndex(of: expandAfter) ?? 0
+                                },
+                                set: { index in
+                                    expandAfter = ["delimiter", "space", "tab", "enter", "any"][index]
+                                }
+                            ),
+                            options: ["Delimiter", "Space", "Tab", "Enter", "Any"],
+                            columns: 3
+                        )
+                    }
 
-            Section("Permissions") {
+                    CFSettingsRow(
+                        label: "Play sound on expansion",
+                        hint: "Quiet click when a snippet expands"
+                    ) {
+                        CFToggle(isOn: $playSound)
+                    }
+
+                    CFSettingsRow(
+                        label: "Backspace cancels",
+                        hint: "Press backspace immediately after expansion to revert to the abbreviation"
+                    ) {
+                        CFToggle(isOn: $backspaceCancels)
+                    }
+
+                    CFSettingsRow(
+                        label: "Show brief notification",
+                        hint: "Display a subtle notification on expansion"
+                    ) {
+                        CFToggle(isOn: $showNotification)
+                    }
+
+                    CFSettingsRow(
+                        label: "Live preview",
+                        hint: "See your snippet rendered with current variables before it fires",
+                        isLast: true
+                    ) {
+                        HStack(spacing: 8) {
+                            CFToggle(isOn: $livePreview)
+                            Text("Floating preview · 200 ms hold")
+                                .font(.system(size: 12))
+                                .foregroundColor(theme.textMuted)
+                        }
+                    }
+                }
+                .padding(20)
+                .background(theme.surface)
+                .cornerRadius(12)
+                .padding(.horizontal, 24)
+
+                // Permission Banner
                 PermissionStatusView()
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
             }
         }
-        .formStyle(.grouped)
-        .padding()
+        .background(theme.surfaceDeep)
     }
 }
 
@@ -48,24 +106,26 @@ struct PermissionStatusView: View {
     @State private var hasAccessibility = AXIsProcessTrusted()
 
     var body: some View {
-        HStack {
+        Group {
             if hasAccessibility {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                Text("Accessibility permission granted")
+                CFBanner.success(
+                    icon: AnyView(CFIcon(type: .check, size: 18, stroke: 1.8)),
+                    title: "Accessibility permission granted",
+                    message: "ClipFlow can monitor keystrokes for text expansion."
+                )
             } else {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
-                VStack(alignment: .leading) {
-                    Text("Accessibility permission required")
-                    Text("Text expansion needs permission to monitor keystrokes")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                Button("Open System Settings") {
-                    openAccessibilitySettings()
-                }
+                CFBanner.accessibility(
+                    title: "Accessibility permission required",
+                    message: "ClipFlow needs Accessibility access to enable text expansion. Without it, snippets won't expand as you type.",
+                    action: AnyView(
+                        CFToolbarBtn(
+                            label: "Open System Settings",
+                            primary: true
+                        ) {
+                            openAccessibilitySettings()
+                        }
+                    )
+                )
             }
         }
         .onAppear {
@@ -86,4 +146,5 @@ struct PermissionStatusView: View {
 
 #Preview {
     TextExpansionSettingsView()
+        .cfAutoTheme()
 }
