@@ -43,44 +43,29 @@ private struct SnippetEditorContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            // Sidebar
-            List(selection: $selectedSnippet) {
-                ForEach(filteredGroups, id: \.id) { group in
-                    Section(header: Text(group.name)) {
-                        ForEach(filteredSnippets(for: group), id: \.id) { snippet in
-                            SnippetRow(snippet: snippet)
-                                .tag(snippet)
-                        }
-                    }
-                }
+        ThreePanelLayout(
+            leftPanel: {
+                GroupsPanel(
+                    groups: groups,
+                    selectedGroup: $selectedGroup,
+                    onCreateGroup: createGroup
+                )
+            },
+            middlePanel: {
+                SnippetsPanel(
+                    group: selectedGroup,
+                    filteredGroups: filteredGroups,
+                    searchText: $searchText,
+                    selectedSnippet: $selectedSnippet,
+                    filteredSnippets: filteredSnippets,
+                    onCreateSnippet: createSnippet
+                )
+            },
+            rightPanel: {
+                EditorPanel(selectedSnippet: selectedSnippet)
             }
-            .navigationTitle("Snippets")
-            .searchable(text: $searchText, prompt: "Search snippets...")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("New Group") {
-                            createGroup()
-                        }
-                        Button("New Snippet") {
-                            createSnippet()
-                        }
-                    } label: {
-                        Label("Add", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            // Detail
-            if let snippet = selectedSnippet {
-                SnippetDetailView(snippet: snippet)
-            } else {
-                Text("Select a snippet to edit")
-                    .foregroundColor(.secondary)
-            }
-        }
-        .frame(minWidth: 800, minHeight: 600)
+        )
+        .frame(minWidth: 980, minHeight: 640)
     }
 
     private func createGroup() {
@@ -284,37 +269,26 @@ private struct SnippetDetailView: View {
                     .frame(minHeight: 200)
                     .environment(\.layoutDirection, snippet.content.isRTL ? .rightToLeft : .leftToRight)
 
-                HStack(spacing: 8) {
-                    Button(action: { insertVariable("{date}") }) {
-                        Label("Date", systemImage: "calendar")
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        CFVarChip(text: "{date}") {
+                            insertVariable("{date}")
+                        }
+                        CFVarChip(text: "{time}") {
+                            insertVariable("{time}")
+                        }
+                        CFVarChip(text: "{clipboard}") {
+                            insertVariable("{clipboard}")
+                        }
+                        CFVarChip(text: "{cursor}") {
+                            insertVariable("{cursor}")
+                        }
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
 
-                    Button(action: { insertVariable("{time}") }) {
-                        Label("Time", systemImage: "clock")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    Button(action: { insertVariable("{clipboard}") }) {
-                        Label("Clipboard", systemImage: "doc.on.clipboard")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    Button(action: { insertVariable("{cursor}") }) {
-                        Label("Cursor", systemImage: "cursorarrow.click")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    Spacer()
+                    Text("Click to insert variables · Type {prompt:Name} for user input")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
                 }
-
-                Text("Use variables for dynamic content")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
 
             Section("Expansion") {
@@ -473,7 +447,259 @@ private struct SnippetDetailView: View {
     }
 }
 
+// MARK: - Three Panel Layout
+private struct ThreePanelLayout<Left: View, Middle: View, Right: View>: View {
+    @ViewBuilder let leftPanel: () -> Left
+    @ViewBuilder let middlePanel: () -> Middle
+    @ViewBuilder let rightPanel: () -> Right
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        HStack(spacing: 0) {
+            leftPanel()
+                .frame(width: 230)
+                .background(theme.surfaceAlt)
+
+            Divider()
+
+            middlePanel()
+                .frame(maxWidth: .infinity)
+                .background(theme.surface)
+
+            Divider()
+
+            rightPanel()
+                .frame(width: 280)
+                .background(theme.surfaceAlt)
+        }
+    }
+}
+
+// MARK: - Groups Panel
+private struct GroupsPanel: View {
+    let groups: FetchedResults<SnippetGroup>
+    @Binding var selectedGroup: SnippetGroup?
+    let onCreateGroup: () -> Void
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Groups")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(theme.textStrong)
+
+                Spacer()
+
+                CFIconBtn(
+                    icon: AnyView(CFIcon(type: .plus, size: 14, stroke: 1.8))
+                ) {
+                    onCreateGroup()
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(theme.fill1)
+
+            Divider()
+
+            // Groups List
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(Array(groups), id: \.id) { group in
+                        GroupRow(
+                            group: group,
+                            isSelected: selectedGroup?.id == group.id
+                        ) {
+                            selectedGroup = group
+                        }
+                    }
+                }
+                .padding(8)
+            }
+        }
+    }
+}
+
+private struct GroupRow: View {
+    @ObservedObject var group: SnippetGroup
+    let isSelected: Bool
+    let action: () -> Void
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                CFIcon(type: .folder, size: 14, stroke: 1.8)
+                    .foregroundColor(isSelected ? theme.accent : theme.text)
+
+                Text(group.name)
+                    .font(.system(size: 13))
+                    .foregroundColor(isSelected ? theme.textStrong : theme.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                CFCountBadge(count: group.sortedSnippets.count)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(isSelected ? theme.fill2 : Color.clear)
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Snippets Panel
+private struct SnippetsPanel: View {
+    let group: SnippetGroup?
+    let filteredGroups: [SnippetGroup]
+    @Binding var searchText: String
+    @Binding var selectedSnippet: Snippet?
+    let filteredSnippets: (SnippetGroup) -> [Snippet]
+    let onCreateSnippet: () -> Void
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header with search
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Snippets")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(theme.textStrong)
+
+                    Spacer()
+
+                    CFIconBtn(
+                        icon: AnyView(CFIcon(type: .plus, size: 14, stroke: 1.8))
+                    ) {
+                        onCreateSnippet()
+                    }
+                }
+
+                CFInput(
+                    text: $searchText,
+                    placeholder: "Search snippets...",
+                    prefix: nil,
+                    suffix: AnyView(
+                        CFIcon(type: .search, size: 14, stroke: 1.6)
+                            .foregroundColor(theme.textMuted)
+                    )
+                )
+            }
+            .padding(12)
+            .background(theme.surface)
+
+            Divider()
+
+            // Snippets List
+            ScrollView {
+                if let group = group {
+                    VStack(spacing: 2) {
+                        ForEach(filteredSnippets(group), id: \.id) { snippet in
+                            SnippetListRow(
+                                snippet: snippet,
+                                isSelected: selectedSnippet?.id == snippet.id
+                            ) {
+                                selectedSnippet = snippet
+                            }
+                        }
+                    }
+                    .padding(8)
+                } else {
+                    // Show all snippets from filtered groups
+                    VStack(spacing: 12) {
+                        ForEach(filteredGroups, id: \.id) { group in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(group.name)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(theme.textMuted)
+                                    .padding(.horizontal, 8)
+                                    .padding(.top, 8)
+
+                                VStack(spacing: 2) {
+                                    ForEach(filteredSnippets(group), id: \.id) { snippet in
+                                        SnippetListRow(
+                                            snippet: snippet,
+                                            isSelected: selectedSnippet?.id == snippet.id
+                                        ) {
+                                            selectedSnippet = snippet
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(8)
+                }
+            }
+        }
+    }
+}
+
+private struct SnippetListRow: View {
+    @ObservedObject var snippet: Snippet
+    let isSelected: Bool
+    let action: () -> Void
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(snippet.title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(isSelected ? theme.textStrong : theme.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(snippet.abbreviation)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(theme.textSubtle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(isSelected ? theme.accent.opacity(0.15) : Color.clear)
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(isSelected ? theme.accent.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Editor Panel
+private struct EditorPanel: View {
+    let selectedSnippet: Snippet?
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        if let snippet = selectedSnippet {
+            SnippetDetailView(snippet: snippet)
+        } else {
+            VStack(spacing: 16) {
+                CFIcon(type: .text, size: 48, stroke: 1.4)
+                    .foregroundColor(theme.textFaint)
+
+                Text("Select a snippet to edit")
+                    .font(.system(size: 14))
+                    .foregroundColor(theme.textMuted)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
 #Preview {
     SnippetEditorView()
         .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
+        .cfAutoTheme()
 }

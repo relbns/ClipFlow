@@ -7,38 +7,89 @@ struct AppearanceSettingsView: View {
     @AppStorage("menuItemsNumbered") private var menuItemsNumbered = true
     @AppStorage("maxTitleLength") private var maxTitleLength = 50.0
 
+    @Environment(\.cfTheme) var theme
+
     var body: some View {
-        Form {
-            Section(L("menu_style")) {
-                Picker(L("view_mode"), selection: $viewMode) {
-                    Text(L("simple_mode")).tag("simple")
-                    Text(L("organized_mode")).tag("organized")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Header
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(L("appearance"))
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(theme.textStrong)
+
+                    Text("Customize how clipboard items appear in the menu")
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.textSubtle)
                 }
-                .pickerStyle(.radioGroup)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
 
-                Text(L("view_mode_description"))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+                // Settings Rows
+                VStack(spacing: 0) {
+                    CFSettingsRow(
+                        label: L("view_mode"),
+                        hint: L("view_mode_description")
+                    ) {
+                        CFSegmentedControl(
+                            selection: Binding(
+                                get: {
+                                    ["simple", "organized"].firstIndex(of: viewMode) ?? 1
+                                },
+                                set: { index in
+                                    viewMode = ["simple", "organized"][index]
+                                }
+                            ),
+                            options: [L("simple_mode"), L("organized_mode")],
+                            columns: 2
+                        )
+                    }
 
-            Section(L("menu_items")) {
-                Toggle(L("show_icons"), isOn: $showIcons)
-                Toggle(L("show_thumbnails"), isOn: $showThumbnails)
-                Toggle(L("number_menu_items"), isOn: $menuItemsNumbered)
+                    CFSettingsRow(
+                        label: L("show_icons"),
+                        hint: "Display type icons (text, image, link) next to items"
+                    ) {
+                        CFToggle(isOn: $showIcons)
+                    }
 
-                VStack(alignment: .leading) {
-                    Text("\(L("max_title_length")): \(Int(maxTitleLength)) \(L("characters"))")
-                        .font(.caption)
+                    CFSettingsRow(
+                        label: L("show_thumbnails"),
+                        hint: "Show image previews and color swatches"
+                    ) {
+                        CFToggle(isOn: $showThumbnails)
+                    }
 
-                    Slider(value: $maxTitleLength, in: 20...100, step: 5)
+                    CFSettingsRow(
+                        label: L("number_menu_items"),
+                        hint: "Add keyboard shortcuts 1-9, 0 to menu items"
+                    ) {
+                        CFToggle(isOn: $menuItemsNumbered)
+                    }
+
+                    CFSettingsRow(
+                        label: L("max_title_length"),
+                        hint: "\(Int(maxTitleLength)) \(L("characters"))",
+                        isLast: true
+                    ) {
+                        CFSlider(
+                            value: $maxTitleLength,
+                            range: 20...100,
+                            displayValue: "\(Int(maxTitleLength))"
+                        )
+                    }
                 }
+                .padding(20)
+                .background(theme.surface)
+                .cornerRadius(12)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
             }
         }
-        .formStyle(.grouped)
-        .padding()
+        .background(theme.surfaceDeep)
     }
 }
 
 #Preview {
     AppearanceSettingsView()
+        .cfAutoTheme()
 }
