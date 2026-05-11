@@ -527,6 +527,17 @@ private struct GroupsPanel: View {
     let onCreateGroup: () -> Void
 
     @Environment(\.cfTheme) var theme
+    @Environment(\.managedObjectContext) private var viewContext
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Snippet.lastUsed, ascending: false)],
+        predicate: NSPredicate(format: "lastUsed != nil"),
+        animation: .default)
+    private var recentSnippets: FetchedResults<Snippet>
+
+    private var recentSnippetsLimited: [Snippet] {
+        Array(recentSnippets.prefix(5))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -550,21 +561,94 @@ private struct GroupsPanel: View {
 
             Divider()
 
-            // Groups List
+            // Content
             ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(Array(groups), id: \.id) { group in
-                        GroupRow(
-                            group: group,
-                            isSelected: selectedGroup?.id == group.id
-                        ) {
-                            selectedGroup = group
+                VStack(spacing: 16) {
+                    // Library Section
+                    if !recentSnippetsLimited.isEmpty {
+                        VStack(spacing: 8) {
+                            CFSectionLabel("LIBRARY")
+                                .padding(.horizontal, 8)
+
+                            VStack(spacing: 2) {
+                                ForEach(recentSnippetsLimited, id: \.id) { snippet in
+                                    LibraryRow(
+                                        icon: .clock,
+                                        iconColor: Color(red: 0.78, green: 0.14, blue: 0.70),
+                                        title: snippet.title,
+                                        subtitle: snippet.abbreviation
+                                    ) {
+                                        // TODO: Navigate to snippet
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+
+                    // Groups Section
+                    VStack(spacing: 8) {
+                        CFSectionLabel("GROUPS")
+                            .padding(.horizontal, 8)
+
+                        VStack(spacing: 2) {
+                            ForEach(Array(groups), id: \.id) { group in
+                                GroupRow(
+                                    group: group,
+                                    isSelected: selectedGroup?.id == group.id
+                                ) {
+                                    selectedGroup = group
+                                }
+                            }
                         }
                     }
                 }
                 .padding(8)
             }
         }
+    }
+}
+
+private struct LibraryRow: View {
+    let icon: CFIcon.IconType
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+    let action: () -> Void
+
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(iconColor.opacity(0.18))
+                        .frame(width: 22, height: 22)
+
+                    CFIcon(type: icon, size: 12, stroke: 1.6)
+                        .foregroundColor(iconColor)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(theme.textStrong)
+                        .lineLimit(1)
+
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.textMuted)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.clear)
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
     }
 }
 
