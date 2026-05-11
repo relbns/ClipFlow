@@ -321,21 +321,21 @@ struct CFShowcase: View {
                         number: 1,
                         state: .done,
                         title: "Pin ClipFlow to your menubar",
-                        body: "ClipFlow lives up here — there's no Dock icon."
+                        bodyText: "ClipFlow lives up here — there's no Dock icon."
                     )
 
                     CFStepIndicator(
                         number: 2,
                         state: .active,
                         title: "Grant Accessibility permission",
-                        body: "Required so snippets can expand as you type."
+                        bodyText: "Required so snippets can expand as you type."
                     )
 
                     CFStepIndicator(
                         number: 3,
                         state: .default,
                         title: "Try your first snippet",
-                        body: "We've added .dd for today's date."
+                        bodyText: "We've added .dd for today's date."
                     )
                 }
             }

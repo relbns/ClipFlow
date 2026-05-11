@@ -12,11 +12,11 @@ struct CFStepIndicator: View {
     let number: Int
     let state: StepState
     let title: String
-    let body: String
+    let bodyText: String
 
     @Environment(\.cfTheme) var theme
 
-    var body: some View {
+    var bodyText: some View {
         HStack(alignment: .top, spacing: 14) {
             // Circle indicator
             ZStack {
@@ -51,7 +51,7 @@ struct CFStepIndicator: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(theme.textStrong)
 
-                Text(body)
+                Text(bodyText)
                     .font(.system(size: 12))
                     .foregroundColor(theme.textMuted)
                     .lineSpacing(2)
@@ -110,21 +110,21 @@ struct CFStepIndicator: View {
                 number: 1,
                 state: .done,
                 title: "Pin ClipFlow to your menubar",
-                body: "ClipFlow lives up here — there's no Dock icon. Drag the menubar item to where you'd like."
+                bodyText: "ClipFlow lives up here — there's no Dock icon. Drag the menubar item to where you'd like."
             )
 
             CFStepIndicator(
                 number: 2,
                 state: .active,
                 title: "Grant Accessibility permission",
-                body: "Required so snippets can expand as you type. We never read passwords or secure fields."
+                bodyText: "Required so snippets can expand as you type. We never read passwords or secure fields."
             )
 
             CFStepIndicator(
                 number: 3,
                 state: .default,
                 title: "Try your first snippet",
-                body: "We've added .dd for today's date. Type it anywhere, then press space."
+                bodyText: "We've added .dd for today's date. Type it anywhere, then press space."
             )
         }
     }
@@ -140,21 +140,21 @@ struct CFStepIndicator: View {
             number: 1,
             state: .done,
             title: "Step completed",
-            body: "This step has been completed successfully."
+            bodyText: "This step has been completed successfully."
         )
 
         CFStepIndicator(
             number: 2,
             state: .active,
             title: "Current step",
-            body: "This is the active step with highlighted border and glow."
+            bodyText: "This is the active step with highlighted border and glow."
         )
 
         CFStepIndicator(
             number: 3,
             state: .default,
             title: "Upcoming step",
-            body: "This step is not yet active."
+            bodyText: "This step is not yet active."
         )
     }
     .padding()
