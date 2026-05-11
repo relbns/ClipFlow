@@ -16,7 +16,7 @@ struct CFStepIndicator: View {
 
     @Environment(\.cfTheme) var theme
 
-    var bodyText: some View {
+    var body: some View {
         HStack(alignment: .top, spacing: 14) {
             // Circle indicator
             ZStack {
