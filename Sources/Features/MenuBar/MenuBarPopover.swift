@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Modern SwiftUI MenuBar Popover - replaces NSMenu
+@MainActor
 struct MenuBarPopover: View {
     let clipboardMonitor: ClipboardMonitor
     @Binding var isPresented: Bool
@@ -124,7 +125,9 @@ struct MenuBarPopover: View {
             Divider()
 
             CFFooterRowBtn(icon: .trash, label: "Clear history") {
-                clearClipboardHistory()
+                Task { @MainActor in
+                    clearClipboardHistory()
+                }
             }
 
             CFFooterRowBtn(icon: .power, label: "Quit ClipFlow", kbd: "⌘Q", danger: true) {
