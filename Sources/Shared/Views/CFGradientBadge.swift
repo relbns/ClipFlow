@@ -51,9 +51,9 @@ struct CFGradientBadge: View {
     ///   - darken: Additional darkening factor (0.0-1.0)
     /// - Returns: Mixed color
     private func mixColor(_ base: Color, with mixer: Color, ratio: Double, darken: Double = 0) -> Color {
-        // Convert to UIColor for component access
-        let uiBase = UIColor(base)
-        let uiMixer = UIColor(mixer)
+        // Convert to NSColor for component access (macOS)
+        let uiBase = NSColor(base)
+        let uiMixer = NSColor(mixer)
 
         var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
         var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
