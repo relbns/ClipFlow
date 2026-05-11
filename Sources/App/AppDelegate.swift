@@ -13,10 +13,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
 
+    // Text Expansion
+    private var textExpansionEngine: TextExpansionEngine?
+    private var keystrokeMonitor: KeystrokeMonitor?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize services
         clipboardMonitor = ClipboardMonitor()
         appContextMonitor = AppContextMonitor()
+
+        // Initialize text expansion
+        let context = CoreDataStack.shared.viewContext
+        textExpansionEngine = TextExpansionEngine(context: context)
+        if let engine = textExpansionEngine {
+            keystrokeMonitor = KeystrokeMonitor(textExpansionEngine: engine)
+        }
 
         // Create menu bar controller (keep for fallback)
         if let monitor = clipboardMonitor {
@@ -54,7 +65,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             clipboardMonitor?.startMonitoring()
             appContextMonitor?.startMonitoring()
+
+            // Start text expansion if enabled (default: true)
+            let expansionEnabled = UserDefaults.standard.object(forKey: "textExpansionEnabled") as? Bool ?? true
+            if expansionEnabled {
+                startTextExpansion()
+            }
         }
+
+        // Observe text expansion setting changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(textExpansionSettingChanged),
+            name: UserDefaults.didChangeNotification,
+            object: nil
+        )
 
         // Hide dock icon (menu bar app only)
         NSApp.setActivationPolicy(.accessory)
@@ -208,5 +233,59 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         aboutWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         print("✅ About window should be visible now")
+    }
+
+    // MARK: - Text Expansion
+    private func startTextExpansion() {
+        guard let monitor = keystrokeMonitor else {
+            print("❌ KeystrokeMonitor not initialized")
+            return
+        }
+
+        do {
+            try monitor.startMonitoring()
+            print("✅ Text expansion started")
+        } catch {
+            print("❌ Failed to start text expansion: \(error)")
+            // Show alert to user about accessibility permissions
+            if case ExpansionError.accessibilityPermissionDenied = error {
+                showAccessibilityAlert()
+            }
+        }
+    }
+
+    private func stopTextExpansion() {
+        keystrokeMonitor?.stopMonitoring()
+        print("🛑 Text expansion stopped")
+    }
+
+    @objc private func textExpansionSettingChanged() {
+        let isEnabled = UserDefaults.standard.object(forKey: "textExpansionEnabled") as? Bool ?? true
+
+        if isEnabled {
+            if keystrokeMonitor?.isMonitoring == false {
+                startTextExpansion()
+            }
+        } else {
+            if keystrokeMonitor?.isMonitoring == true {
+                stopTextExpansion()
+            }
+        }
+    }
+
+    private func showAccessibilityAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Permission Required"
+        alert.informativeText = "ClipFlow needs Accessibility permission to enable text expansion. Please grant permission in System Settings."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+        }
     }
 }
