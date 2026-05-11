@@ -164,6 +164,25 @@ extension NSManagedObjectModel {
         let groupSortOrder = createIntAttribute(name: "sortOrder", defaultValue: 0)
         groupProperties.append(groupSortOrder)
 
+        // Sync metadata
+        let groupSyncLocation = NSAttributeDescription()
+        groupSyncLocation.name = "syncLocation"
+        groupSyncLocation.attributeType = .stringAttributeType
+        groupSyncLocation.isOptional = true
+        groupProperties.append(groupSyncLocation)
+
+        let groupGistId = NSAttributeDescription()
+        groupGistId.name = "gistId"
+        groupGistId.attributeType = .stringAttributeType
+        groupGistId.isOptional = true
+        groupProperties.append(groupGistId)
+
+        let groupLastSynced = NSAttributeDescription()
+        groupLastSynced.name = "lastSynced"
+        groupLastSynced.attributeType = .dateAttributeType
+        groupLastSynced.isOptional = true
+        groupProperties.append(groupLastSynced)
+
         groupEntity.properties = groupProperties
 
         // MARK: - AppRule Entity
