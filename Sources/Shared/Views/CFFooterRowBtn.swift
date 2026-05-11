@@ -82,7 +82,7 @@ struct CFFooterRowBtn: View {
                 print("Quit")
             }
         }
-        .background(theme.fill1)
+        .background(Color.black.opacity(0.07))
 
         Text("↑ Danger variant (Quit)")
             .font(.caption)
