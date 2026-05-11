@@ -46,9 +46,9 @@ struct SettingsView: View {
                 case 1: AppearanceSettingsView()
                 case 2: TextExpansionSettingsView()
                 case 3: HotkeySettingsView()
-                case 4: ExclusionsSettingsView()
-                case 5: SyncSettingsView()
-                case 6: AdvancedSettingsView()
+                case 4: SyncSettingsView()
+                case 5: PrivacySettingsView()
+                case 6: LanguageSettingsView()
                 default: EmptyView()
                 }
             }
