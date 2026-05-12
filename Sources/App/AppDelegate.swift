@@ -34,6 +34,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hasShownAccessibilityAlert = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Create default snippets on first launch
+        CoreDataStack.shared.createDefaultSnippetsIfNeeded()
+
         // Initialize services
         clipboardMonitor = ClipboardMonitor()
         appContextMonitor = AppContextMonitor()
