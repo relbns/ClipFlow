@@ -43,6 +43,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         textExpansionEngine = TextExpansionEngine(context: context)
         if let engine = textExpansionEngine {
             keystrokeMonitor = KeystrokeMonitor(textExpansionEngine: engine)
+
+            // Preload snippet cache for better performance
+            engine.refreshCache()
         }
 
         // Create menu bar controller (keep for fallback)

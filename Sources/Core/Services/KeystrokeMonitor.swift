@@ -36,11 +36,9 @@ class KeystrokeMonitor: ObservableObject {
                 guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
                 let monitor = Unmanaged<KeystrokeMonitor>.fromOpaque(refcon).takeUnretainedValue()
 
-                Task { @MainActor in
-                    return await monitor.handleKeyEvent(proxy: proxy, type: type, event: event)
-                }
-
-                return Unmanaged.passUnretained(event)
+                // PERFORMANCE: Handle synchronously to avoid lag
+                // Only the expansion itself happens asynchronously
+                return monitor.handleKeyEventSync(proxy: proxy, type: type, event: event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
@@ -69,7 +67,8 @@ class KeystrokeMonitor: ObservableObject {
         print("⌨️ Keystroke monitoring stopped")
     }
 
-    private func handleKeyEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) async -> Unmanaged<CGEvent> {
+    // PERFORMANCE: Synchronous handler to avoid lag on every keystroke
+    private func handleKeyEventSync(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent> {
         guard type == .keyDown else { return Unmanaged.passUnretained(event) }
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
@@ -81,35 +80,40 @@ class KeystrokeMonitor: ObservableObject {
 
         // Handle special keys
         if isDeleteKey(keyCode) {
-            if !typedBuffer.isEmpty {
-                typedBuffer.removeLast()
+            Task { @MainActor in
+                if !self.typedBuffer.isEmpty {
+                    self.typedBuffer.removeLast()
+                }
             }
             return Unmanaged.passUnretained(event)
         }
 
         if isResetKey(keyCode) {
-            typedBuffer = ""
+            Task { @MainActor in
+                self.typedBuffer = ""
+            }
             return Unmanaged.passUnretained(event)
         }
 
-        // Add to buffer
-        typedBuffer.append(chars)
-        if typedBuffer.count > maxBufferLength {
-            typedBuffer = String(typedBuffer.suffix(maxBufferLength))
-        }
+        // Update buffer on main actor
+        Task { @MainActor in
+            self.typedBuffer.append(chars)
+            if self.typedBuffer.count > self.maxBufferLength {
+                self.typedBuffer = String(self.typedBuffer.suffix(self.maxBufferLength))
+            }
 
-        // Try to match snippet
-        if let match = await textExpansionEngine.findMatch(in: typedBuffer, triggerChar: chars.last) {
-            print("🎯 Match found: \(match.snippet.abbreviation) → \(match.snippet.title)")
+            // Try to match snippet (synchronous, fast lookup in cache)
+            if let match = self.textExpansionEngine.findMatch(in: self.typedBuffer, triggerChar: chars.last) {
+                print("🎯 Match found: \(match.snippet.abbreviation) → \(match.snippet.title)")
 
-            // Clear matched part from buffer
-            typedBuffer = ""
+                // Clear matched part from buffer
+                self.typedBuffer = ""
 
-            // Trigger expansion
-            await textExpansionEngine.expand(match)
-
-            // Optionally suppress trigger character
-            // For now, let it through
+                // Trigger expansion asynchronously (doesn't block typing)
+                Task {
+                    await self.textExpansionEngine.expand(match)
+                }
+            }
         }
 
         return Unmanaged.passUnretained(event)
