@@ -1,6 +1,21 @@
 import Cocoa
 import SwiftUI
 
+/// Wrapper that dynamically updates layout direction based on language changes
+struct DynamicLanguageWrapper<Content: View>: View {
+    @EnvironmentObject var languageManager: LanguageManager
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .environment(\.layoutDirection, languageManager.layoutDirection)
+    }
+}
+
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
@@ -149,13 +164,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openPreferences() {
         print("🔧 AppDelegate.openPreferences() called")
+
         if settingsWindow == nil {
             print("📝 Creating new settings window")
             let languageManager = LanguageManager.shared
-            let settingsView = SettingsView()
-                .cfAutoTheme()
-                .environment(\.layoutDirection, languageManager.layoutDirection)
-                .environmentObject(languageManager)
+            let settingsView = DynamicLanguageWrapper {
+                SettingsView()
+                    .cfAutoTheme()
+            }
+            .environmentObject(languageManager)
 
             let hostingController = NSHostingController(rootView: settingsView)
 
@@ -178,14 +195,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openSnippetEditor() {
         print("📋 AppDelegate.openSnippetEditor() called")
+
         if snippetEditorWindow == nil {
             print("📝 Creating new editor window")
             let languageManager = LanguageManager.shared
-            let editorView = SnippetEditorView()
-                .cfAutoTheme()
-                .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
-                .environment(\.layoutDirection, languageManager.layoutDirection)
-                .environmentObject(languageManager)
+            let editorView = DynamicLanguageWrapper {
+                SnippetEditorView()
+                    .cfAutoTheme()
+                    .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
+            }
+            .environmentObject(languageManager)
 
             let hostingController = NSHostingController(rootView: editorView)
 
@@ -208,13 +227,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openAbout() {
         print("ℹ️ AppDelegate.openAbout() called")
+
         if aboutWindow == nil {
             print("📝 Creating new about window")
             let languageManager = LanguageManager.shared
-            let aboutView = AboutView()
-                .cfAutoTheme()
-                .environment(\.layoutDirection, languageManager.layoutDirection)
-                .environmentObject(languageManager)
+            let aboutView = DynamicLanguageWrapper {
+                AboutView()
+                    .cfAutoTheme()
+            }
+            .environmentObject(languageManager)
 
             let hostingController = NSHostingController(rootView: aboutView)
 
