@@ -99,7 +99,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSLog("✅ Clipboard and context monitoring started")
 
             // Start text expansion if enabled (default: true)
-            let expansionEnabled = UserDefaults.standard.object(forKey: "textExpansionEnabled") as? Bool ?? true
+            // Use explicit Bool conversion to avoid type mismatch crashes
+            let expansionEnabled: Bool
+            if let value = UserDefaults.standard.value(forKey: "textExpansionEnabled") as? Bool {
+                expansionEnabled = value
+            } else if let value = UserDefaults.standard.value(forKey: "textExpansionEnabled") as? Int {
+                expansionEnabled = value != 0
+            } else {
+                expansionEnabled = true // default
+                UserDefaults.standard.set(true, forKey: "textExpansionEnabled")
+            }
             NSLog("📋 Text expansion setting: \(expansionEnabled)")
             if expansionEnabled {
                 NSLog("🎯 Calling startTextExpansion()...")
