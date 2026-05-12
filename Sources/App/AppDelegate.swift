@@ -31,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Text Expansion
     private var textExpansionEngine: TextExpansionEngine?
     private var keystrokeMonitor: KeystrokeMonitor?
+    private var hasShownAccessibilityAlert = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize services
@@ -88,12 +89,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Observe text expansion setting changes
-        NotificationCenter.default.addObserver(
+        // Observe text expansion setting changes (specific key only)
+        UserDefaults.standard.addObserver(
             self,
-            selector: #selector(textExpansionSettingChanged),
-            name: UserDefaults.didChangeNotification,
-            object: nil
+            forKeyPath: "textExpansionEnabled",
+            options: [.new],
+            context: nil
         )
 
         // Hide dock icon (menu bar app only)
@@ -263,14 +264,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Don't restart if already monitoring
+        if monitor.isMonitoring {
+            print("✅ Text expansion already running")
+            return
+        }
+
         do {
             try monitor.startMonitoring()
             print("✅ Text expansion started")
         } catch {
             print("❌ Failed to start text expansion: \(error)")
-            // Show alert to user about accessibility permissions
+            // Only show alert for permission denied (not other errors)
             if case ExpansionError.accessibilityPermissionDenied = error {
-                showAccessibilityAlert()
+                // Only show alert once per session
+                if !hasShownAccessibilityAlert {
+                    hasShownAccessibilityAlert = true
+                    showAccessibilityAlert()
+                } else {
+                    print("⚠️ Permission still denied (alert already shown)")
+                }
             }
         }
     }
@@ -280,18 +293,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("🛑 Text expansion stopped")
     }
 
-    @objc private func textExpansionSettingChanged() {
-        let isEnabled = UserDefaults.standard.object(forKey: "textExpansionEnabled") as? Bool ?? true
-
-        if isEnabled {
-            if keystrokeMonitor?.isMonitoring == false {
-                startTextExpansion()
-            }
-        } else {
-            if keystrokeMonitor?.isMonitoring == true {
-                stopTextExpansion()
-            }
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if keyPath == "textExpansionEnabled" {
+            textExpansionSettingChanged()
         }
+    }
+
+    private func textExpansionSettingChanged() {
+        let isEnabled = UserDefaults.standard.object(forKey: "textExpansionEnabled") as? Bool ?? true
+        let isCurrentlyMonitoring = keystrokeMonitor?.isMonitoring ?? false
+
+        // Only change state if needed
+        if isEnabled && !isCurrentlyMonitoring {
+            startTextExpansion()
+        } else if !isEnabled && isCurrentlyMonitoring {
+            stopTextExpansion()
+        }
+        // Otherwise, already in correct state - do nothing
     }
 
     private func showAccessibilityAlert() {
