@@ -34,21 +34,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hasShownAccessibilityAlert = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSLog("🚀 ClipFlow applicationDidFinishLaunching started")
+
         // Create default snippets on first launch
         CoreDataStack.shared.createDefaultSnippetsIfNeeded()
 
         // Initialize services
         clipboardMonitor = ClipboardMonitor()
         appContextMonitor = AppContextMonitor()
+        NSLog("✅ Clipboard and context monitors initialized")
 
         // Initialize text expansion
         let context = CoreDataStack.shared.viewContext
         textExpansionEngine = TextExpansionEngine(context: context)
         if let engine = textExpansionEngine {
+            NSLog("✅ TextExpansionEngine created")
             keystrokeMonitor = KeystrokeMonitor(textExpansionEngine: engine)
+            NSLog("✅ KeystrokeMonitor created")
 
             // Preload snippet cache for better performance
             engine.refreshCache()
+            NSLog("✅ Snippet cache preloaded")
+        } else {
+            NSLog("❌ Failed to create TextExpansionEngine")
         }
 
         // Create menu bar controller (keep for fallback)
@@ -85,13 +93,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Start monitoring
         Task { @MainActor in
+            NSLog("🔄 Starting monitors...")
             clipboardMonitor?.startMonitoring()
             appContextMonitor?.startMonitoring()
+            NSLog("✅ Clipboard and context monitoring started")
 
             // Start text expansion if enabled (default: true)
             let expansionEnabled = UserDefaults.standard.object(forKey: "textExpansionEnabled") as? Bool ?? true
+            NSLog("📋 Text expansion setting: \(expansionEnabled)")
             if expansionEnabled {
+                NSLog("🎯 Calling startTextExpansion()...")
                 startTextExpansion()
+            } else {
+                NSLog("⚠️ Text expansion is disabled in settings")
             }
         }
 
@@ -265,31 +279,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Text Expansion
     private func startTextExpansion() {
+        NSLog("🎬 startTextExpansion() called")
+
         guard let monitor = keystrokeMonitor else {
-            print("❌ KeystrokeMonitor not initialized")
+            NSLog("❌ KeystrokeMonitor not initialized - cannot start text expansion")
             return
         }
+        NSLog("✅ KeystrokeMonitor exists")
+
+        // Check accessibility permission first
+        let hasPermission = AXIsProcessTrusted()
+        NSLog("🔐 Accessibility permission status: \(hasPermission)")
 
         // Don't restart if already monitoring
         if monitor.isMonitoring {
-            print("✅ Text expansion already running")
+            NSLog("✅ Text expansion already running")
             return
         }
+        NSLog("▶️ Attempting to start keystroke monitoring...")
 
         do {
             try monitor.startMonitoring()
-            print("✅ Text expansion started")
+            NSLog("✅✅✅ Text expansion started successfully!")
         } catch {
-            print("❌ Failed to start text expansion: \(error)")
+            NSLog("❌❌❌ Failed to start text expansion: \(error)")
+            NSLog("Error type: \(type(of: error))")
             // Only show alert for permission denied (not other errors)
             if case ExpansionError.accessibilityPermissionDenied = error {
+                NSLog("⚠️ Error is accessibilityPermissionDenied")
                 // Only show alert once per session
                 if !hasShownAccessibilityAlert {
                     hasShownAccessibilityAlert = true
+                    NSLog("🚨 Showing accessibility alert")
                     showAccessibilityAlert()
                 } else {
-                    print("⚠️ Permission still denied (alert already shown)")
+                    NSLog("⚠️ Permission still denied (alert already shown)")
                 }
+            } else {
+                NSLog("⚠️ Error is NOT accessibilityPermissionDenied, it's: \(error)")
             }
         }
     }
