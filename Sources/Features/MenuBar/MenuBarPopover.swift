@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreData
 
 /// Modern SwiftUI MenuBar Popover - replaces NSMenu
 @MainActor
@@ -8,6 +9,7 @@ struct MenuBarPopover: View {
 
     @AppStorage("viewMode") private var viewMode = "organized"
     @State private var searchText = ""
+    @State private var snippetCount: Int = 0
 
     @Environment(\.cfTheme) var theme
 
@@ -34,6 +36,7 @@ struct MenuBarPopover: View {
                 default: // organized
                     OrganizedHistoryView(
                         clips: filteredClips,
+                        snippetCount: snippetCount,
                         onSelect: selectClip
                     )
                 }
@@ -47,6 +50,9 @@ struct MenuBarPopover: View {
         }
         .frame(width: 340)
         .background(theme.popoverBg)
+        .onAppear {
+            fetchSnippetCount()
+        }
     }
 
     // MARK: - Header
@@ -173,6 +179,14 @@ struct MenuBarPopover: View {
         clipboardMonitor.clearHistory()
         isPresented = false
     }
+
+    private func fetchSnippetCount() {
+        let context = CoreDataStack.shared.viewContext
+        let request: NSFetchRequest<Snippet> = Snippet.fetchRequest()
+        request.predicate = NSPredicate(format: "isEnabled == YES")
+
+        snippetCount = (try? context.count(for: request)) ?? 0
+    }
 }
 
 // MARK: - Simple History View
@@ -217,6 +231,7 @@ struct SimpleHistoryView: View {
 // MARK: - Organized History View
 struct OrganizedHistoryView: View {
     let clips: [SimpleClipItem]
+    let snippetCount: Int
     let onSelect: (SimpleClipItem) -> Void
 
     @Environment(\.cfTheme) var theme
@@ -267,7 +282,7 @@ struct OrganizedHistoryView: View {
                 icon: .sparkles,
                 iconColor: Color(red: 0.47, green: 0.44, blue: 1.0),
                 label: "Snippets",
-                count: 0,  // TODO: Fetch from Core Data
+                count: snippetCount,
                 clips: [],
                 onSelect: { _ in }
             )

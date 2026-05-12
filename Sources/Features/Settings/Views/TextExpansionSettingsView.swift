@@ -104,6 +104,7 @@ struct TextExpansionSettingsView: View {
 
 struct PermissionStatusView: View {
     @State private var hasAccessibility = AXIsProcessTrusted()
+    @State private var checkTimer: Timer?
 
     var body: some View {
         Group {
@@ -130,6 +131,22 @@ struct PermissionStatusView: View {
         }
         .onAppear {
             hasAccessibility = AXIsProcessTrusted()
+            startPeriodicCheck()
+        }
+        .onDisappear {
+            checkTimer?.invalidate()
+            checkTimer = nil
+        }
+    }
+
+    private func startPeriodicCheck() {
+        // Check every 2 seconds if permission status changed
+        checkTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            let newStatus = AXIsProcessTrusted()
+            if newStatus != hasAccessibility {
+                hasAccessibility = newStatus
+                print("🔐 Accessibility permission status changed: \(newStatus)")
+            }
         }
     }
 
@@ -137,8 +154,8 @@ struct PermissionStatusView: View {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
 
-        // Recheck after a delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        // Immediate recheck after opening settings
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             hasAccessibility = AXIsProcessTrusted()
         }
     }
