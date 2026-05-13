@@ -18,14 +18,21 @@ class KeystrokeMonitor: ObservableObject {
     }
 
     func startMonitoring() throws {
+        NSLog("🎯 KeystrokeMonitor.startMonitoring() called")
+
         // Check Accessibility permissions
         let trusted = AXIsProcessTrusted()
+        NSLog("🔐 AXIsProcessTrusted returned: \(trusted)")
+
         guard trusted else {
+            NSLog("❌ Throwing accessibilityPermissionDenied error")
             throw ExpansionError.accessibilityPermissionDenied
         }
+        NSLog("✅ Accessibility permission verified")
 
         // Create event tap for keyDown events
         let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
+        NSLog("📊 Creating CGEvent tap with mask: \(eventMask)")
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -42,15 +49,23 @@ class KeystrokeMonitor: ObservableObject {
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
+            NSLog("❌ CGEvent.tapCreate returned nil - failed to create event tap")
             throw ExpansionError.failedToCreateEventTap
         }
+        NSLog("✅ CGEvent tap created successfully")
 
         self.eventTap = tap
         self.runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        NSLog("✅ Run loop source created")
+
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        NSLog("✅ Run loop source added to current run loop")
+
         CGEvent.tapEnable(tap: tap, enable: true)
+        NSLog("✅ Event tap enabled")
 
         isMonitoring = true
+        NSLog("⌨️⌨️⌨️ Keystroke monitoring started successfully!")
         print("⌨️ Keystroke monitoring started")
     }
 

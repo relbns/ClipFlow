@@ -13,8 +13,8 @@ func L(_ key: String) -> String {
         return localized
     }
 
-    // Fallback: try other bundles
-    let fallbackBundles = [Bundle.main, Bundle.module]
+    // Fallback: try main bundle
+    let fallbackBundles = [Bundle.main]
     for fallbackBundle in fallbackBundles {
         let fallbackLocalized = NSLocalizedString(key, bundle: fallbackBundle, comment: "")
         if fallbackLocalized != key {

@@ -50,13 +50,7 @@ class LanguageManager: ObservableObject {
         // Try to find localized bundle
         let languageCode = String(currentLanguage.prefix(2))
 
-        // Check Bundle.module first (SPM)
-        if let path = Bundle.module.path(forResource: languageCode, ofType: "lproj"),
-           let bundle = Bundle(path: path) {
-            return bundle
-        }
-
-        // Check Bundle.main (Xcode)
+        // Check Bundle.main for localized resources
         if let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
            let bundle = Bundle(path: path) {
             return bundle

@@ -96,7 +96,16 @@ struct CFShowcase: View {
             }
 
             CFSettingsRow(label: "Monospace Input") {
-                CFInput(text: .constant(".sig"), placeholder: "Abbreviation", mono: true, prefix: ".")
+                CFInput(
+                    text: .constant(".sig"),
+                    placeholder: "Abbreviation",
+                    mono: true,
+                    prefix: AnyView(
+                        Text(".")
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.textSubtle)
+                    )
+                )
             }
 
             CFSettingsRow(label: "Slider") {
