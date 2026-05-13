@@ -76,17 +76,15 @@ struct CFInput: View {
     @Binding var text: String
     var placeholder: String = ""
     var mono: Bool = false
-    var prefix: String? = nil
+    var prefix: AnyView? = nil
     var suffix: AnyView? = nil
     var dir: TextAlignment = .leading
     @Environment(\.cfTheme) var theme
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             if let prefix = prefix {
-                Text(prefix)
-                    .font(.system(size: 12))
-                    .foregroundColor(theme.textSubtle)
+                prefix
             }
 
             TextField(placeholder, text: $text)
@@ -99,12 +97,12 @@ struct CFInput: View {
                 suffix
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
+        .padding(.horizontal, 10)
+        .frame(height: 28)
         .background(theme.inputBg)
-        .cornerRadius(6)
+        .cornerRadius(7)
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 7)
                 .strokeBorder(theme.stroke, lineWidth: 1)
         )
     }
@@ -346,7 +344,15 @@ struct CFControls_Previews: PreviewProvider {
                         }
 
                         CFField(label: "Monospace Input") {
-                            CFInput(text: .constant(".sig"), placeholder: "Abbreviation", mono: true, prefix: ".")
+                            CFInput(
+                                text: .constant(".sig"),
+                                placeholder: "Abbreviation",
+                                mono: true,
+                                prefix: AnyView(
+                                    Text(".")
+                                        .font(.system(size: 13))
+                                )
+                            )
                         }
 
                         CFField(label: "Slider") {

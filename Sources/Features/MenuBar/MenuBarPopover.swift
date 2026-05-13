@@ -59,67 +59,27 @@ struct MenuBarPopover: View {
     private var headerView: some View {
         VStack(spacing: 0) {
             // Search - padding 8px 8px 6px
-            VStack(spacing: 0) {
-                CFInput(
-                    text: $searchText,
-                    placeholder: "Search clipboard...",
-                    prefix: nil,
-                    suffix: AnyView(
-                        HStack(spacing: 6) {
-                            CFKBD(text: "⌘F", dim: true)
-                            CFIcon(type: .search, size: 13, stroke: 1.8)
-                                .foregroundColor(theme.textSubtle)
-                        }
-                    )
+            CFInput(
+                text: $searchText,
+                placeholder: "Search clips & snippets",
+                prefix: AnyView(
+                    CFIcon(type: .search, size: 13, stroke: 1.8)
+                        .foregroundColor(theme.textSubtle)
+                ),
+                suffix: AnyView(
+                    CFKBD(text: "⌘F", dim: true)
                 )
-            }
+            )
             .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
-
-            // Mode Switcher (if not Hebrew)
-            if viewMode != "hebrew" {
-                HStack(spacing: 8) {
-                    modeButton("Simple", icon: .text, isActive: viewMode == "simple") {
-                        viewMode = "simple"
-                    }
-
-                    modeButton("Organized", icon: .folder, isActive: viewMode == "organized") {
-                        viewMode = "organized"
-                    }
-
-                    Spacer()
-
-                    Button(action: { viewMode = "hebrew" }) {
-                        CFIcon(type: .hebrew, size: 14, stroke: 1.8)
-                            .foregroundColor(theme.textMuted)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(EdgeInsets(top: 0, leading: 12, bottom: 12, trailing: 12))
-            }
         }
     }
 
-    private func modeButton(_ label: String, icon: CFIcon.IconType, isActive: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                CFIcon(type: icon, size: 12, stroke: 1.8)
-                    .foregroundColor(isActive ? theme.accent : theme.textMuted)
-
-                Text(label)
-                    .font(.system(size: 11, weight: isActive ? .semibold : .regular))
-                    .foregroundColor(isActive ? theme.textStrong : theme.textMuted)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(isActive ? theme.accent.opacity(0.15) : Color.clear)
-            .cornerRadius(4)
-        }
-        .buttonStyle(.plain)
-    }
 
     // MARK: - Footer
     private var footerView: some View {
         VStack(spacing: 0) {
+            Divider()
+
             CFFooterRowBtn(icon: .sparkles, label: "Snippet Editor…", kbd: "⌘E") {
                 openSnippetEditor()
             }
@@ -139,8 +99,60 @@ struct MenuBarPopover: View {
             CFFooterRowBtn(icon: .power, label: "Quit ClipFlow", kbd: "⌘Q", danger: true) {
                 NSApp.terminate(nil)
             }
+
+            // Mode toggle (only in Organized mode)
+            if viewMode == "organized" {
+                modeSwitcher
+                    .padding(EdgeInsets(top: 6, leading: 10, bottom: 10, trailing: 10))
+            } else {
+                Spacer()
+                    .frame(height: 6)
+            }
         }
-        .background(theme.fill1)
+    }
+
+    private var modeSwitcher: some View {
+        HStack(spacing: 2) {
+            ForEach(["Simple", "Organized"], id: \.self) { mode in
+                Button(action: {
+                    viewMode = mode.lowercased()
+                }) {
+                    Group {
+                        if viewMode == mode.lowercased() {
+                            Text(mode)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(theme.textStrong)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
+                                .background(theme.segSelected)
+                                .cornerRadius(5)
+                                .shadow(
+                                    color: theme.segShadow.color,
+                                    radius: theme.segShadow.radius,
+                                    x: theme.segShadow.x,
+                                    y: theme.segShadow.y
+                                )
+                        } else {
+                            Text(mode)
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(theme.textMuted)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
+                                .background(Color.clear)
+                                .cornerRadius(5)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2)
+        .background(theme.inputBg)
+        .cornerRadius(7)
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .strokeBorder(theme.strokeSoft, lineWidth: 1)
+        )
     }
 
     // MARK: - Helpers
