@@ -10,9 +10,21 @@ swift build -c release
 APP_DIR="Build/ClipFlow.app"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
+mkdir -p "$APP_DIR/Contents/Frameworks"
 
 # Copy binary
 cp .build/release/ClipFlow "$APP_DIR/Contents/MacOS/"
+
+# Copy frameworks (Sparkle, etc.)
+echo "📦 Copying frameworks..."
+if [ -f ".build/release/Sparkle.framework/Sparkle" ]; then
+    cp -R .build/release/Sparkle.framework "$APP_DIR/Contents/Frameworks/"
+    echo "   ✅ Sparkle.framework"
+fi
+
+# Copy any other .framework or .bundle files
+find .build/release -name "*.framework" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \; 2>/dev/null || true
+find .build/release -name "*.bundle" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 
 # Copy and fix Info.plist (replace Xcode variables)
 cp Sources/Resources/Info.plist "$APP_DIR/Contents/Info.plist.tmp"
