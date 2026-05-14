@@ -391,6 +391,7 @@ struct OrganizedHistoryView: View {
                 .padding(.top, 8)
 
             SnippetsListView()
+                .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
                 .padding(.bottom, 4)
         }
         .padding(8)
