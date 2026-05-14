@@ -6,7 +6,7 @@ echo "🔨 Building ClipFlow.app..."
 # Build release binary
 swift build -c release
 
-# Create app bundle structure  
+# Create app bundle structure
 APP_DIR="Build/ClipFlow.app"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
@@ -14,17 +14,40 @@ mkdir -p "$APP_DIR/Contents/Resources"
 # Copy binary
 cp .build/release/ClipFlow "$APP_DIR/Contents/MacOS/"
 
-# Copy Info.plist
-cp Sources/Resources/Info.plist "$APP_DIR/Contents/"
+# Copy and fix Info.plist (replace Xcode variables)
+cp Sources/Resources/Info.plist "$APP_DIR/Contents/Info.plist.tmp"
+sed 's/\$(EXECUTABLE_NAME)/ClipFlow/g' "$APP_DIR/Contents/Info.plist.tmp" | \
+sed 's/\$(DEVELOPMENT_LANGUAGE)/en/g' | \
+sed 's/\$(PRODUCT_BUNDLE_IDENTIFIER)/com.singalong.clipflow/g' > "$APP_DIR/Contents/Info.plist"
+rm "$APP_DIR/Contents/Info.plist.tmp"
+
+# Copy entitlements
+if [ -f "Sources/Resources/ClipFlow.entitlements" ]; then
+    cp Sources/Resources/ClipFlow.entitlements "$APP_DIR/Contents/"
+fi
 
 # Copy resources if they exist
 if [ -d "Sources/Resources/Assets.xcassets" ]; then
     cp -R Sources/Resources/Assets.xcassets "$APP_DIR/Contents/Resources/"
 fi
 
+# Try to code sign (optional, won't fail if no identity)
+echo "🔐 Attempting to code sign..."
+if codesign -s - --force --deep "$APP_DIR" 2>/dev/null; then
+    echo "✅ Code signed (ad-hoc)"
+else
+    echo "⚠️  Code sign skipped (not critical)"
+fi
+
+echo ""
 echo "✅ Built: $APP_DIR"
 echo ""
-echo "Now:"
-echo "1. Drag Build/ClipFlow.app to /Applications"
-echo "2. Run from /Applications"
-echo "3. Grant Accessibility permission"
+echo "📦 Now install to /Applications:"
+echo "   sudo rm -rf /Applications/ClipFlow.app"
+echo "   sudo cp -R Build/ClipFlow.app /Applications/"
+echo "   sudo chmod -R 755 /Applications/ClipFlow.app"
+echo ""
+echo "Then:"
+echo "1. Open /Applications/ClipFlow.app (NOT from Xcode!)"
+echo "2. Grant Accessibility permission (ONLY ONCE!)"
+echo "3. Permission will stick because path is stable"
