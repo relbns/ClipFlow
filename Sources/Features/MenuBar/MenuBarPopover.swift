@@ -41,7 +41,7 @@ struct MenuBarPopover: View {
                     )
                 }
             }
-            .frame(maxHeight: 500)
+            .frame(minHeight: 400, maxHeight: 700)
 
             Divider()
 
