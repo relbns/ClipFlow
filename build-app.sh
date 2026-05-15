@@ -15,6 +15,13 @@ mkdir -p "$APP_DIR/Contents/Frameworks"
 # Copy binary
 cp .build/release/ClipFlow "$APP_DIR/Contents/MacOS/"
 
+# Fix Sparkle framework @rpath reference
+echo "🔧 Fixing framework paths..."
+install_name_tool -change \
+    "@rpath/Sparkle.framework/Versions/B/Sparkle" \
+    "@executable_path/../Frameworks/Sparkle.framework/Versions/B/Sparkle" \
+    "$APP_DIR/Contents/MacOS/ClipFlow"
+
 # Copy frameworks (Sparkle, etc.)
 echo "📦 Copying frameworks..."
 if [ -f ".build/release/Sparkle.framework/Sparkle" ]; then
