@@ -112,21 +112,24 @@ class KeystrokeMonitor: ObservableObject {
 
         // Update buffer on main actor
         Task { @MainActor in
+            // First append to buffer
             self.typedBuffer.append(chars)
             if self.typedBuffer.count > self.maxBufferLength {
                 self.typedBuffer = String(self.typedBuffer.suffix(self.maxBufferLength))
             }
 
-            // Try to match snippet (synchronous, fast lookup in cache)
+            // Try to match snippet (pass buffer including trigger char, and the trigger char separately)
+            // The findMatch will check if buffer WITHOUT trigger ends with abbreviation
             if let match = self.textExpansionEngine.findMatch(in: self.typedBuffer, triggerChar: chars.last) {
                 print("🎯 Match found: \(match.snippet.abbreviation) → \(match.snippet.title)")
 
-                // Clear matched part from buffer
+                // Clear buffer
                 self.typedBuffer = ""
 
                 // Trigger expansion asynchronously (doesn't block typing)
+                // Need to delete abbreviation + 1 for trigger character
                 Task {
-                    await self.textExpansionEngine.expand(match)
+                    await self.textExpansionEngine.expand(match, includingTrigger: true)
                 }
             }
         }

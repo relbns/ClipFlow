@@ -89,12 +89,19 @@ class TextExpansionEngine {
             // Get frontmost app (with caching)
             let frontmostApp = getFrontmostAppBundleID()
 
+            // Check trigger character first
+            guard let trigger = triggerChar else { return nil }
+
+            // Buffer might include trigger char at end - strip it for matching
+            let bufferWithoutTrigger = buffer.dropLast()
+            guard !bufferWithoutTrigger.isEmpty else { return nil }
+
             // Fast path: Try to find a match in cached snippets
             for cached in snippetCache {
                 let abbrev = cached.abbreviation
 
-                // Quick check: buffer must end with abbreviation
-                guard buffer.hasSuffix(abbrev) else { continue }
+                // Quick check: buffer (without trigger) must end with abbreviation
+                guard bufferWithoutTrigger.hasSuffix(abbrev) else { continue }
 
                 // Check app-specific rules
                 if cached.restrictToApps {
@@ -103,9 +110,7 @@ class TextExpansionEngine {
                     }
                 }
 
-                // Check trigger character
-                guard let trigger = triggerChar else { continue }
-
+                // Check if trigger matches the required type
                 if isValidTrigger(trigger, for: cached.triggerType) {
                     return Match(snippet: cached.snippet, abbreviationLength: abbrev.count)
                 }
@@ -116,11 +121,12 @@ class TextExpansionEngine {
     }
 
     /// Expand a matched snippet (async - runs in background)
-    func expand(_ match: Match) async {
+    func expand(_ match: Match, includingTrigger: Bool = false) async {
         let snippet = match.snippet
 
-        // Delete the abbreviation (backspaces)
-        deleteCharacters(count: match.abbreviationLength)
+        // Delete the abbreviation + trigger character (backspaces)
+        let deleteCount = match.abbreviationLength + (includingTrigger ? 1 : 0)
+        deleteCharacters(count: deleteCount)
 
         // Small delay for deletion to complete
         try? await Task.sleep(nanoseconds: 5_000_000) // 5ms
