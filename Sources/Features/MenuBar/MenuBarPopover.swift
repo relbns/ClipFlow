@@ -100,14 +100,9 @@ struct MenuBarPopover: View {
                 NSApp.terminate(nil)
             }
 
-            // Mode toggle (only in Organized mode)
-            if viewMode == "organized" {
-                modeSwitcher
-                    .padding(EdgeInsets(top: 6, leading: 10, bottom: 10, trailing: 10))
-            } else {
-                Spacer()
-                    .frame(height: 6)
-            }
+            // Mode toggle
+            modeSwitcher
+                .padding(EdgeInsets(top: 6, leading: 10, bottom: 10, trailing: 10))
         }
     }
 

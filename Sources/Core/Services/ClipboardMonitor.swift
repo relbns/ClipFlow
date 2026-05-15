@@ -10,7 +10,10 @@ class ClipboardMonitor: ObservableObject {
     private var lastChangeCount: Int = 0
     private let pasteboard = NSPasteboard.general
     private var cancellables = Set<AnyCancellable>()
-    private let maxHistorySize = 30
+
+    // Settings
+    @AppStorage("maxHistoryItems") private var maxHistoryItems: Double = 30
+    @AppStorage("removeDuplicates") private var removeDuplicates: Bool = true
 
     func startMonitoring() {
         lastChangeCount = pasteboard.changeCount
@@ -46,11 +49,13 @@ class ClipboardMonitor: ObservableObject {
     private func handleNewClip(content: String, type: ClipType, imageData: Data? = nil) async {
         print("📋 New clip detected: \(content.prefix(50))")
 
-        // Check for duplicates
-        let contentHash = content.sha256Hash
-        if clipHistory.contains(where: { $0.dataHash == contentHash }) {
-            print("   ↳ Duplicate, skipping")
-            return
+        // Check for duplicates (if enabled)
+        if removeDuplicates {
+            let contentHash = content.sha256Hash
+            if clipHistory.contains(where: { $0.dataHash == contentHash }) {
+                print("   ↳ Duplicate, skipping")
+                return
+            }
         }
 
         // Create new clip item
@@ -63,9 +68,10 @@ class ClipboardMonitor: ObservableObject {
         // Add to history (newest first)
         clipHistory.insert(clipItem, at: 0)
 
-        // Maintain max size
-        if clipHistory.count > maxHistorySize {
-            clipHistory = Array(clipHistory.prefix(maxHistorySize))
+        // Maintain max size (use setting)
+        let maxSize = Int(maxHistoryItems)
+        if clipHistory.count > maxSize {
+            clipHistory = Array(clipHistory.prefix(maxSize))
         }
 
         print("   ↳ Added to history (\(clipHistory.count) items)")

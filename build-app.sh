@@ -50,6 +50,18 @@ if [ -d "Sources/Resources/Assets.xcassets" ]; then
     cp -R Sources/Resources/Assets.xcassets "$APP_DIR/Contents/Resources/"
 fi
 
+# Copy localizations
+if [ -d "Sources/Resources/Localizations" ]; then
+    echo "🌍 Copying localizations..."
+    cp -R Sources/Resources/Localizations/* "$APP_DIR/Contents/Resources/"
+    echo "   ✅ Localizations copied"
+fi
+
+# Copy AppIcon.icns if it exists
+if [ -f "Sources/Resources/AppIcon.icns" ]; then
+    cp Sources/Resources/AppIcon.icns "$APP_DIR/Contents/Resources/"
+fi
+
 # Try to code sign (optional, won't fail if no identity)
 echo "🔐 Attempting to code sign..."
 if codesign -s - --force --deep "$APP_DIR" 2>/dev/null; then
