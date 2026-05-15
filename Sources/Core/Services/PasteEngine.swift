@@ -5,12 +5,15 @@ actor PasteEngine {
 
     /// Paste content to the frontmost application
     func paste(_ content: String) async {
+        print("📝 PasteEngine.paste called with content: \(content.prefix(100))")
+
         // Check for {cursor} marker
         let cursorMarker = "{cursor}"
         let hasCursor = content.contains(cursorMarker)
 
         // Remove cursor marker and calculate position
         let cleanContent = content.replacingOccurrences(of: cursorMarker, with: "")
+        print("📝 Clean content (after removing {cursor}): \(cleanContent.prefix(100))")
         let cursorOffset = hasCursor ? content.distance(from: content.range(of: cursorMarker)!.upperBound, to: content.endIndex) : 0
 
         // Save current clipboard
@@ -20,20 +23,20 @@ actor PasteEngine {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(cleanContent, forType: .string)
 
-        // Wait briefly for clipboard to update
-        try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        // Wait for clipboard to update (increased from 10ms)
+        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
 
         // Simulate Cmd+V
         await simulatePaste()
 
         // If cursor marker exists, move cursor to that position
         if hasCursor && cursorOffset > 0 {
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms wait for paste
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms wait for paste
             await moveCursorLeft(count: cursorOffset)
         }
 
-        // Restore original clipboard after delay
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        // Restore original clipboard after longer delay
+        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
         if let saved = savedClipboard {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(saved, forType: .string)

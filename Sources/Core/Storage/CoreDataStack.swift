@@ -108,8 +108,8 @@ class CoreDataStack {
             title: "Email Signature",
             abbreviation: ".sig",
             content: """
-            Best,
-            {clipboard}
+            Best regards,
+            Ariel Benesh
             """,
             group: defaultGroup
         )
