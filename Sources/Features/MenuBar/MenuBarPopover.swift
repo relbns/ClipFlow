@@ -110,7 +110,11 @@ struct MenuBarPopover: View {
         HStack(spacing: 2) {
             ForEach(["Simple", "Organized"], id: \.self) { mode in
                 Button(action: {
-                    viewMode = mode.lowercased()
+                    print("🔄 Mode button clicked: \(mode) (current: \(viewMode))")
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        viewMode = mode.lowercased()
+                    }
+                    print("🔄 Mode changed to: \(viewMode)")
                 }) {
                     Group {
                         if viewMode == mode.lowercased() {

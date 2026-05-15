@@ -11,9 +11,14 @@ class ClipboardMonitor: ObservableObject {
     private let pasteboard = NSPasteboard.general
     private var cancellables = Set<AnyCancellable>()
 
-    // Settings
-    @AppStorage("maxHistoryItems") private var maxHistoryItems: Double = 30
-    @AppStorage("removeDuplicates") private var removeDuplicates: Bool = true
+    // Settings from UserDefaults
+    private var maxHistoryItems: Int {
+        Int(UserDefaults.standard.double(forKey: "maxHistoryItems"))
+    }
+
+    private var removeDuplicates: Bool {
+        UserDefaults.standard.bool(forKey: "removeDuplicates")
+    }
 
     func startMonitoring() {
         lastChangeCount = pasteboard.changeCount
@@ -68,8 +73,8 @@ class ClipboardMonitor: ObservableObject {
         // Add to history (newest first)
         clipHistory.insert(clipItem, at: 0)
 
-        // Maintain max size (use setting)
-        let maxSize = Int(maxHistoryItems)
+        // Maintain max size (use setting, default 30)
+        let maxSize = max(10, maxHistoryItems)
         if clipHistory.count > maxSize {
             clipHistory = Array(clipHistory.prefix(maxSize))
         }

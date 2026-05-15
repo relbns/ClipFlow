@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AppearanceSettingsView: View {
+    @AppStorage("appearanceMode") private var appearanceMode = "auto"
     @AppStorage("viewMode") private var viewMode = "organized"
     @AppStorage("showIcons") private var showIcons = true
     @AppStorage("showThumbnails") private var showThumbnails = true
@@ -27,6 +28,25 @@ struct AppearanceSettingsView: View {
 
                 // Settings Rows
                 VStack(spacing: 0) {
+                    CFSettingsRow(
+                        label: "Theme",
+                        hint: "Choose light, dark, or follow system appearance"
+                    ) {
+                        CFSegmentedControl(
+                            selection: Binding(
+                                get: {
+                                    ["auto", "light", "dark"].firstIndex(of: appearanceMode) ?? 0
+                                },
+                                set: { index in
+                                    appearanceMode = ["auto", "light", "dark"][index]
+                                    // TODO: Update app theme
+                                }
+                            ),
+                            options: ["Auto", "Light", "Dark"],
+                            columns: 3
+                        )
+                    }
+
                     CFSettingsRow(
                         label: L("view_mode"),
                         hint: L("view_mode_description")

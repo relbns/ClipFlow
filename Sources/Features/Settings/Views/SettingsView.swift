@@ -168,6 +168,13 @@ struct GeneralSettingsView: View {
                         Spacer()
 
                         CFLinkBtn(
+                            icon: AnyView(CFIcon(type: .sparkles, size: 13)),
+                            label: "About ClipFlow"
+                        ) {
+                            NSApp.sendAction(#selector(AppDelegate.openAbout), to: nil, from: nil)
+                        }
+
+                        CFLinkBtn(
                             icon: AnyView(CFIcon(type: .link, size: 13)),
                             label: L("view_on_github")
                         ) {
