@@ -45,6 +45,10 @@ struct AppearanceSettingsView: View {
                             options: ["Auto", "Light", "Dark"],
                             columns: 3
                         )
+                        .onChange(of: appearanceMode) { _, newValue in
+                            // Theme will be applied automatically by ThemeManager observing UserDefaults
+                            print("🎨 Theme changed to: \(newValue)")
+                        }
                     }
 
                     CFSettingsRow(

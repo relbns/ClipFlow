@@ -16,6 +16,20 @@ struct DynamicLanguageWrapper<Content: View>: View {
     }
 }
 
+/// Window delegate for cleanup when Welcome window closes
+class WelcomeWindowDelegate: NSObject, NSWindowDelegate {
+    let onClose: () -> Void
+
+    init(onClose: @escaping () -> Void) {
+        self.onClose = onClose
+        super.init()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onClose()
+    }
+}
+
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
@@ -27,14 +41,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var snippetEditorWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
+    private var welcomeWindow: NSWindow?
+    private var welcomeWindowDelegate: WelcomeWindowDelegate?
 
     // Text Expansion
     private var textExpansionEngine: TextExpansionEngine?
     private var keystrokeMonitor: KeystrokeMonitor?
     private var hasShownAccessibilityAlert = false
 
+    // Theme
+    private var themeManager: ThemeManager?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("🚀 ClipFlow applicationDidFinishLaunching started")
+
+        // Initialize theme manager
+        themeManager = ThemeManager.shared
+        NSLog("✅ Theme manager initialized")
 
         // Create default snippets on first launch
         CoreDataStack.shared.createDefaultSnippetsIfNeeded()
@@ -284,6 +307,61 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         aboutWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         print("✅ About window should be visible now")
+    }
+
+    @objc func openWelcome() {
+        print("👋 AppDelegate.openWelcome() called")
+
+        if welcomeWindow == nil {
+            print("📝 Creating new welcome window")
+            let languageManager = LanguageManager.shared
+
+            // Create a state wrapper for the welcome view
+            class WelcomeState: ObservableObject {
+                @Published var isPresented = true
+            }
+            let state = WelcomeState()
+
+            let welcomeView = DynamicLanguageWrapper {
+                WelcomeView(
+                    isPresented: .init(
+                        get: { state.isPresented },
+                        set: { state.isPresented = $0 }
+                    ),
+                    onGetStarted: { [weak self] in
+                        self?.welcomeWindow?.close()
+                        self?.welcomeWindow = nil
+                    }
+                )
+                .cfAutoTheme()
+            }
+            .environmentObject(languageManager)
+
+            let hostingController = NSHostingController(rootView: welcomeView)
+
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "Welcome to ClipFlow"
+            window.setContentSize(NSSize(width: 780, height: 560))
+            window.styleMask = [NSWindow.StyleMask.titled, NSWindow.StyleMask.closable]
+            window.center()
+
+            // Close and cleanup when window is closed
+            let delegate = WelcomeWindowDelegate { [weak self] in
+                self?.welcomeWindow = nil
+                self?.welcomeWindowDelegate = nil
+            }
+            self.welcomeWindowDelegate = delegate
+            window.delegate = delegate
+
+            welcomeWindow = window
+            print("✅ Welcome window created")
+        } else {
+            print("♻️ Reusing existing welcome window")
+        }
+
+        welcomeWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        print("✅ Welcome window should be visible now")
     }
 
     // MARK: - Text Expansion

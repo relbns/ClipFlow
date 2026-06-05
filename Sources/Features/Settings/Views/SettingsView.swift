@@ -175,6 +175,13 @@ struct GeneralSettingsView: View {
                         }
 
                         CFLinkBtn(
+                            icon: AnyView(CFIcon(type: .star, size: 13)),
+                            label: "Show Welcome Screen"
+                        ) {
+                            NSApp.sendAction(#selector(AppDelegate.openWelcome), to: nil, from: nil)
+                        }
+
+                        CFLinkBtn(
                             icon: AnyView(CFIcon(type: .link, size: 13)),
                             label: L("view_on_github")
                         ) {

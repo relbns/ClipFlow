@@ -33,17 +33,23 @@ fi
 find .build/release -name "*.framework" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \; 2>/dev/null || true
 find .build/release -name "*.bundle" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 
-# Copy and fix Info.plist (replace Xcode variables)
+# Copy and fix Info.plist (replace Xcode variables + increment build)
 cp Sources/Resources/Info.plist "$APP_DIR/Contents/Info.plist.tmp"
+
+# Get current build number and increment it
+CURRENT_BUILD=$(grep -A1 "CFBundleVersion" Sources/Resources/Info.plist | grep "<string>" | sed 's/.*<string>\(.*\)<\/string>/\1/')
+NEW_BUILD=$((CURRENT_BUILD + 1))
+BUILD_DATE=$(date "+%Y%m%d.%H%M")
+
 sed 's/\$(EXECUTABLE_NAME)/ClipFlow/g' "$APP_DIR/Contents/Info.plist.tmp" | \
 sed 's/\$(DEVELOPMENT_LANGUAGE)/en/g' | \
-sed 's/\$(PRODUCT_BUNDLE_IDENTIFIER)/com.singalong.clipflow/g' > "$APP_DIR/Contents/Info.plist"
+sed "s/<string>\${CURRENT_BUILD}<\/string>/<string>${BUILD_DATE}<\/string>/g" > "$APP_DIR/Contents/Info.plist"
 rm "$APP_DIR/Contents/Info.plist.tmp"
 
-# Copy entitlements
-if [ -f "Sources/Resources/ClipFlow.entitlements" ]; then
-    cp Sources/Resources/ClipFlow.entitlements "$APP_DIR/Contents/"
-fi
+echo "📝 Build number: $BUILD_DATE"
+
+# Keep entitlements path for signing (don't copy to app bundle)
+ENTITLEMENTS_PATH="Sources/Resources/ClipFlow.entitlements"
 
 # Copy resources if they exist
 if [ -d "Sources/Resources/Assets.xcassets" ]; then
@@ -62,12 +68,42 @@ if [ -f "Sources/Resources/AppIcon.icns" ]; then
     cp Sources/Resources/AppIcon.icns "$APP_DIR/Contents/Resources/"
 fi
 
-# Try to code sign (optional, won't fail if no identity)
-echo "🔐 Attempting to code sign..."
-if codesign -s - --force --deep "$APP_DIR" 2>/dev/null; then
-    echo "✅ Code signed (ad-hoc)"
+# Code sign with development certificate
+echo "🔐 Code signing..."
+CERT_NAME="Apple Development: arielbenesh@gmail.com (5TC494SL83)"
+
+# Sign frameworks first
+if [ -d "$APP_DIR/Contents/Frameworks" ]; then
+    for framework in "$APP_DIR/Contents/Frameworks"/*.framework; do
+        if [ -e "$framework" ]; then
+            echo "   Signing $(basename "$framework")..."
+            codesign --force --sign "$CERT_NAME" \
+                --timestamp \
+                --options runtime \
+                "$framework/Versions/A" 2>/dev/null || true
+        fi
+    done
+fi
+
+# Sign the main app with entitlements
+if [ -f "$ENTITLEMENTS_PATH" ]; then
+    codesign --force --sign "$CERT_NAME" \
+        --entitlements "$ENTITLEMENTS_PATH" \
+        --timestamp \
+        --options runtime \
+        "$APP_DIR"
 else
-    echo "⚠️  Code sign skipped (not critical)"
+    codesign --force --sign "$CERT_NAME" \
+        --timestamp \
+        --options runtime \
+        "$APP_DIR"
+fi
+
+if [ $? -eq 0 ]; then
+    echo "✅ Signed with: $CERT_NAME"
+else
+    echo "⚠️  Code signing failed - trying ad-hoc..."
+    codesign -s - --force --deep "$APP_DIR" 2>/dev/null
 fi
 
 echo ""

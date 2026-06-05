@@ -223,19 +223,25 @@ struct CFSegmentedControl: View {
             ForEach(0..<options.count, id: \.self) { index in
                 let isSelected = index == selection
                 Button(action: { selection = index }) {
-                    Text(options[index])
-                        .font(.system(size: isSelected ? 12 : 11))
-                        .foregroundColor(isSelected ? theme.textStrong : theme.textSubtle)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, isSelected ? 6 : 5)
-                        .background(isSelected ? AnyShapeStyle(theme.segSelected) : AnyShapeStyle(Color.clear))
-                        .cornerRadius(5)
-                        .shadow(
-                            color: isSelected ? theme.segShadow.color : .clear,
-                            radius: theme.segShadow.radius,
-                            x: theme.segShadow.x,
-                            y: theme.segShadow.y
-                        )
+                    ZStack {
+                        // Background and shadow
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(isSelected ? AnyShapeStyle(theme.segSelected) : AnyShapeStyle(Color.clear))
+                            .shadow(
+                                color: isSelected ? theme.segShadow.color : .clear,
+                                radius: theme.segShadow.radius,
+                                x: theme.segShadow.x,
+                                y: theme.segShadow.y
+                            )
+
+                        // Text content
+                        Text(options[index])
+                            .font(.system(size: isSelected ? 12 : 11))
+                            .foregroundColor(isSelected ? theme.textStrong : theme.textSubtle)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, isSelected ? 6 : 5)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
