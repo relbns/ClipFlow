@@ -31,6 +31,7 @@ struct CFIcon: View {
         case lock
         case dot
         case hebrew
+        case info
     }
 
     let type: IconType
@@ -385,16 +386,30 @@ struct CFIcon: View {
             path.addLine(to: CGPoint(x: 18, y: 18))
             path.move(to: CGPoint(x: 12, y: 6))
             path.addLine(to: CGPoint(x: 18, y: 6))
+
+        case .info:
+            // Circle with 'i'
+            path.addEllipse(in: CGRect(x: 3.5, y: 3.5, width: 17, height: 17))
+            path.move(to: CGPoint(x: 12, y: 10))
+            path.addLine(to: CGPoint(x: 12, y: 16))
         }
 
         return path
     }
 
     private func iconFillPath(for type: IconType) -> Path? {
-        guard type == .dot else { return nil }
-
         var path = Path()
-        path.addEllipse(in: CGRect(x: 9, y: 9, width: 6, height: 6))
+
+        switch type {
+        case .dot:
+            path.addEllipse(in: CGRect(x: 9, y: 9, width: 6, height: 6))
+        case .info:
+            // Dot for 'i'
+            path.addEllipse(in: CGRect(x: 10.5, y: 6.5, width: 3, height: 3))
+        default:
+            return nil
+        }
+
         return path
     }
 }

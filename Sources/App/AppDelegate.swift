@@ -113,6 +113,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSNotification.Name("OpenSnippetEditor"),
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openAbout),
+            name: NSNotification.Name("OpenAbout"),
+            object: nil
+        )
 
         // Start monitoring
         Task { @MainActor in

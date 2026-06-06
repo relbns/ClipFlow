@@ -88,6 +88,10 @@ struct MenuBarPopover: View {
                 openPreferences()
             }
 
+            CFFooterRowBtn(icon: .info, label: "About ClipFlow") {
+                openAbout()
+            }
+
             Divider()
 
             CFFooterRowBtn(icon: .trash, label: "Clear history") {
@@ -183,6 +187,11 @@ struct MenuBarPopover: View {
     private func openPreferences() {
         isPresented = false
         NotificationCenter.default.post(name: NSNotification.Name("OpenPreferences"), object: nil)
+    }
+
+    private func openAbout() {
+        isPresented = false
+        NotificationCenter.default.post(name: NSNotification.Name("OpenAbout"), object: nil)
     }
 
     @MainActor
