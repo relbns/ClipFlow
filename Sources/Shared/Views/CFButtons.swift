@@ -17,7 +17,7 @@ struct CFToolbarBtn: View {
                         .frame(width: 12, height: 12)
                 }
                 Text(label)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
             }
             .foregroundColor(primary ? .white : theme.textStrong)
             .padding(.horizontal, 9)
@@ -112,7 +112,7 @@ struct CFDangerBtn: View {
     var body: some View {
         Button(action: { action?() }) {
             Text(label)
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundColor(Color(red: 1.0, green: 0.48, blue: 0.45, opacity: 1.0))
                 .padding(.horizontal, 9)
                 .frame(height: 24)

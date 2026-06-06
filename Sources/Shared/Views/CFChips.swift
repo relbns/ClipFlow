@@ -1,33 +1,5 @@
 import SwiftUI
 
-// MARK: - Keyboard Shortcut Badge
-struct CFKBD: View {
-    let text: String
-    var dim: Bool = false
-    @Environment(\.cfTheme) var theme
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .foregroundColor(dim ? theme.textSubtle : theme.textMid)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .frame(minWidth: 16)
-            .background(dim ? theme.fillSoft : theme.fill2)
-            .cornerRadius(4)
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(theme.stroke, lineWidth: 1)
-            )
-            .shadow(
-                color: theme.shadowStrong,
-                radius: 0,
-                x: 0,
-                y: -1
-            )
-    }
-}
-
 // MARK: - Pill (for tags, excluded apps, etc.)
 struct CFPill: View {
     let text: String
@@ -253,10 +225,10 @@ struct CFChips_Previews: PreviewProvider {
                             .foregroundColor(theme.text)
 
                         HStack(spacing: 8) {
-                            CFKBD(text: "⌘E")
-                            CFKBD(text: "⌘,")
-                            CFKBD(text: "1", dim: true)
-                            CFKBD(text: "⌘F", dim: false)
+                            CFKBDChip("⌘E")
+                            CFKBDChip("⌘,")
+                            CFKBDChip("1", dim: true)
+                            CFKBDChip("⌘F", dim: false)
                         }
                     }
 

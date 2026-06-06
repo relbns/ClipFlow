@@ -7,35 +7,6 @@ struct CFBanner: View {
         case warn
         case success
         case error
-
-        var colors: (bg: Color, stroke: Color, icon: Color) {
-            switch self {
-            case .info:
-                return (
-                    Color(red: 0.6, green: 0.17, blue: 0.72, opacity: 0.18),  // purple bg
-                    Color(red: 0.6, green: 0.17, blue: 0.72, opacity: 0.35),  // purple stroke
-                    Color(red: 0.85, green: 0.12, blue: 0.72, opacity: 1.0)   // purple icon
-                )
-            case .warn:
-                return (
-                    Color(red: 0.7, green: 0.17, blue: 0.60, opacity: 0.20),  // amber bg
-                    Color(red: 0.7, green: 0.17, blue: 0.60, opacity: 0.40),  // amber stroke
-                    Color(red: 0.85, green: 0.15, blue: 0.60, opacity: 1.0)   // amber icon
-                )
-            case .success:
-                return (
-                    Color(red: 0.7, green: 0.17, blue: 0.45, opacity: 0.18),  // green bg
-                    Color(red: 0.7, green: 0.17, blue: 0.45, opacity: 0.35),  // green stroke
-                    Color(red: 0.85, green: 0.14, blue: 0.45, opacity: 1.0)   // green icon
-                )
-            case .error:
-                return (
-                    Color(red: 0.7, green: 0.17, blue: 0.30, opacity: 0.18),  // red bg
-                    Color(red: 0.7, green: 0.17, blue: 0.30, opacity: 0.35),  // red stroke
-                    Color(red: 0.85, green: 0.15, blue: 0.30, opacity: 1.0)   // red icon
-                )
-            }
-        }
     }
 
     let tone: Tone
@@ -46,11 +17,40 @@ struct CFBanner: View {
 
     @Environment(\.cfTheme) var theme
 
+    private var colors: (bg: Color, stroke: Color, icon: Color) {
+        switch tone {
+        case .info:
+            return (
+                theme.accent.opacity(0.18),
+                theme.accent.opacity(0.35),
+                theme.accent
+            )
+        case .warn:
+            return (
+                theme.warning.opacity(0.20),
+                theme.warning.opacity(0.40),
+                theme.warning
+            )
+        case .success:
+            return (
+                theme.success.opacity(0.18),
+                theme.success.opacity(0.35),
+                theme.success
+            )
+        case .error:
+            return (
+                theme.danger.opacity(0.18),
+                theme.danger.opacity(0.35),
+                theme.danger
+            )
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             // Icon
             icon
-                .foregroundColor(tone.colors.icon)
+                .foregroundColor(colors.icon)
                 .frame(width: 18, height: 18)
                 .padding(.top, 1)
 
@@ -73,11 +73,11 @@ struct CFBanner: View {
             }
         }
         .padding(14)
-        .background(tone.colors.bg)
+        .background(colors.bg)
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(tone.colors.stroke, lineWidth: 1)
+                .strokeBorder(colors.stroke, lineWidth: 1)
         )
     }
 }

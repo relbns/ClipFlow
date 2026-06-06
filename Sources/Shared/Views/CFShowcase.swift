@@ -188,9 +188,9 @@ struct CFShowcase: View {
                     .foregroundColor(theme.text)
 
                 HStack(spacing: 8) {
-                    CFKBD(text: "⌘E")
-                    CFKBD(text: "⌘,")
-                    CFKBD(text: "1", dim: true)
+                    CFKBDChip("⌘E")
+                    CFKBDChip("⌘,")
+                    CFKBDChip("1", dim: true)
                 }
             }
 

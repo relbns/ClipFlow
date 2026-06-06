@@ -42,7 +42,7 @@ struct CFFooterRowBtn: View {
 
                 // Keyboard shortcut badge (optional)
                 if let kbd = kbd {
-                    CFKBD(text: kbd, dim: true)
+                    CFKBDChip(kbd, dim: true)
                 }
             }
             .frame(height: 28)
