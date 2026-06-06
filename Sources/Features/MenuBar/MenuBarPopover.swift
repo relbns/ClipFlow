@@ -67,7 +67,7 @@ struct MenuBarPopover: View {
                         .foregroundColor(theme.textSubtle)
                 ),
                 suffix: AnyView(
-                    CFKBDChip(text: "⌘F", dim: true)
+                    CFKBDChip("⌘F", dim: true)
                 )
             )
             .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
@@ -623,7 +623,7 @@ struct ClipRow: View {
 
                 // Keyboard shortcut
                 if let shortcut = keyboardShortcut {
-                    CFKBDChip(text: shortcut, dim: true)
+                    CFKBDChip(shortcut, dim: true)
                 }
             }
             .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))

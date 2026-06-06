@@ -1,31 +1,5 @@
 import SwiftUI
 
-// MARK: - Variable Chip (for snippet editor)
-struct CFVarChip: View {
-    let text: String
-    var action: (() -> Void)? = nil
-    @Environment(\.cfTheme) var theme
-
-    var body: some View {
-        Button(action: { action?() }) {
-            Text(text)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(Color(red: 0.86, green: 0.12, blue: 0.72)) // oklch(.86 .12 272)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(
-                    theme.accentMix(percent: 30)
-                )
-                .cornerRadius(4)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(theme.accentMix(percent: 35), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Keyboard Shortcut Badge
 struct CFKBD: View {
     let text: String
@@ -265,11 +239,11 @@ struct CFChips_Previews: PreviewProvider {
                             .foregroundColor(theme.text)
 
                         HStack(spacing: 6) {
-                            CFVarChip(text: "{date}")
-                            CFVarChip(text: "{time}")
-                            CFVarChip(text: "{clipboard}")
-                            CFVarChip(text: "{cursor}")
-                            CFVarChip(text: "{prompt:Name}")
+                            CFVarChip("{date}")
+                            CFVarChip("{time}")
+                            CFVarChip("{clipboard}")
+                            CFVarChip("{cursor}")
+                            CFVarChip("{prompt:Name}")
                         }
                     }
 

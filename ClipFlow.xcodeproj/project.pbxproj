@@ -46,6 +46,12 @@
 		955A12DEC6391421EB27FB78 /* KeystrokeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7A1A3DBF823CA7DE9F5658 /* KeystrokeMonitor.swift */; };
 		95E0A6D21B2ECADE24A2A77F /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F14FC56AF62DDB849DEE0A1D /* Constants.swift */; };
 		9692EEC7F0FBB8CEC61AD003 /* ClipFlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4AC65C65E8D9EF183514721 /* ClipFlowApp.swift */; };
+		9883262D2FD4BADB009E6747 /* CFPopoverChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9883262A2FD4BADB009E6747 /* CFPopoverChrome.swift */; };
+		9883262E2FD4BADB009E6747 /* CFCustomToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988326272FD4BADB009E6747 /* CFCustomToggle.swift */; };
+		9883262F2FD4BADB009E6747 /* CFKBDChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988326292FD4BADB009E6747 /* CFKBDChip.swift */; };
+		988326302FD4BADB009E6747 /* CFIconRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 988326282FD4BADB009E6747 /* CFIconRow.swift */; };
+		988326312FD4BADB009E6747 /* CFVarChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9883262B2FD4BADB009E6747 /* CFVarChip.swift */; };
+		988326322FD4BADB009E6747 /* CFWindowChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9883262C2FD4BADB009E6747 /* CFWindowChrome.swift */; };
 		9B5E13E7C993487AA9C2ED84 /* LocalizedString.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B09CF9C4223BAB501E55B77 /* LocalizedString.swift */; };
 		B1C76BEF7E48BD7834E484F4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B644F4586ED641D09F53169D /* Assets.xcassets */; };
 		B967299616B26EC0A7EFC359 /* CFStepIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33AA94B747D55D92A4949E05 /* CFStepIndicator.swift */; };
@@ -99,6 +105,12 @@
 		79522F605CC4D7B01C4AE712 /* SnippetExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetExporter.swift; sourceTree = "<group>"; };
 		856A414C207D33C833CE4A07 /* HotkeySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySettingsView.swift; sourceTree = "<group>"; };
 		9103FD8B825B281538EB0478 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		988326272FD4BADB009E6747 /* CFCustomToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CFCustomToggle.swift; sourceTree = "<group>"; };
+		988326282FD4BADB009E6747 /* CFIconRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CFIconRow.swift; sourceTree = "<group>"; };
+		988326292FD4BADB009E6747 /* CFKBDChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CFKBDChip.swift; sourceTree = "<group>"; };
+		9883262A2FD4BADB009E6747 /* CFPopoverChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CFPopoverChrome.swift; sourceTree = "<group>"; };
+		9883262B2FD4BADB009E6747 /* CFVarChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CFVarChip.swift; sourceTree = "<group>"; };
+		9883262C2FD4BADB009E6747 /* CFWindowChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CFWindowChrome.swift; sourceTree = "<group>"; };
 		9A5B8C4014153C530D56684B /* CFShowcase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CFShowcase.swift; sourceTree = "<group>"; };
 		9B09CF9C4223BAB501E55B77 /* LocalizedString.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizedString.swift; sourceTree = "<group>"; };
 		9D4D91766CA3DABF5A2E8A38 /* Date+Hebrew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Hebrew.swift"; sourceTree = "<group>"; };
@@ -185,6 +197,12 @@
 		423B45F574A886A6E41B1D6B /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				988326272FD4BADB009E6747 /* CFCustomToggle.swift */,
+				988326282FD4BADB009E6747 /* CFIconRow.swift */,
+				988326292FD4BADB009E6747 /* CFKBDChip.swift */,
+				9883262A2FD4BADB009E6747 /* CFPopoverChrome.swift */,
+				9883262B2FD4BADB009E6747 /* CFVarChip.swift */,
+				9883262C2FD4BADB009E6747 /* CFWindowChrome.swift */,
 				0078EAA9C1191D58149B1620 /* CFBanner.swift */,
 				BAFA64DB6FAA884714B755D0 /* CFButtons.swift */,
 				6DD23D3B6CCBAD33F4FD0406 /* CFChips.swift */,
@@ -512,6 +530,12 @@
 				6F1BD781FC23BE0FD525512A /* TextExpansionEngine.swift in Sources */,
 				0754B7BA1F097D7924D74682 /* TextExpansionSettingsView.swift in Sources */,
 				FCEF28ACCC08AADBEBE54E13 /* VariableProcessor.swift in Sources */,
+				9883262D2FD4BADB009E6747 /* CFPopoverChrome.swift in Sources */,
+				9883262E2FD4BADB009E6747 /* CFCustomToggle.swift in Sources */,
+				9883262F2FD4BADB009E6747 /* CFKBDChip.swift in Sources */,
+				988326302FD4BADB009E6747 /* CFIconRow.swift in Sources */,
+				988326312FD4BADB009E6747 /* CFVarChip.swift in Sources */,
+				988326322FD4BADB009E6747 /* CFWindowChrome.swift in Sources */,
 				45E25996E08B177C436D12EA /* WelcomeView.swift in Sources */,
 				903F88E5CD3F220E25813EA3 /* iCloudSyncService.swift in Sources */,
 			);

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>ClipFlow — UI Review</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #0e0e12; color: #fff;
+    font-family: "Inter", -apple-system, system-ui, sans-serif; }
+  @font-face { font-family: "SF Pro Text"; src: local("Inter"); font-display: swap; }
+  code { font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; }
+
+  /* ---------- THEME TOKENS ---------- */
+  .theme-dark {
+    --text-strong: #fff;
+    --text:        rgba(255,255,255,.92);
+    --text-mid:    rgba(255,255,255,.72);
+    --text-muted:  rgba(255,255,255,.58);
+    --text-subtle: rgba(255,255,255,.46);
+    --text-label:  rgba(255,255,255,.42);
+    --text-faint:  rgba(255,255,255,.38);
+    --text-bullet: rgba(255,255,255,.30);
+
+    --fill-soft: rgba(255,255,255,.04);
+    --fill-1:    rgba(255,255,255,.07);
+    --fill-2:    rgba(255,255,255,.10);
+    --fill-3:    rgba(255,255,255,.16);
+
+    --stroke:      rgba(255,255,255,.08);
+    --stroke-soft: rgba(255,255,255,.06);
+
+    --surface:      #1d1d22;
+    --surface-alt:  #1a1a1f;
+    --surface-deep: #15151a;
+    --input-bg:     rgba(0,0,0,.30);
+
+    --popover-bg:        linear-gradient(180deg, rgba(46,46,52,.92), rgba(34,34,40,.92));
+    --popover-bg-solid:  rgba(46,46,52,.92);
+    --titlebar-bg:       linear-gradient(180deg, #2c2c33, #232328);
+    --statusbar-bg:      linear-gradient(180deg, rgba(40,40,46,.72), rgba(28,28,32,.72));
+    --btn-bg:            linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+    --seg-selected:      linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.06));
+
+    --shadow-soft:    rgba(0,0,0,.20);
+    --shadow-strong:  rgba(0,0,0,.28);
+    --shadow-deep:    rgba(0,0,0,.55);
+
+    --inset-hi:       rgba(255,255,255,.08);
+    --caret-shadow:   0 0 0 .5px rgba(255,255,255,.10);
+    --popover-shadow: 0 24px 60px -10px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,255,255,.10), inset 0 1px 0 rgba(255,255,255,.06);
+    --window-shadow:  0 30px 80px -10px rgba(0,0,0,.5), 0 0 0 .5px rgba(255,255,255,.10);
+    --btn-shadow:     0 1px 0 rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.08);
+    --seg-shadow:     0 1px 0 rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.06);
+    --knob:           #fff;
+    --knob-shadow:    0 1px 2px rgba(0,0,0,.4), 0 0 0 .5px rgba(0,0,0,.2);
+  }
+
+  .theme-light {
+    --text-strong: #0a0a0c;
+    --text:        rgba(0,0,0,.86);
+    --text-mid:    rgba(0,0,0,.66);
+    --text-muted:  rgba(0,0,0,.55);
+    --text-subtle: rgba(0,0,0,.46);
+    --text-label:  rgba(0,0,0,.42);
+    --text-faint:  rgba(0,0,0,.36);
+    --text-bullet: rgba(0,0,0,.28);
+
+    --fill-soft: rgba(0,0,0,.02);
+    --fill-1:    rgba(0,0,0,.05);
+    --fill-2:    rgba(0,0,0,.07);
+    --fill-3:    rgba(0,0,0,.11);
+
+    --stroke:      rgba(0,0,0,.10);
+    --stroke-soft: rgba(0,0,0,.07);
+
+    --surface:      #f6f6f8;
+    --surface-alt:  #ececef;
+    --surface-deep: #ffffff;
+    --input-bg:     #ffffff;
+
+    --popover-bg:        linear-gradient(180deg, rgba(252,252,254,.85), rgba(244,244,247,.85));
+    --popover-bg-solid:  rgba(252,252,254,.92);
+    --titlebar-bg:       linear-gradient(180deg, #f1f1f3, #e6e6e9);
+    --statusbar-bg:      linear-gradient(180deg, rgba(252,252,254,.72), rgba(244,244,247,.72));
+    --btn-bg:            linear-gradient(180deg, #ffffff, #f1f1f3);
+    --seg-selected:      linear-gradient(180deg, #ffffff, #f5f5f7);
+
+    --shadow-soft:    rgba(0,0,0,.06);
+    --shadow-strong:  rgba(0,0,0,.10);
+    --shadow-deep:    rgba(0,0,0,.18);
+
+    --inset-hi:       rgba(255,255,255,.65);
+    --caret-shadow:   0 0 0 .5px rgba(0,0,0,.10);
+    --popover-shadow: 0 24px 60px -10px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.5);
+    --window-shadow:  0 30px 80px -10px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.10);
+    --btn-shadow:     0 1px 0 rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.7);
+    --seg-shadow:     0 1px 1.5px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06);
+    --knob:           #fff;
+    --knob-shadow:    0 1px 2px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.10);
+  }
+
+  /* In light theme, status-bar icons need darker text since wallpaper is light */
+  .theme-light .status-bar-icons { color: rgba(0,0,0,.72) !important; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="components/icons.jsx"></script>
+<script type="text/babel" src="components/menubar.jsx"></script>
+<script type="text/babel" src="components/editor.jsx"></script>
+<script type="text/babel" src="components/settings.jsx"></script>
+<script type="text/babel" src="components/about.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState } = React;
+
+// Wrap any artboard content in the chosen theme class so CSS variables resolve.
+const Themed = ({ theme, children, fill }) => (
+  <div className={'theme-' + theme} style={{
+    width: '100%', height: '100%',
+    background: fill || (theme === 'light' ? '#dfe3ea' : '#0e0e12'),
+    color: 'var(--text)',
+  }}>{children}</div>
+);
+
+function App() {
+  return (
+    <DesignCanvas
+      title="ClipFlow"
+      subtitle="UI exploration · macOS menubar clipboard manager + text expander · Dark + Light"
+    >
+      <DCSection id="menubar-dark" title="MenuBar — Dark">
+        <DCArtboard id="mb-simple-d" label="Simple — flat list" width={540} height={800}>
+          <Themed theme="dark" fill="transparent"><MenubarStage h={800} theme="dark"><MenubarSimple/></MenubarStage></Themed>
+        </DCArtboard>
+        <DCArtboard id="mb-org-d" label="Organized — pinned + groups + snippets" width={540} height={800}>
+          <Themed theme="dark" fill="transparent"><MenubarStage h={800} theme="dark"><MenubarOrganized/></MenubarStage></Themed>
+        </DCArtboard>
+        <DCArtboard id="mb-rtl-d" label="Hebrew · RTL" width={540} height={800}>
+          <Themed theme="dark" fill="transparent"><MenubarStage h={800} theme="dark"><MenubarHebrew/></MenubarStage></Themed>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="menubar-light" title="MenuBar — Light">
+        <DCArtboard id="mb-simple-l" label="Simple — flat list" width={540} height={800}>
+          <Themed theme="light" fill="transparent"><MenubarStage h={800} theme="light"><MenubarSimple/></MenubarStage></Themed>
+        </DCArtboard>
+        <DCArtboard id="mb-org-l" label="Organized — pinned + groups + snippets" width={540} height={800}>
+          <Themed theme="light" fill="transparent"><MenubarStage h={800} theme="light"><MenubarOrganized/></MenubarStage></Themed>
+        </DCArtboard>
+        <DCArtboard id="mb-rtl-l" label="Hebrew · RTL" width={540} height={800}>
+          <Themed theme="light" fill="transparent"><MenubarStage h={800} theme="light"><MenubarHebrew/></MenubarStage></Themed>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="editor" title="Snippet Editor (⌘E)">
+        <DCArtboard id="snip-edit-d" label="Dark · three‑pane editor" width={1080} height={700}>
+          <Themed theme="dark"><SnippetEditor/></Themed>
+        </DCArtboard>
+        <DCArtboard id="snip-edit-l" label="Light · three‑pane editor" width={1080} height={700}>
+          <Themed theme="light"><SnippetEditor/></Themed>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="settings" title="Preferences (⌘,)">
+        <DCArtboard id="prefs-exp-d" label="Dark · Text Expansion tab" width={760} height={620}>
+          <Themed theme="dark"><SettingsExpansion/></Themed>
+        </DCArtboard>
+        <DCArtboard id="prefs-exp-l" label="Light · Text Expansion tab" width={760} height={620}>
+          <Themed theme="light"><SettingsExpansion/></Themed>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="welcome" title="First launch">
+        <DCArtboard id="onboarding-d" label="Dark · welcome with three steps" width={780} height={520}>
+          <Themed theme="dark"><Welcome/></Themed>
+        </DCArtboard>
+        <DCArtboard id="onboarding-l" label="Light · welcome with three steps" width={780} height={520}>
+          <Themed theme="light"><Welcome/></Themed>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="about" title="About">
+        <DCArtboard id="about-d" label="Dark · About ClipFlow" width={560} height={680}>
+          <Themed theme="dark"><About/></Themed>
+        </DCArtboard>
+        <DCArtboard id="about-l" label="Light · About ClipFlow" width={560} height={680}>
+          <Themed theme="light"><About/></Themed>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="notes" title="Design notes">
+        <DCArtboard id="notes-d" label="Dark · decisions & rationale" width={780} height={520}>
+          <Themed theme="dark"><DesignNotes/></Themed>
+        </DCArtboard>
+        <DCArtboard id="notes-l" label="Light · decisions & rationale" width={780} height={520}>
+          <Themed theme="light"><DesignNotes/></Themed>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+function DesignNotes() {
+  const Item = ({ k, t, b }) => (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '90px 1fr', gap: 12,
+      padding: '10px 0', borderTop: '1px solid var(--stroke-soft)',
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.06em', paddingTop: 1 }}>{k}</div>
+      <div>
+        <div style={{ fontSize: 13, color: 'var(--text-strong)', marginBottom: 2 }}>{t}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.55 }}>{b}</div>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{
+      width: 780, height: 520, padding: 28,
+      background: 'var(--surface-deep)', color: 'var(--text-strong)',
+      fontFamily: '"SF Pro Text", "Inter", system-ui, sans-serif',
+      overflow: 'auto',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <ClipFlowMark size={28}/>
+        <div style={{ fontSize: 18, fontWeight: 600 }}>ClipFlow design system at a glance</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 16 }}>
+        {[
+          ['Accent', 'oklch(.6 .17 272)', 'oklch(.6 .17 272)'],
+          ['Surface', 'var(--surface)',   'var(--surface)'],
+          ['Translucent', 'var(--popover-bg-solid)', 'var(--popover-bg-solid)'],
+        ].map(([l, v, sw]) => (
+          <div key={l} style={{
+            padding: 12, borderRadius: 8, background: 'var(--fill-soft)',
+            border: '1px solid var(--stroke-soft)', display: 'flex', gap: 10, alignItems: 'center',
+          }}>
+            <div style={{ width: 32, height: 32, borderRadius: 6, background: sw, boxShadow: 'inset 0 0 0 .5px var(--stroke)' }}/>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{l}</div>
+              <div style={{ fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }}>{v}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <Item k="Type" t="SF Pro Text 13/1.4 base · Inter fallback · JetBrains Mono for code & abbreviations"
+          b="Abbreviations get monospace so the leading dot/slash trigger is unmistakable."/>
+        <Item k="Theming" t="Single token set drives Dark and Light · accent stays oklch(.6 .17 272)"
+          b="Surfaces, fills, strokes and shadows all rebind via CSS variables on a .theme-dark / .theme-light wrapper."/>
+        <Item k="Iconography" t="Monochrome SF‑Symbols‑style line set, single weight"
+          b="Replaces emoji icons in the current build — emoji read inconsistently across macOS versions and clash with localized UI."/>
+        <Item k="Density" t="6px row padding · 28–30px row height · 320–340px popover width"
+          b="Matches NSMenu rhythm; numeric kbd hints sit on the trailing edge so the eye learns 1‑9, 0."/>
+        <Item k="RTL" t="Logical properties throughout · sidebar mirrors in Hebrew · numerals stay LTR"
+          b="Mixed‑language items use Unicode bidi isolates so punctuation lands on the right side."/>
+        <Item k="Permission gate" t="Persistent inline banner in Preferences · never inside the menu"
+          b="Keeps the popover lightweight while making the Accessibility requirement unmissable in the right surface."/>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

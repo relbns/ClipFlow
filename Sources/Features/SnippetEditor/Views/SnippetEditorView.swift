@@ -333,18 +333,25 @@ private struct SnippetDetailView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
-                        CFVarChip(text: "{date}") {
-                            insertVariable("{date}")
+                        Button(action: { insertVariable("{date}") }) {
+                            CFVarChip("{date}")
                         }
-                        CFVarChip(text: "{time}") {
-                            insertVariable("{time}")
+                        .buttonStyle(.plain)
+
+                        Button(action: { insertVariable("{time}") }) {
+                            CFVarChip("{time}")
                         }
-                        CFVarChip(text: "{clipboard}") {
-                            insertVariable("{clipboard}")
+                        .buttonStyle(.plain)
+
+                        Button(action: { insertVariable("{clipboard}") }) {
+                            CFVarChip("{clipboard}")
                         }
-                        CFVarChip(text: "{cursor}") {
-                            insertVariable("{cursor}")
+                        .buttonStyle(.plain)
+
+                        Button(action: { insertVariable("{cursor}") }) {
+                            CFVarChip("{cursor}")
                         }
+                        .buttonStyle(.plain)
                     }
 
                     Text("Click to insert variables · Type {prompt:Name} for user input")

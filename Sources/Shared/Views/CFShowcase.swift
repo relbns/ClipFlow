@@ -175,10 +175,10 @@ struct CFShowcase: View {
                     .foregroundColor(theme.text)
 
                 HStack(spacing: 6) {
-                    CFVarChip(text: "{date}")
-                    CFVarChip(text: "{time}")
-                    CFVarChip(text: "{clipboard}")
-                    CFVarChip(text: "{cursor}")
+                    CFVarChip("{date}")
+                    CFVarChip("{time}")
+                    CFVarChip("{clipboard}")
+                    CFVarChip("{cursor}")
                 }
             }
 
