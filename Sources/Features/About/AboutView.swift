@@ -15,11 +15,12 @@ struct AboutView: View {
                 VStack(spacing: 8) {
                     Text("ClipFlow")
                         .font(.system(size: 28, weight: .bold))
+                        .kerning(-0.28)  // letter-spacing -.01em
                         .foregroundColor(theme.textStrong)
 
-                    Text(L("app_tagline"))
-                        .font(.system(size: 14))
-                        .foregroundColor(theme.textMid)
+                    Text("Modern clipboard manager + text expander")
+                        .font(.system(size: 13.5))
+                        .foregroundColor(theme.textMuted)
                 }
 
                 // Version Badge
@@ -47,8 +48,11 @@ struct AboutView: View {
 
                     // Creator
                     CreditRow(
-                        icon: AnyView(CFIcon(type: .sparkles, size: 18, stroke: 1.8)),
-                        iconColor: Color(red: 0.78, green: 0.14, blue: 0.70),
+                        icon: AnyView(
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 16, weight: .medium))
+                        ),
+                        iconColor: theme.accent,
                         title: "Ariel Benesh",
                         description: "Creator & Developer",
                         link: "https://github.com/relbns",
@@ -56,16 +60,19 @@ struct AboutView: View {
                     )
 
                     // Built on giants separator
-                    Text("Built on the shoulders of giants:")
+                    Text("Built on the shoulders of giants")
                         .font(.system(size: 12))
                         .foregroundColor(theme.textSubtle)
-                        .padding(.leading, 30)
+                        .padding(.leading, 36)
                         .padding(.top, 4)
 
                     // Clipy
                     CreditRow(
-                        icon: AnyView(CFIcon(type: .bracket, size: 18, stroke: 1.8)),
-                        iconColor: Color(red: 0.74, green: 0.14, blue: 0.60),
+                        icon: AnyView(
+                            Image(systemName: "curlybraces")
+                                .font(.system(size: 16, weight: .medium))
+                        ),
+                        iconColor: theme.success,
                         title: "Clipy",
                         description: "Core clipboard architecture",
                         link: "https://github.com/Clipy/Clipy",
@@ -74,10 +81,13 @@ struct AboutView: View {
 
                     // Flycut
                     CreditRow(
-                        icon: AnyView(CFIcon(type: .bolt, size: 18, stroke: 1.8)),
-                        iconColor: Color(red: 0.78, green: 0.14, blue: 0.50),
+                        icon: AnyView(
+                            Image(systemName: "paintbrush.fill")
+                                .font(.system(size: 16, weight: .medium))
+                        ),
+                        iconColor: theme.warning,
                         title: "Flycut",
-                        description: "UI/UX inspiration",
+                        description: "UI/UX inspiration for Simple mode",
                         link: "https://github.com/TermiT/Flycut",
                         openURL: openURL
                     )
@@ -94,7 +104,10 @@ struct AboutView: View {
                 // Footer Links
                 HStack(spacing: 16) {
                     CFLinkBtn(
-                        icon: AnyView(CFIcon(type: .link, size: 13, stroke: 1.8)),
+                        icon: AnyView(
+                            Image(systemName: "link")
+                                .font(.system(size: 11, weight: .medium))
+                        ),
                         label: "GitHub"
                     ) {
                         if let url = URL(string: "https://github.com/relbns/ClipFlow") {
@@ -103,8 +116,11 @@ struct AboutView: View {
                     }
 
                     CFLinkBtn(
-                        icon: AnyView(CFIcon(type: .text, size: 13, stroke: 1.8)),
-                        label: L("full_credits")
+                        icon: AnyView(
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 11, weight: .medium))
+                        ),
+                        label: "Full Credits"
                     ) {
                         if let url = URL(string: "https://github.com/relbns/ClipFlow/blob/main/CREDITS.md") {
                             openURL(url)
@@ -112,7 +128,10 @@ struct AboutView: View {
                     }
 
                     CFLinkBtn(
-                        icon: AnyView(CFIcon(type: .gear, size: 13, stroke: 1.8)),
+                        icon: AnyView(
+                            Image(systemName: "doc.badge.gearshape")
+                                .font(.system(size: 11, weight: .medium))
+                        ),
                         label: "License"
                     ) {
                         if let url = URL(string: "https://github.com/relbns/ClipFlow/blob/main/LICENSE") {
@@ -153,7 +172,7 @@ private struct CreditRow: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(iconColor.opacity(0.18))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
 
                 icon
                     .foregroundColor(iconColor)
