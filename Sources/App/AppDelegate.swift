@@ -149,6 +149,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             context: nil
         )
 
+        // Show welcome screen on first launch ONLY
+        // Check both hasLaunchedBefore flag and if we've ever shown the welcome
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
+        let hasCompletedWelcome = UserDefaults.standard.bool(forKey: "hasCompletedWelcome")
+
+        if !hasLaunchedBefore && !hasCompletedWelcome {
+            NSLog("👋 First launch detected - showing welcome screen")
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+
+            // Delay to ensure app is fully initialized
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.openWelcome()
+            }
+        } else {
+            NSLog("✅ Not first launch (hasLaunchedBefore: \(hasLaunchedBefore), hasCompletedWelcome: \(hasCompletedWelcome))")
+        }
+
         // Hide dock icon (menu bar app only)
         NSApp.setActivationPolicy(.accessory)
     }
