@@ -37,10 +37,14 @@ class KeystrokeMonitor: ObservableObject {
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .defaultTap,
+            options: .listenOnly,  // Changed from .defaultTap - listen-only doesn't require filtering
             eventsOfInterest: eventMask,
             callback: { proxy, type, event, refcon in
-                guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
+                NSLog("🔔 CALLBACK FIRED! type=\(type.rawValue)")
+                guard let refcon = refcon else {
+                    NSLog("❌ No refcon!")
+                    return Unmanaged.passUnretained(event)
+                }
                 let monitor = Unmanaged<KeystrokeMonitor>.fromOpaque(refcon).takeUnretainedValue()
 
                 // PERFORMANCE: Handle synchronously to avoid lag
@@ -58,11 +62,19 @@ class KeystrokeMonitor: ObservableObject {
         self.runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         NSLog("✅ Run loop source created")
 
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
-        NSLog("✅ Run loop source added to current run loop")
+        // CRITICAL: Must use CFRunLoopGetMain() not CFRunLoopGetCurrent()
+        // Event tap needs to be on the main run loop to receive events
+        CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        NSLog("✅ Run loop source added to MAIN run loop")
 
         CGEvent.tapEnable(tap: tap, enable: true)
         NSLog("✅ Event tap enabled")
+
+        // Check if it's really enabled
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let isEnabled = CGEvent.tapIsEnabled(tap: tap)
+            NSLog("🔍 Event tap enabled status after 1s: \(isEnabled)")
+        }
 
         isMonitoring = true
         NSLog("⌨️⌨️⌨️ Keystroke monitoring started successfully!")
@@ -73,7 +85,7 @@ class KeystrokeMonitor: ObservableObject {
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = runLoopSource {
-                CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
             }
         }
         eventTap = nil
@@ -90,8 +102,11 @@ class KeystrokeMonitor: ObservableObject {
 
         // Get typed character
         guard let chars = event.keyboardEventCharacters, !chars.isEmpty else {
+            NSLog("⚠️ No characters for keyCode: \(keyCode)")
             return Unmanaged.passUnretained(event)
         }
+
+        NSLog("⌨️ Key: '\(chars)' buffer: '\(typedBuffer)'")
 
         // Handle special keys
         if isDeleteKey(keyCode) {
