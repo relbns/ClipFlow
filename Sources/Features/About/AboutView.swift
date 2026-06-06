@@ -8,12 +8,12 @@ struct AboutView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer().frame(height: 32)
+                    Spacer().frame(height: 28)
 
                     // Hero Icon
-                    ClipFlowMark.heroIcon(size: 128)
+                    ClipFlowMark.heroIcon(size: 120)
 
-                    Spacer().frame(height: 20)
+                    Spacer().frame(height: 18)
 
                     // Title
                     Text("ClipFlow")
@@ -36,20 +36,20 @@ struct AboutView: View {
                             .font(.system(size: 13))
                             .foregroundColor(theme.text)
 
-                        // ALPHA badge - amber color
+                        // ALPHA badge - amber/gold color
                         Text("ALPHA")
                             .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundColor(Color(hue: 0.12, saturation: 0.85, brightness: 0.85))
+                            .foregroundColor(Color(red: 1.0, green: 0.75, blue: 0.0))  // Pure amber #FFC000
                             .textCase(.uppercase)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(
-                                Color(hue: 0.12, saturation: 0.85, brightness: 0.85).opacity(0.25)
+                                Color(red: 1.0, green: 0.75, blue: 0.0).opacity(0.25)
                             )
                             .cornerRadius(4)
                     }
 
-                    Spacer().frame(height: 28)
+                    Spacer().frame(height: 24)
 
                     // Divider
                     Rectangle()
@@ -57,7 +57,7 @@ struct AboutView: View {
                         .frame(height: 1)
                         .frame(width: 460)
 
-                    Spacer().frame(height: 20)
+                    Spacer().frame(height: 18)
 
                     // Credits Section
                     VStack(alignment: .leading, spacing: 0) {
@@ -68,7 +68,7 @@ struct AboutView: View {
                             .kerning(0.66)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Spacer().frame(height: 12)
+                        Spacer().frame(height: 10)
 
                         // Ariel Benesh
                         CreditRow(
@@ -81,7 +81,7 @@ struct AboutView: View {
                             subtitle: "Creator & Developer"
                         )
 
-                        Spacer().frame(height: 16)
+                        Spacer().frame(height: 14)
 
                         // Separator
                         Text("Built on the shoulders of giants")
@@ -89,7 +89,7 @@ struct AboutView: View {
                             .foregroundColor(theme.textSubtle)
                             .padding(.leading, 40)
 
-                        Spacer().frame(height: 12)
+                        Spacer().frame(height: 10)
 
                         // Clipy
                         CreditRow(
@@ -102,7 +102,7 @@ struct AboutView: View {
                             subtitle: "Core clipboard architecture"
                         )
 
-                        Spacer().frame(height: 10)
+                        Spacer().frame(height: 8)
 
                         // Flycut
                         CreditRow(
@@ -117,7 +117,7 @@ struct AboutView: View {
                     }
                     .padding(.horizontal, 50)
 
-                    Spacer().frame(height: 28)
+                    Spacer().frame(height: 24)
 
                     // Divider
                     Rectangle()
@@ -125,7 +125,7 @@ struct AboutView: View {
                         .frame(height: 1)
                         .frame(width: 460)
 
-                    Spacer().frame(height: 18)
+                    Spacer().frame(height: 16)
 
                     // Footer Links
                     HStack(spacing: 20) {
@@ -175,14 +175,14 @@ struct AboutView: View {
                         .buttonStyle(.plain)
                     }
 
-                    Spacer().frame(height: 12)
+                    Spacer().frame(height: 10)
 
                     // Copyright
                     Text("© 2026 ClipFlow")
                         .font(.system(size: 11))
                         .foregroundColor(theme.textFaint)
 
-                    Spacer().frame(height: 32)
+                    Spacer().frame(height: 28)
                 }
                 .frame(maxWidth: .infinity)
             }
