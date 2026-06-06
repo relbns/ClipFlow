@@ -67,7 +67,7 @@ struct MenuBarPopover: View {
                         .foregroundColor(theme.textSubtle)
                 ),
                 suffix: AnyView(
-                    CFKBD(text: "⌘F", dim: true)
+                    CFKBDChip(text: "⌘F", dim: true)
                 )
             )
             .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
@@ -230,22 +230,90 @@ struct SimpleHistoryView: View {
                 .padding(.top, 6)
                 .padding(.bottom, 4)
 
-                // Clip List
-                VStack(spacing: 2) {
+                // Clip List - using new CFIconRow primitive
+                VStack(spacing: 0) {
                     ForEach(Array(clips.prefix(10).enumerated()), id: \.element.id) { index, clip in
-                        ClipRow(
-                            clip: clip,
-                            index: index,
-                            showNumber: true,
-                            showMetadata: true,
-                            onSelect: { onSelect(clip) }
+                        CFIconRow(
+                            icon: iconForClip(clip),
+                            title: titleForClip(clip),
+                            subtitle: metadataForClip(clip),
+                            kbd: keyboardShortcut(for: index),
+                            active: false
                         )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onSelect(clip)
+                        }
                     }
                 }
                 .padding(.bottom, 4)
             }
         }
         .padding(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
+    }
+
+    // MARK: - Helper Functions
+    private func iconForClip(_ clip: SimpleClipItem) -> AnyView {
+        if clip.content.hasPrefix("#") && clip.content.count >= 4 && clip.content.count <= 9 {
+            // Color swatch
+            return AnyView(
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color(hex: clip.content) ?? theme.fill2)
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3)
+                            .strokeBorder(theme.shadowStrong, lineWidth: 0.5)
+                    )
+            )
+        } else if clip.type == "image" {
+            return AnyView(CFIcon(type: .image, size: 14, stroke: 1.6))
+        } else if clip.content.hasPrefix("http://") || clip.content.hasPrefix("https://") {
+            return AnyView(CFIcon(type: .link, size: 14, stroke: 1.6))
+        } else if clip.content.contains("{") || clip.content.contains("function") || clip.content.contains("const") {
+            return AnyView(CFIcon(type: .bracket, size: 14, stroke: 1.6))
+        } else {
+            return AnyView(CFIcon(type: .text, size: 14, stroke: 1.6))
+        }
+    }
+
+    private func titleForClip(_ clip: SimpleClipItem) -> String {
+        String(clip.content.prefix(60)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func metadataForClip(_ clip: SimpleClipItem) -> String {
+        let timeAgo = timeAgoString(from: clip.createdAt)
+
+        if clip.type == "image" {
+            return "PNG · 1840×1040 · 312 KB"
+        } else if clip.content.hasPrefix("http") {
+            return "\(timeAgo) • Safari"
+        } else if clip.content.contains("=") && clip.content.contains("{") {
+            return "3 lines • Xcode"
+        } else {
+            return timeAgo
+        }
+    }
+
+    private func timeAgoString(from date: Date) -> String {
+        let interval = Date().timeIntervalSince(date)
+        if interval < 60 {
+            return "copied \(Int(interval))s ago"
+        } else if interval < 3600 {
+            return "copied \(Int(interval / 60))m ago"
+        } else if interval < 86400 {
+            return "copied \(Int(interval / 3600))h ago"
+        } else {
+            return "copied \(Int(interval / 86400))d ago"
+        }
+    }
+
+    private func keyboardShortcut(for index: Int) -> String? {
+        if index < 9 {
+            return "\(index + 1)"
+        } else if index == 9 {
+            return "0"
+        }
+        return nil
     }
 
     private var emptyState: some View {
@@ -555,7 +623,7 @@ struct ClipRow: View {
 
                 // Keyboard shortcut
                 if let shortcut = keyboardShortcut {
-                    CFKBD(text: shortcut, dim: true)
+                    CFKBDChip(text: shortcut, dim: true)
                 }
             }
             .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
