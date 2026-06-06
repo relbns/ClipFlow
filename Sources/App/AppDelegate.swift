@@ -255,7 +255,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             let window = NSWindow(contentViewController: hostingController)
             window.title = L("preferences")
-            window.setContentSize(NSSize(width: 680, height: 540))
+            window.setContentSize(NSSize(width: 760, height: 620))
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.center()
 
@@ -287,7 +287,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             let window = NSWindow(contentViewController: hostingController)
             window.title = L("snippet_editor")
-            window.setContentSize(NSSize(width: 980, height: 640))
+            window.setContentSize(NSSize(width: 1080, height: 700))
             window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
             window.center()
 

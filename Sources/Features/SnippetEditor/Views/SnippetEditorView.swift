@@ -83,7 +83,7 @@ private struct SnippetEditorContentView: View {
             // Status Bar
             EditorStatusBar(selectedSnippet: selectedSnippet)
         }
-        .frame(minWidth: 980, minHeight: 640)
+        .frame(minWidth: 1080, minHeight: 700)
     }
 
     private func createGroup() {
