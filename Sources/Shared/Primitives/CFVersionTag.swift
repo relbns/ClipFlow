@@ -22,12 +22,12 @@ struct CFVersionTag: View {
     var body: some View {
         Text(type.label)
             .font(.system(size: 10.5, weight: .semibold))
-            .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.38))  // oklch(.7 .15 60) amber
+            .foregroundColor(Color(red: 0.855, green: 0.647, blue: 0.125))  // Goldenrod amber
             .textCase(.uppercase)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(
-                Color(red: 0.85, green: 0.68, blue: 0.36).opacity(0.25)  // oklch(.7 .17 60) 25%
+                Color(red: 0.855, green: 0.647, blue: 0.125).opacity(0.25)  // Amber 25%
             )
             .cornerRadius(4)
     }
