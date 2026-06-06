@@ -41,9 +41,11 @@ struct AboutView: View {
 
                 // Credits Section
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(L("credits"))
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(theme.textStrong)
+                    Text("CREDITS")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(theme.textLabel)
+                        .textCase(.uppercase)
+                        .tracking(0.06 * 11)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Creator
@@ -103,41 +105,44 @@ struct AboutView: View {
 
                 // Footer Links
                 HStack(spacing: 16) {
-                    CFLinkBtn(
-                        icon: AnyView(
-                            Image(systemName: "link")
-                                .font(.system(size: 11, weight: .medium))
-                        ),
-                        label: "GitHub"
-                    ) {
+                    Button(action: {
                         if let url = URL(string: "https://github.com/relbns/ClipFlow") {
                             openURL(url)
                         }
+                    }) {
+                        Text("🔗 GitHub")
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.accent)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 6)
                     }
+                    .buttonStyle(.plain)
 
-                    CFLinkBtn(
-                        icon: AnyView(
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 11, weight: .medium))
-                        ),
-                        label: "Full Credits"
-                    ) {
+                    Button(action: {
                         if let url = URL(string: "https://github.com/relbns/ClipFlow/blob/main/CREDITS.md") {
                             openURL(url)
                         }
+                    }) {
+                        Text("📄 Full Credits")
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.accent)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 6)
                     }
+                    .buttonStyle(.plain)
 
-                    CFLinkBtn(
-                        icon: AnyView(
-                            Image(systemName: "doc.badge.gearshape")
-                                .font(.system(size: 11, weight: .medium))
-                        ),
-                        label: "License"
-                    ) {
+                    Button(action: {
                         if let url = URL(string: "https://github.com/relbns/ClipFlow/blob/main/LICENSE") {
                             openURL(url)
                         }
+                    }) {
+                        Text("⚙️ License")
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.accent)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 6)
                     }
+                    .buttonStyle(.plain)
                 }
                 .padding(.top, 4)
 
