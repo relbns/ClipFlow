@@ -8,12 +8,12 @@ struct AboutView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer().frame(height: 40)
+                    Spacer().frame(height: 32)
 
                     // Hero Icon
                     ClipFlowMark.heroIcon(size: 128)
 
-                    Spacer().frame(height: 24)
+                    Spacer().frame(height: 20)
 
                     // Title
                     Text("ClipFlow")
@@ -21,14 +21,14 @@ struct AboutView: View {
                         .kerning(-0.28)
                         .foregroundColor(theme.textStrong)
 
-                    Spacer().frame(height: 8)
+                    Spacer().frame(height: 6)
 
                     // Tagline
                     Text("Modern clipboard manager + text expander")
                         .font(.system(size: 13.5))
                         .foregroundColor(theme.textMuted)
 
-                    Spacer().frame(height: 16)
+                    Spacer().frame(height: 14)
 
                     // Version Row
                     HStack(spacing: 8) {
@@ -49,7 +49,7 @@ struct AboutView: View {
                             .cornerRadius(4)
                     }
 
-                    Spacer().frame(height: 32)
+                    Spacer().frame(height: 28)
 
                     // Divider
                     Rectangle()
@@ -57,10 +57,10 @@ struct AboutView: View {
                         .frame(height: 1)
                         .frame(width: 460)
 
-                    Spacer().frame(height: 24)
+                    Spacer().frame(height: 20)
 
                     // Credits Section
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 0) {
                         // Header
                         Text("CREDITS")
                             .font(.system(size: 11, weight: .semibold))
@@ -68,7 +68,7 @@ struct AboutView: View {
                             .kerning(0.66)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Spacer().frame(height: 4)
+                        Spacer().frame(height: 12)
 
                         // Ariel Benesh
                         CreditRow(
@@ -81,7 +81,7 @@ struct AboutView: View {
                             subtitle: "Creator & Developer"
                         )
 
-                        Spacer().frame(height: 12)
+                        Spacer().frame(height: 16)
 
                         // Separator
                         Text("Built on the shoulders of giants")
@@ -89,7 +89,7 @@ struct AboutView: View {
                             .foregroundColor(theme.textSubtle)
                             .padding(.leading, 40)
 
-                        Spacer().frame(height: 8)
+                        Spacer().frame(height: 12)
 
                         // Clipy
                         CreditRow(
@@ -102,7 +102,7 @@ struct AboutView: View {
                             subtitle: "Core clipboard architecture"
                         )
 
-                        Spacer().frame(height: 8)
+                        Spacer().frame(height: 10)
 
                         // Flycut
                         CreditRow(
@@ -117,7 +117,7 @@ struct AboutView: View {
                     }
                     .padding(.horizontal, 50)
 
-                    Spacer().frame(height: 32)
+                    Spacer().frame(height: 28)
 
                     // Divider
                     Rectangle()
@@ -125,7 +125,7 @@ struct AboutView: View {
                         .frame(height: 1)
                         .frame(width: 460)
 
-                    Spacer().frame(height: 20)
+                    Spacer().frame(height: 18)
 
                     // Footer Links
                     HStack(spacing: 20) {
@@ -175,14 +175,14 @@ struct AboutView: View {
                         .buttonStyle(.plain)
                     }
 
-                    Spacer().frame(height: 16)
+                    Spacer().frame(height: 12)
 
                     // Copyright
                     Text("© 2026 ClipFlow")
                         .font(.system(size: 11))
                         .foregroundColor(theme.textFaint)
 
-                    Spacer().frame(height: 40)
+                    Spacer().frame(height: 32)
                 }
                 .frame(maxWidth: .infinity)
             }
