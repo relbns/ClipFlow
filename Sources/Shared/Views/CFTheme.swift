@@ -48,8 +48,13 @@ struct CFTheme {
     let insetHi: Color
     let knob: Color
 
-    // MARK: - Accent
-    let accent: Color  // oklch(.6 .17 272) → warm indigo
+    // MARK: - Accent & Status Colors
+    let accent: Color      // oklch(.6 .17 272) → #7B71FF warm indigo
+    let brandLight: Color  // oklch(.74 .17 280)
+    let brandDeep: Color   // oklch(.50 .19 268)
+    let warning: Color     // oklch(.70 .17 60) → amber
+    let success: Color     // oklch(.70 .17 145) → green
+    let danger: Color      // #ff7a73
 
     // MARK: - Computed Colors
     var popoverBgSolid: Color {
@@ -139,8 +144,13 @@ struct CFTheme {
         insetHi: Color.white.opacity(0.65),
         knob: .white,
 
-        // Accent - warm indigo (approximation of oklch(.6 .17 272))
-        accent: Color(red: 120/255, green: 113/255, blue: 255/255)
+        // Accent & Status Colors
+        accent: Color(red: 123/255, green: 113/255, blue: 255/255),      // #7B71FF oklch(.6 .17 272)
+        brandLight: Color(red: 169/255, green: 155/255, blue: 255/255),  // oklch(.74 .17 280)
+        brandDeep: Color(red: 97/255, green: 72/255, blue: 219/255),     // oklch(.50 .19 268)
+        warning: Color(red: 234/255, green: 179/255, blue: 73/255),      // oklch(.70 .17 60) amber
+        success: Color(red: 73/255, green: 234/255, blue: 155/255),      // oklch(.70 .17 145) green
+        danger: Color(red: 255/255, green: 122/255, blue: 115/255)       // #ff7a73
     )
 
     static let dark = CFTheme(
@@ -223,8 +233,13 @@ struct CFTheme {
         insetHi: Color.white.opacity(0.08),
         knob: .white,
 
-        // Accent - warm indigo (approximation of oklch(.6 .17 272))
-        accent: Color(red: 120/255, green: 113/255, blue: 255/255)
+        // Accent & Status Colors
+        accent: Color(red: 123/255, green: 113/255, blue: 255/255),      // #7B71FF oklch(.6 .17 272)
+        brandLight: Color(red: 169/255, green: 155/255, blue: 255/255),  // oklch(.74 .17 280)
+        brandDeep: Color(red: 97/255, green: 72/255, blue: 219/255),     // oklch(.50 .19 268)
+        warning: Color(red: 234/255, green: 179/255, blue: 73/255),      // oklch(.70 .17 60) amber
+        success: Color(red: 73/255, green: 234/255, blue: 155/255),      // oklch(.70 .17 145) green
+        danger: Color(red: 255/255, green: 122/255, blue: 115/255)       // #ff7a73
     )
 }
 

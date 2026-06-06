@@ -50,14 +50,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hasShownAccessibilityAlert = false
 
     // Theme
-    private var themeManager: ThemeManager?
+    // private var themeManager: ThemeManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("🚀 ClipFlow applicationDidFinishLaunching started")
 
         // Initialize theme manager
-        themeManager = ThemeManager.shared
-        NSLog("✅ Theme manager initialized")
+        // themeManager = ThemeManager.shared
+        // NSLog("✅ Theme manager initialized")
 
         // Create default snippets on first launch
         CoreDataStack.shared.createDefaultSnippetsIfNeeded()
