@@ -721,9 +721,12 @@ struct SnippetsListView: View {
 struct MenuSnippetRow: View {
     let snippet: Snippet
     @Environment(\.cfTheme) var theme
+    @Environment(\.managedObjectContext) var viewContext
 
     var body: some View {
-        Button(action: {}) {
+        Button(action: {
+            expandSnippet()
+        }) {
             HStack(spacing: 10) {
                 // Icon
                 ZStack {
@@ -769,6 +772,23 @@ struct MenuSnippetRow: View {
         }
         .buttonStyle(PlainHoverButtonStyle())
         .padding(.horizontal, 6)
+    }
+
+    private func expandSnippet() {
+        // Get the snippet content and expand it
+        Task {
+            let variableProcessor = VariableProcessor()
+            let expandedContent = await variableProcessor.process(snippet.content)
+
+            // Paste the expanded content
+            let pasteEngine = PasteEngine()
+            await pasteEngine.paste(expandedContent)
+
+            // Update statistics
+            snippet.useCount += 1
+            snippet.lastUsed = Date()
+            try? viewContext.save()
+        }
     }
 }
 

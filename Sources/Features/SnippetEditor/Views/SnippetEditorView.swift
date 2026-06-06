@@ -664,16 +664,37 @@ private struct GroupsPanel: View {
                             ForEach(Array(groups), id: \.id) { group in
                                 GroupRow(
                                     group: group,
-                                    isSelected: selectedGroup?.id == group.id
-                                ) {
-                                    selectedGroup = group
-                                }
+                                    isSelected: selectedGroup?.id == group.id,
+                                    action: {
+                                        selectedGroup = group
+                                    },
+                                    onDelete: {
+                                        deleteGroup(group)
+                                    }
+                                )
                             }
                         }
                     }
                 }
                 .padding(8)
             }
+        }
+    }
+
+    private func deleteGroup(_ group: SnippetGroup) {
+        // If this is the selected group, deselect it
+        if selectedGroup?.id == group.id {
+            selectedGroup = nil
+        }
+
+        // Delete the group from Core Data
+        viewContext.delete(group)
+
+        // Save the context
+        do {
+            try viewContext.save()
+        } catch {
+            print("❌ Failed to delete group: \(error)")
         }
     }
 }
@@ -725,6 +746,7 @@ private struct GroupRow: View {
     @ObservedObject var group: SnippetGroup
     let isSelected: Bool
     let action: () -> Void
+    var onDelete: (() -> Void)? = nil
 
     @Environment(\.cfTheme) var theme
 
@@ -747,6 +769,13 @@ private struct GroupRow: View {
             .cornerRadius(6)
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let onDelete = onDelete {
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete Group", systemImage: "trash")
+                }
+            }
+        }
     }
 }
 
