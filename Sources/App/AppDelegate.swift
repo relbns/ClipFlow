@@ -98,6 +98,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "ClipFlow")
             button.target = self
             button.action = #selector(statusBarButtonClicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
         // Setup notifications
@@ -317,7 +318,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             let window = NSWindow(contentViewController: hostingController)
             window.title = L("about_clipflow")
-            window.setContentSize(NSSize(width: 560, height: 680))
+            window.setContentSize(NSSize(width: 560, height: 520))
             window.styleMask = [.titled, .closable]
             window.center()
 

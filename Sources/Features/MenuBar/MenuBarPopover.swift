@@ -145,6 +145,7 @@ struct MenuBarPopover: View {
                                 .cornerRadius(5)
                         }
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

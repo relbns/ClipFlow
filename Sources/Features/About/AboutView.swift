@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct AboutView: View {
     @Environment(\.openURL) private var openURL
@@ -6,14 +7,19 @@ struct AboutView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 0) {
-                    Spacer().frame(height: 28)
+            VStack(spacing: 0) {
+                Spacer().frame(height: 20)
 
-                    // Hero Icon
-                    ClipFlowMark.heroIcon(size: 120)
+                    // App Icon
+                    if let appIcon = NSImage(named: "AppIcon") {
+                        Image(nsImage: appIcon)
+                            .resizable()
+                            .frame(width: 96, height: 96)
+                            .cornerRadius(21)
+                            .shadow(color: Color.black.opacity(0.25), radius: 16, x: 0, y: 8)
+                    }
 
-                    Spacer().frame(height: 18)
+                    Spacer().frame(height: 12)
 
                     // Title
                     Text("ClipFlow")
@@ -21,14 +27,14 @@ struct AboutView: View {
                         .kerning(-0.28)
                         .foregroundColor(theme.textStrong)
 
-                    Spacer().frame(height: 6)
+                    Spacer().frame(height: 4)
 
                     // Tagline
                     Text("Modern clipboard manager + text expander")
                         .font(.system(size: 13.5))
                         .foregroundColor(theme.textMuted)
 
-                    Spacer().frame(height: 14)
+                    Spacer().frame(height: 10)
 
                     // Version Row
                     HStack(spacing: 8) {
@@ -49,7 +55,7 @@ struct AboutView: View {
                             .cornerRadius(4)
                     }
 
-                    Spacer().frame(height: 24)
+                    Spacer().frame(height: 16)
 
                     // Divider
                     Rectangle()
@@ -57,7 +63,7 @@ struct AboutView: View {
                         .frame(height: 1)
                         .frame(width: 460)
 
-                    Spacer().frame(height: 18)
+                    Spacer().frame(height: 12)
 
                     // Credits Section
                     VStack(alignment: .leading, spacing: 0) {
@@ -68,7 +74,7 @@ struct AboutView: View {
                             .kerning(0.66)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Spacer().frame(height: 10)
+                        Spacer().frame(height: 8)
 
                         // Ariel Benesh
                         CreditRow(
@@ -81,7 +87,7 @@ struct AboutView: View {
                             subtitle: "Creator & Developer"
                         )
 
-                        Spacer().frame(height: 14)
+                        Spacer().frame(height: 10)
 
                         // Separator
                         Text("Built on the shoulders of giants")
@@ -89,7 +95,7 @@ struct AboutView: View {
                             .foregroundColor(theme.textSubtle)
                             .padding(.leading, 40)
 
-                        Spacer().frame(height: 10)
+                        Spacer().frame(height: 8)
 
                         // Clipy
                         CreditRow(
@@ -102,7 +108,7 @@ struct AboutView: View {
                             subtitle: "Core clipboard architecture"
                         )
 
-                        Spacer().frame(height: 8)
+                        Spacer().frame(height: 6)
 
                         // Flycut
                         CreditRow(
@@ -117,7 +123,7 @@ struct AboutView: View {
                     }
                     .padding(.horizontal, 50)
 
-                    Spacer().frame(height: 24)
+                    Spacer().frame(height: 16)
 
                     // Divider
                     Rectangle()
@@ -125,7 +131,7 @@ struct AboutView: View {
                         .frame(height: 1)
                         .frame(width: 460)
 
-                    Spacer().frame(height: 16)
+                    Spacer().frame(height: 12)
 
                     // Footer Links
                     HStack(spacing: 20) {
@@ -175,19 +181,18 @@ struct AboutView: View {
                         .buttonStyle(.plain)
                     }
 
-                    Spacer().frame(height: 10)
+                    Spacer().frame(height: 8)
 
                     // Copyright
                     Text("© 2026 ClipFlow")
                         .font(.system(size: 11))
                         .foregroundColor(theme.textFaint)
 
-                    Spacer().frame(height: 28)
-                }
-                .frame(maxWidth: .infinity)
+                    Spacer().frame(height: 20)
             }
+            .frame(maxWidth: .infinity)
         }
-        .frame(width: 560, height: 680)
+        .frame(width: 560, height: 520)
         .background(theme.surfaceDeep)
     }
 }
