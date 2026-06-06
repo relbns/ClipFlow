@@ -28,5 +28,7 @@
 	<string>Copyright © 2026 Ariel Benesh. All rights reserved.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>ClipFlow needs accessibility access to monitor keystrokes for text expansion. Your snippets will automatically expand as you type abbreviations like ".sig" or ".time".</string>
 </dict>
 </plist>
