@@ -714,6 +714,39 @@ private struct GroupsPanel: View {
                         .padding(.top, 8)
                     }
 
+                    // All Snippets Option
+                    VStack(spacing: 8) {
+                        CFSectionLabel("LIBRARY")
+                            .padding(.horizontal, 8)
+
+                        Button(action: { selectedGroup = nil }) {
+                            HStack(spacing: 10) {
+                                CFIcon(type: .bracket, size: 14, stroke: 1.8)
+                                    .foregroundColor(selectedGroup == nil ? theme.accent : theme.text)
+
+                                Text("All Snippets")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(selectedGroup == nil ? theme.textStrong : theme.text)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Text("\(groups.reduce(0) { $0 + $1.sortedSnippets.count })")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(theme.textSubtle)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(theme.fill1)
+                                    .cornerRadius(4)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(selectedGroup == nil ? theme.fill2 : Color.clear)
+                            .cornerRadius(6)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.top, 8)
+
                     // Groups Section
                     VStack(spacing: 8) {
                         CFSectionLabel("GROUPS")
@@ -796,6 +829,7 @@ private struct LibraryRow: View {
             .padding(.vertical, 6)
             .background(Color.clear)
             .cornerRadius(6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -826,6 +860,7 @@ private struct GroupRow: View {
             .padding(.vertical, 8)
             .background(isSelected ? theme.fill2 : Color.clear)
             .cornerRadius(6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -848,6 +883,7 @@ private struct SnippetsPanel: View {
     let onCreateSnippet: () -> Void
 
     @Environment(\.cfTheme) var theme
+    @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
         VStack(spacing: 0) {
@@ -889,10 +925,14 @@ private struct SnippetsPanel: View {
                         ForEach(filteredSnippets(group), id: \.id) { snippet in
                             SnippetListRow(
                                 snippet: snippet,
-                                isSelected: selectedSnippet?.id == snippet.id
-                            ) {
-                                selectedSnippet = snippet
-                            }
+                                isSelected: selectedSnippet?.id == snippet.id,
+                                action: {
+                                    selectedSnippet = snippet
+                                },
+                                onDelete: {
+                                    deleteSnippet(snippet)
+                                }
+                            )
                         }
                     }
                     .padding(8)
@@ -911,10 +951,14 @@ private struct SnippetsPanel: View {
                                     ForEach(filteredSnippets(group), id: \.id) { snippet in
                                         SnippetListRow(
                                             snippet: snippet,
-                                            isSelected: selectedSnippet?.id == snippet.id
-                                        ) {
-                                            selectedSnippet = snippet
-                                        }
+                                            isSelected: selectedSnippet?.id == snippet.id,
+                                            action: {
+                                                selectedSnippet = snippet
+                                            },
+                                            onDelete: {
+                                                deleteSnippet(snippet)
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -925,12 +969,25 @@ private struct SnippetsPanel: View {
             }
         }
     }
+
+    private func deleteSnippet(_ snippet: Snippet) {
+        if selectedSnippet?.id == snippet.id {
+            selectedSnippet = nil
+        }
+        viewContext.delete(snippet)
+        do {
+            try viewContext.save()
+        } catch {
+            print("❌ Failed to delete snippet: \(error)")
+        }
+    }
 }
 
 private struct SnippetListRow: View {
     @ObservedObject var snippet: Snippet
     let isSelected: Bool
     let action: () -> Void
+    var onDelete: (() -> Void)? = nil
 
     @Environment(\.cfTheme) var theme
 
@@ -955,8 +1012,16 @@ private struct SnippetListRow: View {
                 RoundedRectangle(cornerRadius: 6)
                     .strokeBorder(isSelected ? theme.accent.opacity(0.3) : Color.clear, lineWidth: 1)
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let onDelete = onDelete {
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete Snippet", systemImage: "trash")
+                }
+            }
+        }
     }
 }
 
