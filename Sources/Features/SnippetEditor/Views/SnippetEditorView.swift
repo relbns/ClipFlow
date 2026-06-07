@@ -60,6 +60,7 @@ private struct SnippetEditorContentView: View {
                     GroupsPanel(
                         groups: groups,
                         selectedGroup: $selectedGroup,
+                        selectedSnippet: $selectedSnippet,
                         onCreateGroup: createGroup
                     )
                 },
@@ -567,25 +568,78 @@ private struct ThreePanelLayout<Left: View, Middle: View, Right: View>: View {
     @ViewBuilder let rightPanel: () -> Right
 
     @Environment(\.cfTheme) var theme
+    @State private var leftWidth: CGFloat = 230
+    @State private var rightWidth: CGFloat = 280
 
     var body: some View {
-        HStack(spacing: 0) {
-            leftPanel()
-                .frame(width: 230)
-                .background(theme.surfaceAlt)
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                leftPanel()
+                    .frame(width: leftWidth)
+                    .background(theme.surfaceAlt)
 
-            Divider()
+                ResizableDivider(
+                    onDrag: { delta in
+                        let newWidth = leftWidth + delta
+                        leftWidth = max(180, min(400, newWidth))
+                    }
+                )
 
-            middlePanel()
-                .frame(maxWidth: .infinity)
-                .background(theme.surface)
+                middlePanel()
+                    .frame(maxWidth: .infinity)
+                    .background(theme.surface)
 
-            Divider()
+                ResizableDivider(
+                    onDrag: { delta in
+                        let newWidth = rightWidth - delta
+                        rightWidth = max(250, min(500, newWidth))
+                    }
+                )
 
-            rightPanel()
-                .frame(width: 280)
-                .background(theme.surfaceAlt)
+                rightPanel()
+                    .frame(width: rightWidth)
+                    .background(theme.surfaceAlt)
+            }
         }
+    }
+}
+
+/// Resizable divider with drag gesture
+private struct ResizableDivider: View {
+    let onDrag: (CGFloat) -> Void
+    @State private var isHovering = false
+    @State private var lastDragValue: CGFloat = 0
+    @Environment(\.cfTheme) var theme
+
+    var body: some View {
+        Rectangle()
+            .fill(theme.stroke)
+            .frame(width: 1)
+            .overlay(
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: 8)
+                    .contentShape(Rectangle())
+                    .onHover { hovering in
+                        isHovering = hovering
+                        if hovering {
+                            NSCursor.resizeLeftRight.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
+                    .gesture(
+                        DragGesture()
+                            .onChanged { value in
+                                let delta = value.translation.width - lastDragValue
+                                lastDragValue = value.translation.width
+                                onDrag(delta)
+                            }
+                            .onEnded { _ in
+                                lastDragValue = 0
+                            }
+                    )
+            )
     }
 }
 
@@ -593,6 +647,7 @@ private struct ThreePanelLayout<Left: View, Middle: View, Right: View>: View {
 private struct GroupsPanel: View {
     let groups: FetchedResults<SnippetGroup>
     @Binding var selectedGroup: SnippetGroup?
+    @Binding var selectedSnippet: Snippet?
     let onCreateGroup: () -> Void
 
     @Environment(\.cfTheme) var theme
@@ -647,7 +702,11 @@ private struct GroupsPanel: View {
                                         title: snippet.title,
                                         subtitle: snippet.abbreviation
                                     ) {
-                                        // TODO: Navigate to snippet
+                                        // Navigate to snippet: set both group and snippet
+                                        if let group = snippet.group {
+                                            selectedGroup = group
+                                        }
+                                        selectedSnippet = snippet
                                     }
                                 }
                             }
