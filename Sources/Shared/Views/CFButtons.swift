@@ -74,34 +74,6 @@ struct CFIconBtn: View {
     }
 }
 
-// MARK: - Link Button (text-only, accent color)
-struct CFLinkBtn: View {
-    var icon: AnyView? = nil
-    let label: String
-    var action: (() -> Void)? = nil
-
-    @Environment(\.cfTheme) var theme
-
-    var body: some View {
-        Button(action: { action?() }) {
-            HStack(spacing: 6) {
-                if let icon = icon {
-                    icon
-                        .frame(width: 13, height: 13)
-                }
-                Text(label)
-                    .font(.system(size: 13, weight: .medium))
-            }
-            .foregroundColor(Color(red: 0.68, green: 0.17, blue: 0.72, opacity: 1.0))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.clear)
-            .cornerRadius(6)
-        }
-        .buttonStyle(PlainHoverButtonStyle())
-    }
-}
-
 // MARK: - Danger Button (for destructive actions)
 struct CFDangerBtn: View {
     let label: String
@@ -254,15 +226,15 @@ struct CFButtons_Previews: PreviewProvider {
                         CFLinkBtn(
                             icon: AnyView(CFIcon(type: .link, size: 13)),
                             label: "GitHub"
-                        )
+                        ) {}
                         CFLinkBtn(
                             icon: AnyView(CFIcon(type: .text, size: 13)),
                             label: "Full Credits"
-                        )
+                        ) {}
                         CFLinkBtn(
                             icon: AnyView(CFIcon(type: .gear, size: 13)),
                             label: "License"
-                        )
+                        ) {}
                     }
                 }
 

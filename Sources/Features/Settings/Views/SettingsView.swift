@@ -22,7 +22,7 @@ struct SettingsView: View {
                 ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
                     Button(action: { selectedTab = index }) {
                         VStack(spacing: 4) {
-                            CFGradientBadge(icon: tab.icon, accent: tab.accent)
+                            CFGradientBadge(icon: tab.icon, accent: tab.accent, size: 44)
                             Text(tab.label)
                                 .font(.system(size: 11))
                                 .foregroundColor(selectedTab == index ? theme.textStrong : theme.textMid)
@@ -74,21 +74,34 @@ struct GeneralSettingsView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        ClipFlowMark(size: 48, rounded: true, showBackground: true)
+                        // Load the actual app icon from bundle resources
+                        Group {
+                            if let bundle = Bundle.module.resourceURL?.appendingPathComponent("Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png"),
+                               let iconImage = NSImage(contentsOf: bundle) {
+                                Image(nsImage: iconImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 64, height: 64)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            } else {
+                                // Fallback to custom drawn icon
+                                ClipFlowMark(size: 64, rounded: true, showBackground: true)
+                            }
+                        }
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("ClipFlow")
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundColor(theme.textStrong)
 
-                            Text(L("app_tagline"))
+                            Text("Modern Clipboard Manager + Text Expander")
                                 .font(.system(size: 12))
                                 .foregroundColor(theme.textSubtle)
                         }
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
+                .padding(.horizontal, 26)
+                .padding(.top, 18)
 
                 // Settings Rows
                 VStack(spacing: 0) {
@@ -150,7 +163,7 @@ struct GeneralSettingsView: View {
                 .padding(20)
                 .background(theme.surface)
                 .cornerRadius(12)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 26)
 
                 // About Section
                 VStack(alignment: .leading, spacing: 12) {
@@ -194,9 +207,10 @@ struct GeneralSettingsView: View {
                 .padding(20)
                 .background(theme.surface)
                 .cornerRadius(12)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+                .padding(.horizontal, 26)
+                .padding(.bottom, 22)
             }
+            .padding(.bottom, 24) // Extra padding for scroll indicator
         }
         .background(theme.surfaceDeep)
     }

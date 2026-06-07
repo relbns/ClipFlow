@@ -5,15 +5,17 @@ import SwiftUI
 struct CFLinkBtn: View {
     @Environment(\.cfTheme) var theme
 
-    let icon: AnyView
+    var icon: AnyView? = nil
     let label: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
-                icon
-                    .foregroundColor(theme.accent)
+                if let icon = icon {
+                    icon
+                        .foregroundColor(theme.accent)
+                }
 
                 Text(label)
                     .font(.system(size: 12))

@@ -138,46 +138,6 @@ struct CFStatusChip: View {
     }
 }
 
-// MARK: - Alpha/Beta Tag (for version badge)
-struct CFVersionTag: View {
-    enum TagType {
-        case alpha
-        case beta
-        case dev
-
-        var label: String {
-            switch self {
-            case .alpha: return "Alpha"
-            case .beta: return "Beta"
-            case .dev: return "Dev"
-            }
-        }
-
-        var color: Color {
-            switch self {
-            case .alpha: return Color(red: 0.7, green: 0.17, blue: 0.60, opacity: 1.0) // amber
-            case .beta: return Color(red: 0.6, green: 0.17, blue: 0.72, opacity: 1.0) // purple
-            case .dev: return Color(red: 0.7, green: 0.14, blue: 0.50, opacity: 1.0) // green
-            }
-        }
-    }
-
-    let type: TagType
-    @Environment(\.cfTheme) var theme
-
-    var body: some View {
-        Text(type.label)
-            .font(.system(size: 10.5, weight: .semibold))
-            .tracking(0.6)
-            .textCase(.uppercase)
-            .foregroundColor(type.color)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
-            .background(type.color.opacity(0.25))
-            .cornerRadius(999)
-    }
-}
-
 // MARK: - Preview
 #if DEBUG
 struct CFChips_Previews: PreviewProvider {
@@ -277,7 +237,7 @@ struct CFChips_Previews: PreviewProvider {
                         HStack(spacing: 8) {
                             CFVersionTag(type: .alpha)
                             CFVersionTag(type: .beta)
-                            CFVersionTag(type: .dev)
+                            CFVersionTag(type: .stable)
                         }
                     }
                 }

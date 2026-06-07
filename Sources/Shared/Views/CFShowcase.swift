@@ -153,7 +153,7 @@ struct CFShowcase: View {
                     CFLinkBtn(
                         icon: AnyView(CFIcon(type: .link, size: 13)),
                         label: "GitHub"
-                    )
+                    ) {}
                     CFIconBtn(icon: AnyView(CFIcon(type: .gear, size: 14)))
                     CFIconBtn(icon: AnyView(CFIcon(type: .trash, size: 14)))
                     CFDangerBtn(label: "Delete")
