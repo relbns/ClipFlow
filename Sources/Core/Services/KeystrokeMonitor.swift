@@ -49,7 +49,7 @@ class KeystrokeMonitor: ObservableObject {
 
         self.eventTap = tap
         self.runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
         isMonitoring = true
@@ -60,7 +60,7 @@ class KeystrokeMonitor: ObservableObject {
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = runLoopSource {
-                CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
             }
         }
         eventTap = nil
