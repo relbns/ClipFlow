@@ -18,66 +18,41 @@ class KeystrokeMonitor: ObservableObject {
     }
 
     func startMonitoring() throws {
-        NSLog("🎯 KeystrokeMonitor.startMonitoring() called")
-
         // Check Accessibility permissions
         let trusted = AXIsProcessTrusted()
-        NSLog("🔐 AXIsProcessTrusted returned: \(trusted)")
-
         guard trusted else {
-            NSLog("❌ Throwing accessibilityPermissionDenied error")
             throw ExpansionError.accessibilityPermissionDenied
         }
-        NSLog("✅ Accessibility permission verified")
 
         // Create event tap for keyDown events
         let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
-        NSLog("📊 Creating CGEvent tap with mask: \(eventMask)")
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .listenOnly,  // Changed from .defaultTap - listen-only doesn't require filtering
+            options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: { proxy, type, event, refcon in
-                NSLog("🔔 CALLBACK FIRED! type=\(type.rawValue)")
-                guard let refcon = refcon else {
-                    NSLog("❌ No refcon!")
-                    return Unmanaged.passUnretained(event)
-                }
+                guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
                 let monitor = Unmanaged<KeystrokeMonitor>.fromOpaque(refcon).takeUnretainedValue()
 
-                // PERFORMANCE: Handle synchronously to avoid lag
-                // Only the expansion itself happens asynchronously
-                return monitor.handleKeyEventSync(proxy: proxy, type: type, event: event)
+                Task { @MainActor in
+                    return await monitor.handleKeyEvent(proxy: proxy, type: type, event: event)
+                }
+
+                return Unmanaged.passUnretained(event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            NSLog("❌ CGEvent.tapCreate returned nil - failed to create event tap")
             throw ExpansionError.failedToCreateEventTap
         }
-        NSLog("✅ CGEvent tap created successfully")
 
         self.eventTap = tap
         self.runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        NSLog("✅ Run loop source created")
-
-        // CRITICAL: Must use CFRunLoopGetMain() not CFRunLoopGetCurrent()
-        // Event tap needs to be on the main run loop to receive events
-        CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
-        NSLog("✅ Run loop source added to MAIN run loop")
-
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        NSLog("✅ Event tap enabled")
-
-        // Check if it's really enabled
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            let isEnabled = CGEvent.tapIsEnabled(tap: tap)
-            NSLog("🔍 Event tap enabled status after 1s: \(isEnabled)")
-        }
 
         isMonitoring = true
-        NSLog("⌨️⌨️⌨️ Keystroke monitoring started successfully!")
         print("⌨️ Keystroke monitoring started")
     }
 
@@ -85,7 +60,7 @@ class KeystrokeMonitor: ObservableObject {
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = runLoopSource {
-                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+                CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
             }
         }
         eventTap = nil
@@ -94,59 +69,47 @@ class KeystrokeMonitor: ObservableObject {
         print("⌨️ Keystroke monitoring stopped")
     }
 
-    // PERFORMANCE: Synchronous handler to avoid lag on every keystroke
-    private func handleKeyEventSync(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent> {
+    private func handleKeyEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) async -> Unmanaged<CGEvent> {
         guard type == .keyDown else { return Unmanaged.passUnretained(event) }
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
         // Get typed character
         guard let chars = event.keyboardEventCharacters, !chars.isEmpty else {
-            NSLog("⚠️ No characters for keyCode: \(keyCode)")
             return Unmanaged.passUnretained(event)
         }
 
-        NSLog("⌨️ Key: '\(chars)' buffer: '\(typedBuffer)'")
-
         // Handle special keys
         if isDeleteKey(keyCode) {
-            Task { @MainActor in
-                if !self.typedBuffer.isEmpty {
-                    self.typedBuffer.removeLast()
-                }
+            if !typedBuffer.isEmpty {
+                typedBuffer.removeLast()
             }
             return Unmanaged.passUnretained(event)
         }
 
         if isResetKey(keyCode) {
-            Task { @MainActor in
-                self.typedBuffer = ""
-            }
+            typedBuffer = ""
             return Unmanaged.passUnretained(event)
         }
 
-        // Update buffer on main actor
-        Task { @MainActor in
-            // First append to buffer
-            self.typedBuffer.append(chars)
-            if self.typedBuffer.count > self.maxBufferLength {
-                self.typedBuffer = String(self.typedBuffer.suffix(self.maxBufferLength))
-            }
+        // Add to buffer
+        typedBuffer.append(chars)
+        if typedBuffer.count > maxBufferLength {
+            typedBuffer = String(typedBuffer.suffix(maxBufferLength))
+        }
 
-            // Try to match snippet (pass buffer including trigger char, and the trigger char separately)
-            // The findMatch will check if buffer WITHOUT trigger ends with abbreviation
-            if let match = self.textExpansionEngine.findMatch(in: self.typedBuffer, triggerChar: chars.last) {
-                print("🎯 Match found: \(match.snippet.abbreviation) → \(match.snippet.title)")
+        // Try to match snippet
+        if let match = await textExpansionEngine.findMatch(in: typedBuffer, triggerChar: chars.last) {
+            print("🎯 Match found: \(match.snippet.abbreviation) → \(match.snippet.title)")
 
-                // Clear buffer
-                self.typedBuffer = ""
+            // Clear matched part from buffer
+            typedBuffer = ""
 
-                // Trigger expansion asynchronously (doesn't block typing)
-                // Need to delete abbreviation + 1 for trigger character
-                Task {
-                    await self.textExpansionEngine.expand(match, includingTrigger: true)
-                }
-            }
+            // Trigger expansion
+            await textExpansionEngine.expand(match)
+
+            // Optionally suppress trigger character
+            // For now, let it through
         }
 
         return Unmanaged.passUnretained(event)
