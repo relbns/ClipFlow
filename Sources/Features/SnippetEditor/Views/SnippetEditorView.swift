@@ -716,9 +716,6 @@ private struct GroupsPanel: View {
 
                     // All Snippets Option
                     VStack(spacing: 8) {
-                        CFSectionLabel("LIBRARY")
-                            .padding(.horizontal, 8)
-
                         Button(action: { selectedGroup = nil }) {
                             HStack(spacing: 10) {
                                 CFIcon(type: .bracket, size: 14, stroke: 1.8)
