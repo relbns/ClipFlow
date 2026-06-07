@@ -1,0 +1,137 @@
+name: Build Signed Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*-signed'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.4'
+
+    - name: Import Code Signing Certificates
+      uses: apple-actions/import-codesign-certs@v2
+      with:
+        p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+        p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+    - name: Build app bundle
+      run: |
+        chmod +x Scripts/build-app.sh
+        ./Scripts/build-app.sh
+
+    - name: Code Sign
+      env:
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
+      run: |
+        # Sign frameworks
+        codesign --force --options runtime --deep \
+          --sign "$APPLE_IDENTITY" \
+          --timestamp \
+          "Build/ClipFlow.app/Contents/Frameworks/Sparkle.framework"
+
+        # Sign app bundle
+        codesign --force --options runtime --deep \
+          --sign "$APPLE_IDENTITY" \
+          --timestamp \
+          --entitlements "Sources/Resources/ClipFlow.entitlements" \
+          "Build/ClipFlow.app"
+
+        # Verify signature
+        codesign --verify --deep --strict --verbose=2 "Build/ClipFlow.app"
+
+    - name: Notarize
+      env:
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      run: |
+        # Create ZIP for notarization
+        ditto -c -k --keepParent "Build/ClipFlow.app" "Build/ClipFlow.zip"
+
+        # Submit for notarization
+        xcrun notarytool submit "Build/ClipFlow.zip" \
+          --apple-id "$APPLE_ID" \
+          --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+          --team-id "$APPLE_TEAM_ID" \
+          --wait
+
+        # Staple the notarization ticket
+        xcrun stapler staple "Build/ClipFlow.app"
+
+    - name: Create DMG
+      run: |
+        brew install create-dmg
+
+        create-dmg \
+          --volname "ClipFlow" \
+          --volicon "Sources/Resources/Assets.xcassets/AppIcon.appiconset/icon_512x512.png" \
+          --window-pos 200 120 \
+          --window-size 600 400 \
+          --icon-size 100 \
+          --icon "ClipFlow.app" 175 190 \
+          --hide-extension "ClipFlow.app" \
+          --app-drop-link 425 190 \
+          "Build/ClipFlow-Signed.dmg" \
+          "Build/ClipFlow.app"
+
+        # Sign DMG
+        codesign --force --sign "$APPLE_IDENTITY" --timestamp "Build/ClipFlow-Signed.dmg"
+
+        # Notarize DMG
+        xcrun notarytool submit "Build/ClipFlow-Signed.dmg" \
+          --apple-id "$APPLE_ID" \
+          --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+          --team-id "$APPLE_TEAM_ID" \
+          --wait
+
+        # Staple DMG
+        xcrun stapler staple "Build/ClipFlow-Signed.dmg"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ClipFlow-Signed-${{ github.ref_name }}
+        path: Build/ClipFlow-Signed.dmg
+        retention-days: 90
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: Build/ClipFlow-Signed.dmg
+        draft: false
+        body: |
+          ## ClipFlow ${{ github.ref_name }}
+
+          ### Installation
+          1. Download `ClipFlow-Signed.dmg`
+          2. Open the DMG
+          3. Drag ClipFlow.app to Applications
+          4. Open ClipFlow - no warning needed! ✅
+          5. Grant Accessibility permission when prompted
+
+          ### What's Changed
+          - See commit history for details
+
+          ### Requirements
+          - macOS 14.0 (Sonoma) or later
+
+          ---
+
+          **Note:** This build is signed and notarized by Apple.
+
+          Built with ❤️ using [Claude Code](https://claude.ai/code)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
