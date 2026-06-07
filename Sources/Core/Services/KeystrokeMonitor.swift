@@ -105,11 +105,8 @@ class KeystrokeMonitor: ObservableObject {
             // Clear matched part from buffer
             typedBuffer = ""
 
-            // Trigger expansion
-            await textExpansionEngine.expand(match)
-
-            // Optionally suppress trigger character
-            // For now, let it through
+            // Trigger expansion (delete abbreviation + trigger character)
+            await textExpansionEngine.expand(match, includingTrigger: true)
         }
 
         return Unmanaged.passUnretained(event)
