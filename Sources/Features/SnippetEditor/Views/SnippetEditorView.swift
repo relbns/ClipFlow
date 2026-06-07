@@ -691,7 +691,7 @@ private struct GroupsPanel: View {
                     // Library Section
                     if !recentSnippetsLimited.isEmpty {
                         VStack(spacing: 8) {
-                            CFSectionLabel("LIBRARY")
+                            CFSectionLabel("RECENT")
                                 .padding(.horizontal, 8)
 
                             VStack(spacing: 2) {
