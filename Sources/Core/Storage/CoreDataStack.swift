@@ -164,6 +164,9 @@ enum StoreMigrator {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
         try? coordinator.destroyPersistentStore(at: url, ofType: NSSQLiteStoreType, options: nil)
+        for extensionSuffix in ["", "-wal", "-shm"] {
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + extensionSuffix))
+        }
     }
 }
 

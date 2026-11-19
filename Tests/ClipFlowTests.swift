@@ -176,6 +176,7 @@ final class StorageTests: XCTestCase {
         XCTAssertTrue(rule.isEnabled)
         XCTAssertFalse(rule.isDeny)
         XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("ClipFlow-v1-backup.sqlite").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("ClipFlow-migrating.sqlite").path))
     }
 
     /// Set CLIPFLOW_STORE_FIXTURE to a copy of a real store to check it is recognised as v1 or v2.
