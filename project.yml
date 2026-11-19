@@ -41,7 +41,6 @@ targets:
         com.apple.security.app-sandbox: false
     dependencies:
       - package: KeyboardShortcuts
-      - package: Sparkle
     settings:
       base:
         INFOPLIST_FILE: Sources/Resources/Info.plist
@@ -53,6 +52,3 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: 2.0.0
-  Sparkle:
-    url: https://github.com/sparkle-project/Sparkle
-    from: 2.6.0
