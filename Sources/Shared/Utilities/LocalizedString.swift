@@ -9,6 +9,12 @@ func L(_ key: String) -> String {
     return english.map { NSLocalizedString(key, bundle: $0, comment: "") } ?? key
 }
 
+/// Picks `<key>_one` for a count of 1 and `<key>_other` otherwise, formatted with the count.
+@MainActor
+func L(_ key: String, count: Int) -> String {
+    L(count == 1 ? key + "_one" : key + "_other", count)
+}
+
 @MainActor
 func L(_ key: String, _ args: CVarArg...) -> String {
     let format = L(key)

@@ -174,7 +174,6 @@
 /* Interface (Preferences, popover, About, Welcome, editor) */
 "search_clipboard" = "Search clipboard…";
 "recent_clips" = "Recent clips";
-"items_count" = "%d items";
 "no_history" = "Nothing copied yet";
 "section_pinned" = "Pinned";
 "section_categories" = "Categories";
@@ -201,7 +200,6 @@
 "copied_seconds_ago" = "copied %ds ago";
 "copied_minutes_ago" = "copied %dm ago";
 "copied_hours_ago" = "copied %dh ago";
-"copied_days_ago" = "copied %dd ago";
 "tab_general" = "General";
 "tab_appearance" = "Appearance";
 "tab_expansion" = "Expansion";
@@ -336,4 +334,12 @@
 "editor_search" = "Search snippets…";
 "editor_select_snippet" = "Choose a snippet to edit";
 "editor_no_selection" = "No snippet selected";
-"editor_stats" = "%d characters · %d words";
+"items_count_one" = "1 item";
+"items_count_other" = "%d items";
+"copied_days_ago_one" = "copied yesterday";
+"copied_days_ago_other" = "copied %d days ago";
+"editor_chars_one" = "1 character";
+"editor_chars_other" = "%d characters";
+"editor_words_one" = "1 word";
+"editor_words_other" = "%d words";
+"launch_at_login_failed" = "Couldn't change Launch at login";

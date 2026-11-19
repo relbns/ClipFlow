@@ -134,7 +134,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.messageText = L("store_moved_title")
             alert.informativeText = L("store_moved_message", url.path)
             alert.addButton(withTitle: L("show_in_finder"))
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: L("ok"))
         }
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn, case .movedAside(let url) = issue {
@@ -178,7 +178,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.bool(forKey: "textExpansionEnabled")
     }
 
-    /// Idempotent: starts the tap once expansion is on and Input Monitoring is granted, stops it otherwise.
     private func updateHistoryRecordingState() {
         if UserDefaults.standard.bool(forKey: "startMonitoring") {
             clipboardMonitor.startMonitoring()
@@ -187,6 +186,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Idempotent: starts the tap once expansion is on and Input Monitoring is granted, stops it otherwise.
     private func updateTextExpansionState() {
         let shouldRun = isTextExpansionEnabled && permissions.canListen
         if shouldRun && !keystrokeMonitor.isMonitoring {
@@ -284,6 +284,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let settingsView = DynamicLanguageWrapper {
                 SettingsView()
                     .cfAutoTheme()
+                    .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
             }
             .environmentObject(LanguageManager.shared)
 

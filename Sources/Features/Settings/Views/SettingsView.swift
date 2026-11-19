@@ -1,4 +1,3 @@
-import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -91,7 +90,7 @@ struct GeneralSettingsView: View {
     @AppStorage("removeDuplicates") private var removeDuplicates = true
     @AppStorage("moveUsedToTop") private var moveUsedToTop = true
     @AppStorage("startMonitoring") private var recordHistory = true
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var confirmingClear = false
 
     var body: some View {
@@ -122,6 +121,7 @@ struct GeneralSettingsView: View {
                 }
             }
         }
+        .onAppear { launchAtLogin = LaunchAtLogin.isEnabled }
         .alert(L("clear_history_confirm_title"), isPresented: $confirmingClear) {
             Button(L("pref_clear_history_button"), role: .destructive) {
                 NotificationCenter.default.post(name: .clearClipboardHistory, object: nil)
@@ -133,16 +133,7 @@ struct GeneralSettingsView: View {
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-        } catch {
-            Log.app.error("Launch at login change failed: \(error.localizedDescription, privacy: .public)")
-        }
-        launchAtLogin = SMAppService.mainApp.status == .enabled
+        launchAtLogin = LaunchAtLogin.set(enabled)
     }
 }
 

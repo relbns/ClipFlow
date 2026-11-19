@@ -967,9 +967,6 @@ private struct EditorToolbar: View {
                     CFIcon(type: .trash, size: 12, stroke: 1.8)
                     Text(L("delete"))
                         .font(.system(size: 12))
-                    Text("⌘⌫")
-                        .font(.system(size: 10))
-                        .foregroundColor(theme.danger.opacity(0.7))
                 }
                 .foregroundColor(selectedSnippet == nil ? theme.textFaint : theme.danger)
                 .padding(.horizontal, 10)
@@ -978,7 +975,7 @@ private struct EditorToolbar: View {
                 .cornerRadius(5)
             }
             .buttonStyle(.plain)
-            .keyboardShortcut(.delete, modifiers: .command)
+
             .disabled(selectedSnippet == nil)
         }
         .padding(.horizontal, 16)
@@ -1001,7 +998,7 @@ private struct EditorStatusBar: View {
         let chars = snippet.content.count
         let words = snippet.content.split(separator: " ").count
 
-        return L("editor_stats", chars, words)
+        return "\(L("editor_chars", count: chars)) · \(L("editor_words", count: words))"
     }
 
     var body: some View {

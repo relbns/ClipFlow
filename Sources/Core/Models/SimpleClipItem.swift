@@ -139,7 +139,7 @@ extension SimpleClipItem {
         case ..<60: return L("copied_seconds_ago", seconds)
         case ..<3600: return L("copied_minutes_ago", seconds / 60)
         case ..<86400: return L("copied_hours_ago", seconds / 3600)
-        default: return L("copied_days_ago", seconds / 86400)
+        default: return L("copied_days_ago", count: seconds / 86400)
         }
     }
 }

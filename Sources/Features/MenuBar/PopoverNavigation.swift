@@ -90,17 +90,17 @@ final class PopoverNavigation: ObservableObject {
         }
     }
 
-    /// The shortcuts the popover footer shows: ⌘E editor, ⌘, preferences, ⌘Q quit. Matched by key
-    /// position, as macOS does for ⌘ shortcuts, so they also work with a Hebrew layout.
+    /// The shortcuts the popover footer shows: ⌘E editor, ⌘, preferences, ⌘Q quit. Keys are looked up in
+    /// the current Latin layout, so they follow AZERTY or Dvorak and still work while typing Hebrew.
     private func handleCommand(keyCode: UInt16) -> Bool {
         switch keyCode {
-        case 14:
+        case SyntheticKeyboard.keyCode(for: "e") ?? 14:
             onClose()
             NotificationCenter.default.post(name: NSNotification.Name("OpenSnippetEditor"), object: nil)
-        case 43:
+        case SyntheticKeyboard.keyCode(for: ",") ?? 43:
             onClose()
             NotificationCenter.default.post(name: NSNotification.Name("OpenPreferences"), object: nil)
-        case 12:
+        case SyntheticKeyboard.keyCode(for: "q") ?? 12:
             NSApp.terminate(nil)
         default:
             return false

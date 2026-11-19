@@ -68,8 +68,19 @@ enum AppExclusions {
         return cachedApps
     }
 
+    /// Earlier builds could store an app twice; entries for the same app are merged.
     static func decode(_ json: String) -> [ExcludedApp] {
-        (try? JSONDecoder().decode([ExcludedApp].self, from: Data(json.utf8))) ?? []
+        let stored = (try? JSONDecoder().decode([ExcludedApp].self, from: Data(json.utf8))) ?? []
+        var merged: [ExcludedApp] = []
+        for app in stored {
+            if let index = merged.firstIndex(where: { $0.bundleID == app.bundleID }) {
+                merged[index].excludeFromHistory = merged[index].excludeFromHistory || app.excludeFromHistory
+                merged[index].excludeFromExpansion = merged[index].excludeFromExpansion || app.excludeFromExpansion
+            } else {
+                merged.append(app)
+            }
+        }
+        return merged
     }
 
     static func encode(_ apps: [ExcludedApp]) -> String {

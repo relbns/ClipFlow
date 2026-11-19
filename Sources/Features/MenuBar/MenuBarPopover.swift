@@ -237,7 +237,7 @@ struct SimpleHistoryView: View {
 
                     Spacer()
 
-                    Text(L("items_count", clips.count))
+                    Text(L("items_count", count: clips.count))
                         .font(.system(size: 10.5))
                         .foregroundColor(theme.textSubtle)
                 }

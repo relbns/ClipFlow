@@ -1,4 +1,3 @@
-import ServiceManagement
 import SwiftUI
 
 /// Welcome/Onboarding screen
@@ -13,7 +12,7 @@ struct WelcomeView: View {
     @Environment(\.cfTheme) var theme
     @Binding var isPresented: Bool
     @ObservedObject private var permissions = PermissionService.shared
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = LaunchAtLogin.isEnabled
 
     var onGetStarted: () -> Void
 
@@ -207,12 +206,7 @@ struct WelcomeView: View {
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
-        do {
-            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-        } catch {
-            Log.app.error("Launch at login change failed: \(error.localizedDescription, privacy: .public)")
-        }
-        launchAtLogin = SMAppService.mainApp.status == .enabled
+        launchAtLogin = LaunchAtLogin.set(enabled)
     }
 
     // MARK: - Footer
