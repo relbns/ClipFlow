@@ -6,13 +6,12 @@
 
 ### Modern Clipboard Manager + Text Expander for macOS
 
-*Powerful clipboard history • Real-time text expansion • Hebrew RTL support • Cloud sync*
+*Clipboard history • Real-time text expansion • Hebrew RTL support*
 
 [![CI](https://github.com/relbns/ClipFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/relbns/ClipFlow/actions)
-[![Swift Version](https://img.shields.io/badge/Swift-6.0-orange.svg?logo=swift)](https://swift.org)
+[![Swift Version](https://img.shields.io/badge/Swift-5.9%2B-orange.svg?logo=swift)](https://swift.org)
 [![Platform](https://img.shields.io/badge/macOS-14.0%2B-blue.svg?logo=apple)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Made with Claude](https://img.shields.io/badge/Made%20with-Claude%20Code-blueviolet.svg)](https://claude.ai/code)
 
 [Features](#-features) • [Installation](#-getting-started) • [Usage](#-usage-examples) • [Development](#️-development) • [Credits](#-credits)
@@ -23,42 +22,39 @@
 
 ## ✨ Features
 
-### 📋 Clipboard Manager
-- **Two UI Modes**:
-  - **Simple Mode**: Flycut-style flat list with keyboard shortcuts (1-9, 0)
-  - **Organized Mode**: Grouped by type (Recent, Images, URLs, Text)
-- **Rich Content Support**: Text, images, URLs, hex colors
-- **Image Thumbnails**: Preview images directly in menu (24x24 / 32x32)
-- **Color Swatches**: Visual preview for hex color codes (#FF5733)
-- **RTL Support**: Full Hebrew right-to-left text support
-- **Search**: Instant filter across all clipboard items
+### 📋 Clipboard history
+- **Persistent history**: every copy is kept across restarts, up to the limit you set (default 30). Pinned clips are never trimmed.
+- **Everything on the clipboard is kept**: text, rich text, images, files, links and hex colors, each with its source app, size and image dimensions.
+- **Paste on pick**: choose a clip and it is pasted straight into the app you were in, and stays on the clipboard.
+- **Keyboard first**: `⌃⌘V` opens the history. Arrows and Return pick, `1`-`9` and `0` paste directly, typing filters, Esc closes.
+- **Private by default**: password-manager copies (concealed or transient pasteboard data) and excluded apps are never recorded.
+- **Duplicates**: copying something again moves it to the top instead of adding a second row.
+- **Two views**: Simple (a flat numbered list) and Organized (Recent, Images, Links, Colors, Text).
 
-### ⚡ Text Expansion
-- **Real-time Expansion**: Type abbreviations, get full text instantly
-- **Trigger Options**: Space, delimiter, any character, tab, enter
-- **Dynamic Variables**:
+### ⚡ Text expansion
+- **Real-time expansion**: type an abbreviation such as `.sig` and a trigger, and it is replaced in any app.
+- **Triggers**: delimiter (space or punctuation), space, Tab, Enter, or any character.
+- **Your clipboard is safe**: expansion goes through the pasteboard and puts back exactly what you had copied.
+- **Variables**:
   - `{date}`, `{date:yyyy-MM-dd}`, `{date:hebrew}`
   - `{time}`, `{time:HH:mm}`
-  - `{clipboard}` - Current clipboard content
-  - `{cursor}` - Cursor position after expansion
+  - `{clipboard}`: the current clipboard text
+  - `{cursor}`: where the caret lands after expansion
   - `{year}`, `{month}`, `{day}`
-- **Custom Variables**: `{name:prompt="Enter your name"}`
-- **App-Specific Rules**: Restrict snippets to specific applications
-- **Statistics Tracking**: Usage count and time saved
+  - `{prompt:Name}`: asks for a value when the snippet expands
+- **App rules**: restrict a snippet to some apps, never expand it in others, or exclude apps from expansion altogether.
+- **Statistics**: use count and last used, per snippet.
 
-### 🌐 Hebrew Support
-- **RTL Text Display**: Proper right-to-left rendering in menus and editor
-- **Hebrew Calendar**: `{date:hebrew}` for Hebrew dates
-- **Hebrew Keyboard Detection**: Auto-detect Hebrew layout (NSEvent+Keyboard)
-- **Hebrew Abbreviations**: Support for Hebrew shortcuts (.תז, .שלום)
-- **Bilingual UI**: English and Hebrew localization
+### 🌐 Hebrew
+- Hebrew abbreviations (`;חת`), `{date:hebrew}` for the Hebrew calendar, and an English and Hebrew interface.
 
-### ☁️ Sync & Export
-- **iCloud Sync**: Auto-sync snippets across devices every 5 minutes
-- **JSON Export/Import**: Backup and share snippet collections
-- **XML Export**: TextExpander-compatible plist format
-- **Conflict Resolution**: Skip, overwrite, or rename strategies
-- **Manual Sync**: On-demand sync and restore from iCloud
+### 📦 Export
+- **JSON export and import** of snippet libraries, with skip, overwrite or rename on conflicts.
+- **XML export** in a TextExpander-compatible plist format.
+
+### 🧭 In progress
+- The interface is being aligned with the full design (`design_handoff_clipflow/`): theme, popover, preferences, snippet editor, onboarding and full right-to-left layout.
+- iCloud sync and launch at login are not working yet. Their settings are visible but have no effect.
 
 ---
 
@@ -67,59 +63,38 @@
 ### Requirements
 
 - macOS 14.0 (Sonoma) or later
-- Xcode 15.2+ (for building from source)
-- Swift 6.0
+- Xcode 15.2 or later, for building from source
 
-### Installation
-
-#### Option 1: Build from Source
+### Build and install
 
 ```bash
-# Clone the repository
 git clone https://github.com/relbns/ClipFlow.git
 cd ClipFlow
 
-# Build the project
-swift build -c release
+# Sign with your Apple Development certificate, so macOS keeps the app's
+# permissions across rebuilds. List yours with:
+#   security find-identity -v -p codesigning
+echo "Apple Development: Your Name (TEAMID)" > .signing-identity
 
-# The binary will be at:
-# .build/release/ClipFlow
+./build-app.sh       # builds Build/ClipFlow.app
+./install-app.sh     # copies it to /Applications
+open /Applications/ClipFlow.app
 ```
 
-#### Option 2: Run in Development Mode
+`./build-app.sh --adhoc` builds without a certificate, but macOS then asks for the permissions again after every rebuild. `./build-app.sh --sandbox` builds with the App Sandbox enabled.
 
-```bash
-# Build and run
-swift run ClipFlow
+### Permissions
 
-# Or open in Xcode
-open Package.swift
-# Then press ⌘R to run
-```
+ClipFlow needs two permissions for text expansion and paste-on-pick. Clipboard history works without them.
 
-### First Launch Setup
+- **Accessibility**: to type the expansion and paste the clip you pick.
+- **Input Monitoring**: to notice the abbreviations you type.
 
-1. **Grant Accessibility Permission** (Required for text expansion):
-   - Go to: **System Settings → Privacy & Security → Accessibility**
-   - Click the lock to make changes
-   - Click **+** and add ClipFlow
-   - Or use the "Open System Settings" button in ClipFlow → Preferences → Text Expansion
+The welcome screen and **Preferences → Expansion** ask for both. You can also grant them in **System Settings → Privacy & Security**. Expansion starts as soon as they are granted.
 
-2. **Configure Settings** (⌘,):
-   - **General**: Launch at login, max history items (10-100)
-   - **Appearance**: Simple vs Organized mode, icons, thumbnails
-   - **Text Expansion**: Enable/disable, trigger type, sound feedback
-   - **Hotkeys**: Customize all keyboard shortcuts
-   - **Sync**: Enable iCloud sync (optional)
+### Your first snippet
 
-3. **Create Your First Snippet** (⌘E):
-   - Click **+ Snippet**
-   - **Title**: "My Email"
-   - **Abbreviation**: `.email` (must start with . ; or /)
-   - **Content**: `your@email.com`
-   - **Trigger**: Delimiter (space, tab, punctuation)
-   - Click **Save**
-   - Test: Type `.email[SPACE]` anywhere!
+ClipFlow starts with a few snippets: `.dd` (today's date), `.time`, `.now` and `.sig`. To add your own, open the Snippet Editor from the menu bar icon, add a snippet, give it an abbreviation that starts with `.`, `;` or `/`, and type it anywhere followed by a space.
 
 ---
 
@@ -173,11 +148,11 @@ Result: console.log(█) // cursor positioned between parentheses
 
 ```
 Abbreviation: .hi
-Content: Hello {name:prompt="Enter your name"}!
+Content: Hello {prompt:Name}!
 Trigger: Space
 
 Type: .hi[SPACE]
-→ Dialog appears: "Enter your name"
+→ Dialog appears: "Name"
 Enter: John
 Result: Hello John!
 ```
@@ -200,50 +175,12 @@ Apps: TablePlus, DataGrip
 
 | Shortcut | Action |
 |----------|--------|
-| ⌘⇧V | Open main menu |
-| ⌘⌃V | Open history menu |
-| ⌘⇧B | Open snippets menu |
-| ⌘E | Open snippet editor |
-| ⌘, | Open preferences |
-| ⌘⌥⌫ | Clear clipboard history |
-| 1-9, 0 | Quick select menu items |
-| Esc | Close any menu |
-| ⌥ + Paste | Paste as plain text |
-| ⌘ + Paste | Paste without adding to history |
+| ⌃⌘V | Open clipboard history (global, change it in Preferences → Hotkeys) |
+| ↑ ↓ and Return | Pick a clip in the history and paste it |
+| 1-9, 0 | Paste clip 1-10 directly, while the search field is empty |
+| Esc | Close the history |
 
----
-
-## 🎨 UI Customization
-
-### Settings → Appearance
-
-- **View Mode**: 
-  - **Simple**: Flycut-style flat list (up to 50 items)
-  - **Organized**: Grouped folders (Recent, Images, URLs, Text)
-- **Show Icons**: Type indicators (📝 text, 🖼️ images, 🔗 URLs)
-- **Show Thumbnails**: Image previews (32x32) and color swatches
-- **Number Menu Items**: Keyboard shortcuts 1-9, 0
-- **Max Title Length**: 20-100 characters (slider)
-
-### Settings → Text Expansion
-
-- **Enable/Disable**: Toggle text expansion globally
-- **Expand After**:
-  - Delimiter (space, tab, punctuation) - Recommended
-  - Space only
-  - Any character
-  - Tab only
-  - Enter only
-- **Case Sensitive**: Match abbreviation case exactly
-- **Play Sound**: Audio feedback on expansion
-- **Show Notification**: Brief notification on expansion
-
-### Settings → Sync
-
-- **iCloud Sync**: Auto-sync every 5 minutes
-- **Export All**: Save all snippets to JSON file
-- **Import**: Load snippets from JSON file
-- **Conflict Resolution**: Choose skip/overwrite/rename strategy
+Opening the Snippet Editor and clearing the history can get global shortcuts in Preferences → Hotkeys. They have none by default, so ClipFlow never takes a shortcut away from another app.
 
 ---
 
@@ -252,84 +189,44 @@ Apps: TablePlus, DataGrip
 ### Project Structure
 
 ```
-ClipFlow/
-├── Sources/
-│   ├── App/                      # App entry point
-│   │   ├── ClipFlowApp.swift     # @main SwiftUI app
-│   │   └── AppDelegate.swift     # MenuBar setup
-│   ├── Core/
-│   │   ├── Models/               # Core Data models
-│   │   │   ├── ClipItem.swift
-│   │   │   ├── Snippet.swift
-│   │   │   ├── SnippetGroup.swift
-│   │   │   └── AppRule.swift
-│   │   ├── Services/             # Business logic
-│   │   │   ├── ClipboardMonitor.swift
-│   │   │   ├── KeystrokeMonitor.swift
-│   │   │   ├── TextExpansionEngine.swift
-│   │   │   ├── VariableProcessor.swift
-│   │   │   ├── PasteEngine.swift
-│   │   │   └── Sync/
-│   │   │       ├── SnippetExporter.swift
-│   │   │       └── iCloudSyncService.swift
-│   │   ├── Storage/
-│   │   │   └── CoreDataStack.swift
-│   │   └── Extensions/
-│   │       ├── String+Hebrew.swift
-│   │       ├── Date+Hebrew.swift
-│   │       └── NSEvent+Keyboard.swift
-│   ├── Features/
-│   │   ├── SnippetEditor/        # Snippet management UI
-│   │   ├── Settings/             # Preferences windows
-│   │   └── MenuBar/              # Menu controller
-│   ├── Shared/
-│   │   └── Utilities/
-│   │       └── LocalizedString.swift
-│   └── Resources/
-│       ├── Assets.xcassets/
-│       └── Localizations/
-│           ├── en.lproj/
-│           └── he.lproj/
-├── Tests/
-│   └── ClipFlowTests.swift
-├── docs/                         # Documentation
-├── Package.swift                 # SPM manifest
-└── README.md
+Sources/
+├── App/                  # Entry point and AppDelegate (status item, popover, windows)
+├── Core/
+│   ├── Expansion/        # AbbreviationMatcher, SnippetTemplate (pure, unit-tested)
+│   ├── Models/           # Core Data classes and the history row model
+│   ├── Services/         # Clipboard monitor, keystroke monitor, expansion and paste
+│   │                     # engines, pasteboard snapshot, permissions
+│   ├── Storage/          # In-code Core Data model (versioned) and migration
+│   └── Extensions/
+├── Features/             # MenuBar, SnippetEditor, Settings, Welcome, About
+├── Shared/               # Theme, UI primitives, utilities, logging
+└── Resources/            # Info.plist, entitlements, assets, en and he strings
+Tests/                    # XCTest suite
+design_handoff_clipflow/  # The design: HTML prototype, screenshots, spec
 ```
 
 ### Building & Testing
 
 ```bash
-# Build debug
-swift build
+swift build          # debug build
+swift test           # unit tests
+./build-app.sh       # signed .app bundle in Build/
+```
 
-# Build release
-swift build -c release
+Logs go to the unified log under the subsystem `com.singalong.clipflow`:
 
-# Run tests
-swift test
-
-# Run with verbose output
-swift build -v
-
-# Clean build
-swift package clean
+```bash
+/usr/bin/log stream --predicate 'subsystem == "com.singalong.clipflow"' --info
 ```
 
 ### Running in Xcode
 
-1. Open `Package.swift` in Xcode
-2. Wait for dependencies to resolve (KeyboardShortcuts, Sparkle)
-3. Select "ClipFlow" scheme
-4. Build (⌘B)
-5. Run (⌘R)
-
-**Note**: Accessibility permissions are required even in development mode for text expansion to work.
+Open `Package.swift` in Xcode, select the ClipFlow scheme and run. Text expansion needs the same two permissions in development.
 
 ### Code Style
 
 - **SwiftLint** configured (see `.swiftlint.yml`)
-- **Swift 6.0** strict concurrency (`@MainActor`, actors)
+- **Swift 5.9+**, with services isolated to the main actor
 - **Combine** for reactive programming
 - **Core Data** for persistence
 - **SwiftUI + AppKit** hybrid UI
@@ -361,20 +258,18 @@ ClipFlow builds upon the excellent work of the macOS clipboard manager community
 - ✨ Real-time text expansion engine with CGEventTap
 - 🎨 Modern SwiftUI + AppKit hybrid interface
 - 🇮🇱 Full Hebrew RTL support (first clipboard manager with this!)
-- ☁️ iCloud sync and cross-device snippet sharing
 - 🔤 TextExpander-compatible variable system
 - 🎯 App-specific expansion rules
 - 💬 Custom variables with runtime prompts
 - 🌈 Color code preview and hex swatch rendering
 - 📦 JSON/XML export with conflict resolution
-- ⚡ Swift 6.0 strict concurrency and macOS 14+ native
+- 🔒 Password-manager aware history and a clipboard that survives expansion
 
 ### Contributors
 This project was developed with [Claude Code](https://claude.ai/code), Anthropic's AI-powered development assistant.
 
 ### Open Source Dependencies
 - [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) by [@sindresorhus](https://github.com/sindresorhus) - Global hotkey management
-- [Sparkle](https://github.com/sparkle-project/Sparkle) - App update framework
 
 See [CREDITS.md](CREDITS.md) for full attribution and licensing details.
 
@@ -391,8 +286,6 @@ Original Clipy code: [CLIPY-LICENSE](CLIPY-LICENSE)
 ## 🔗 Links
 
 - **Issues**: [GitHub Issues](https://github.com/relbns/ClipFlow/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/relbns/ClipFlow/discussions)
-- **Changelog**: [CHANGELOG.md](CHANGELOG.md) (Coming Soon)
 - **Roadmap**: [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)
 
 ---
