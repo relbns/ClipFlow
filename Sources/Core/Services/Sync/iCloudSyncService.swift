@@ -28,13 +28,11 @@ class iCloudSyncService: ObservableObject {
             }
         }
 
-        print("☁️ iCloud auto-sync enabled")
     }
 
     func disableAutoSync() {
         syncTimer?.invalidate()
         syncTimer = nil
-        print("☁️ iCloud auto-sync disabled")
     }
 
     func sync() async {
@@ -59,10 +57,9 @@ class iCloudSyncService: ObservableObject {
             try data.write(to: syncFileURL)
 
             lastSyncDate = Date()
-            print("☁️ Synced to iCloud: \(syncFileURL.path)")
         } catch {
             syncError = error
-            print("❌ iCloud sync failed: \(error)")
+            Log.storage.error("iCloud sync failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -82,7 +79,6 @@ class iCloudSyncService: ObservableObject {
         let exporter = SnippetExporter(context: context)
         _ = try await exporter.importFromJSON(data, mergeStrategy: .overwrite)
 
-        print("☁️ Restored from iCloud")
     }
 }
 

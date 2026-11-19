@@ -159,3 +159,7 @@
 "reset_settings" = "אפס את כל ההגדרות";
 "open_logs" = "פתח קבצי לוג...";
 "troubleshooting" = "לפתרון בעיות";
+
+/* Snippet prompts */
+"fill_in_snippet" = "מילוי שדות לקטע הטקסט";
+"insert" = "הוספה";

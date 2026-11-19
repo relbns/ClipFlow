@@ -1,45 +1,26 @@
 import KeyboardShortcuts
-import Combine
 
+/// Only the history popover has a global default. A global default on a common shortcut
+/// (such as Cmd+E or Shift+Cmd+V) would take that shortcut away from every other app.
 extension KeyboardShortcuts.Name {
-    static let showMainMenu = Self("showMainMenu", default: .init(.v, modifiers: [.command, .shift]))
     static let showHistoryMenu = Self("showHistoryMenu", default: .init(.v, modifiers: [.command, .control]))
-    static let showSnippetsMenu = Self("showSnippetsMenu", default: .init(.b, modifiers: [.command, .shift]))
-    static let showSnippetEditor = Self("showSnippetEditor", default: .init(.e, modifiers: [.command]))
-    static let clearHistory = Self("clearHistory", default: .init(.delete, modifiers: [.command, .option]))
+    static let showSnippetEditor = Self("showSnippetEditor")
+    static let clearHistory = Self("clearHistory")
 }
 
 @MainActor
-class HotkeyManager: ObservableObject {
+final class HotkeyManager {
     static let shared = HotkeyManager()
 
     private init() {}
 
     func setupHotkeys(
-        onMainMenu: @escaping () -> Void,
         onHistoryMenu: @escaping () -> Void,
-        onSnippetsMenu: @escaping () -> Void,
         onSnippetEditor: @escaping () -> Void,
         onClearHistory: @escaping () -> Void
     ) {
-        KeyboardShortcuts.onKeyUp(for: .showMainMenu) {
-            onMainMenu()
-        }
-
-        KeyboardShortcuts.onKeyUp(for: .showHistoryMenu) {
-            onHistoryMenu()
-        }
-
-        KeyboardShortcuts.onKeyUp(for: .showSnippetsMenu) {
-            onSnippetsMenu()
-        }
-
-        KeyboardShortcuts.onKeyUp(for: .showSnippetEditor) {
-            onSnippetEditor()
-        }
-
-        KeyboardShortcuts.onKeyUp(for: .clearHistory) {
-            onClearHistory()
-        }
+        KeyboardShortcuts.onKeyUp(for: .showHistoryMenu, action: onHistoryMenu)
+        KeyboardShortcuts.onKeyUp(for: .showSnippetEditor, action: onSnippetEditor)
+        KeyboardShortcuts.onKeyUp(for: .clearHistory, action: onClearHistory)
     }
 }

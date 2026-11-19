@@ -159,3 +159,7 @@
 "reset_settings" = "Reset All Settings";
 "open_logs" = "Open Log Files...";
 "troubleshooting" = "For troubleshooting issues";
+
+/* Snippet prompts */
+"fill_in_snippet" = "Fill in the snippet";
+"insert" = "Insert";

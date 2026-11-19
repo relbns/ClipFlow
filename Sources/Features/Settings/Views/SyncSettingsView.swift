@@ -127,7 +127,7 @@ private struct SyncSettingsContentView: View {
             do {
                 try await iCloudService.restoreFromiCloud()
             } catch {
-                print("❌ Restore failed: \(error)")
+                Log.ui.error("Restore failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -142,7 +142,7 @@ private struct SyncSettingsContentView: View {
                     showingExportPicker = true
                 }
             } catch {
-                print("❌ Export failed: \(error)")
+                Log.ui.error("Export failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -163,7 +163,7 @@ private struct SyncSettingsContentView: View {
                     showingImportAlert = true
                 }
             } catch {
-                print("❌ Import failed: \(error)")
+                Log.ui.error("Import failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -178,11 +178,8 @@ extension SyncSettingsContentView {
                 contentType: .json,
                 defaultFilename: "ClipFlow-Snippets-\(Date().formatted(.iso8601.year().month().day()))"
             ) { result in
-                switch result {
-                case .success:
-                    print("✅ Export successful")
-                case .failure(let error):
-                    print("❌ Export error: \(error)")
+                if case .failure(let error) = result {
+                    Log.ui.error("Export error: \(error.localizedDescription, privacy: .public)")
                 }
             }
     }
@@ -200,7 +197,7 @@ extension SyncSettingsContentView {
                         performImport(from: url)
                     }
                 case .failure(let error):
-                    print("❌ Import error: \(error)")
+                    Log.ui.error("Import error: \(error.localizedDescription, privacy: .public)")
                 }
             }
     }

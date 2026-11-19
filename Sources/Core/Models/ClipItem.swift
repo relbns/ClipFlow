@@ -1,5 +1,6 @@
 import Foundation
 import CoreData
+import CryptoKit
 
 @objc(ClipItem)
 public class ClipItem: NSManagedObject, Identifiable {
@@ -14,18 +15,15 @@ public class ClipItem: NSManagedObject, Identifiable {
     @NSManaged public var imageData: Data?
     @NSManaged public var rtfData: Data?
     @NSManaged public var fileURLs: [String]?
-}
+    @NSManaged public var pasteboardData: Data?
+    @NSManaged public var sourceAppName: String?
+    @NSManaged public var sourceBundleID: String?
+    @NSManaged public var byteCount: Int64
+    @NSManaged public var pixelWidth: Int32
+    @NSManaged public var pixelHeight: Int32
 
-extension ClipItem {
-    static func create(in context: NSManagedObjectContext, content: String, type: ClipType) -> ClipItem {
-        let item = ClipItem(context: context)
-        item.id = UUID()
-        item.content = content
-        item.type = type.rawValue
-        item.createdAt = Date()
-        item.dataHash = content.sha256Hash
-        item.isPinned = false
-        return item
+    @nonobjc public class func fetchRequest() -> NSFetchRequest<ClipItem> {
+        NSFetchRequest<ClipItem>(entityName: "ClipItem")
     }
 }
 
@@ -35,11 +33,11 @@ enum ClipType: String, Codable {
     case file
     case url
     case rtf
+    case color
 }
 
 extension String {
     var sha256Hash: String {
-        // Simple hash for now - will use CryptoKit later
-        return String(self.hashValue)
+        SHA256.hash(data: Data(utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

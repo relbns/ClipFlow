@@ -1,6 +1,6 @@
-import Foundation
+import AppKit
 
-/// Simple in-memory clip item (doesn't require Core Data)
+/// A history row as the UI sees it. The full pasteboard data stays in Core Data until it is pasted.
 struct SimpleClipItem: Identifiable, Hashable {
     let id: UUID
     let content: String
@@ -8,22 +8,33 @@ struct SimpleClipItem: Identifiable, Hashable {
     let createdAt: Date
     let dataHash: String
     let isPinned: Bool
+    /// A small thumbnail for image clips.
     let imageData: Data?
+    let sourceAppName: String?
+    let sourceBundleID: String?
+    let byteCount: Int
+    let pixelWidth: Int
+    let pixelHeight: Int
 
-    init(
-        id: UUID = UUID(),
-        content: String,
-        type: ClipType,
-        createdAt: Date = Date(),
-        imageData: Data? = nil
-    ) {
-        self.id = id
-        self.content = content
-        self.type = type.rawValue
-        self.createdAt = createdAt
-        self.dataHash = content.sha256Hash
-        self.isPinned = false
-        self.imageData = imageData
+    var kind: ClipType { ClipType(rawValue: type) ?? .text }
+
+    var lineCount: Int {
+        content.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).count
+    }
+
+    init(_ item: ClipItem) {
+        id = item.id
+        content = item.content
+        type = item.type
+        createdAt = item.createdAt
+        dataHash = item.dataHash
+        isPinned = item.isPinned
+        imageData = item.imageData
+        sourceAppName = item.sourceAppName
+        sourceBundleID = item.sourceBundleID
+        byteCount = Int(item.byteCount)
+        pixelWidth = Int(item.pixelWidth)
+        pixelHeight = Int(item.pixelHeight)
     }
 
     func hash(into hasher: inout Hasher) {
@@ -31,6 +42,87 @@ struct SimpleClipItem: Identifiable, Hashable {
     }
 
     static func == (lhs: SimpleClipItem, rhs: SimpleClipItem) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id && lhs.createdAt == rhs.createdAt && lhs.isPinned == rhs.isPinned
+    }
+}
+
+/// What a pasteboard snapshot holds, reduced to what history shows and dedupes on.
+struct ClipCapture: Equatable {
+    let kind: ClipType
+    let text: String
+    let hash: String
+    let byteCount: Int
+    let pixelWidth: Int
+    let pixelHeight: Int
+
+    private static let hexColor = try! NSRegularExpression(pattern: #"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"#)
+
+    static func classify(_ snapshot: PasteboardSnapshot) -> ClipCapture? {
+        let byteCount = snapshot.byteCount
+        let hash = snapshot.contentHash
+
+        if let fileURLData = snapshot.data(for: .fileURL),
+           let urlString = String(data: fileURLData, encoding: .utf8),
+           let url = URL(string: urlString) {
+            return ClipCapture(kind: .file, text: url.path, hash: hash, byteCount: byteCount, pixelWidth: 0, pixelHeight: 0)
+        }
+
+        if let text = snapshot.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let kind: ClipType
+            if hexColor.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)) != nil {
+                kind = .color
+            } else if isWebURL(trimmed) {
+                kind = .url
+            } else if snapshot.contains(.rtf) || snapshot.contains(.html) {
+                kind = .rtf
+            } else {
+                kind = .text
+            }
+            return ClipCapture(kind: kind, text: text, hash: hash, byteCount: byteCount, pixelWidth: 0, pixelHeight: 0)
+        }
+
+        if let imageData = snapshot.data(for: .png) ?? snapshot.data(for: .tiff),
+           let rep = NSBitmapImageRep(data: imageData) {
+            return ClipCapture(kind: .image, text: "", hash: hash, byteCount: imageData.count, pixelWidth: rep.pixelsWide, pixelHeight: rep.pixelsHigh)
+        }
+        return nil
+    }
+
+    static func isWebURL(_ text: String) -> Bool {
+        guard !text.contains(where: \.isWhitespace),
+              let url = URL(string: text),
+              let scheme = url.scheme?.lowercased() else { return false }
+        return (scheme == "http" || scheme == "https") && url.host != nil
+    }
+}
+
+extension SimpleClipItem {
+    /// The second line of a history row, from the clip's real data.
+    func subtitle(now: Date = Date()) -> String {
+        let detail: String
+        switch kind {
+        case .image:
+            let size = ByteCountFormatter.string(fromByteCount: Int64(byteCount), countStyle: .file)
+            detail = pixelWidth > 0 ? "\(pixelWidth)×\(pixelHeight) · \(size)" : size
+        case .color:
+            detail = "hex color"
+        case .file:
+            detail = "file"
+        default:
+            detail = lineCount > 1 ? "\(lineCount) lines" : Self.copiedAgo(createdAt, now: now)
+        }
+        guard let app = sourceAppName, !app.isEmpty else { return detail }
+        return "\(detail) • \(app)"
+    }
+
+    static func copiedAgo(_ date: Date, now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        switch seconds {
+        case ..<60: return "copied \(seconds)s ago"
+        case ..<3600: return "copied \(seconds / 60)m ago"
+        case ..<86400: return "copied \(seconds / 3600)h ago"
+        default: return "copied \(seconds / 86400)d ago"
+        }
     }
 }

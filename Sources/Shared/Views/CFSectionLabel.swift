@@ -51,7 +51,6 @@ struct CFSectionLabel: View {
 
         // With action
         CFSectionLabel("GROUPS") {
-            print("Add group tapped")
         }
 
         Rectangle()
@@ -73,7 +72,6 @@ struct CFSectionLabel: View {
     VStack(spacing: 16) {
         CFSectionLabel("LIBRARY")
         CFSectionLabel("GROUPS") {
-            print("Add tapped")
         }
         CFSectionLabel("RECENT")
     }

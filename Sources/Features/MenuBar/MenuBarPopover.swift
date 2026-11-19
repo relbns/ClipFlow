@@ -114,11 +114,9 @@ struct MenuBarPopover: View {
         HStack(spacing: 2) {
             ForEach(["Simple", "Organized"], id: \.self) { mode in
                 Button(action: {
-                    print("🔄 Mode button clicked: \(mode) (current: \(viewMode))")
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         viewMode = mode.lowercased()
                     }
-                    print("🔄 Mode changed to: \(viewMode)")
                 }) {
                     Group {
                         if viewMode == mode.lowercased() {
@@ -173,11 +171,7 @@ struct MenuBarPopover: View {
     }
 
     private func selectClip(_ clip: SimpleClipItem) {
-        Task {
-            let pasteEngine = PasteEngine()
-            await pasteEngine.paste(clip.content)
-            isPresented = false
-        }
+        PasteCoordinator.shared.paste(clip)
     }
 
     private func openSnippetEditor() {
@@ -246,7 +240,7 @@ struct SimpleHistoryView: View {
                         CFIconRow(
                             icon: iconForClip(clip),
                             title: titleForClip(clip),
-                            subtitle: metadataForClip(clip),
+                            subtitle: clip.subtitle(),
                             kbd: keyboardShortcut(for: index),
                             active: false
                         )
@@ -288,33 +282,6 @@ struct SimpleHistoryView: View {
 
     private func titleForClip(_ clip: SimpleClipItem) -> String {
         String(clip.content.prefix(60)).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func metadataForClip(_ clip: SimpleClipItem) -> String {
-        let timeAgo = timeAgoString(from: clip.createdAt)
-
-        if clip.type == "image" {
-            return "PNG · 1840×1040 · 312 KB"
-        } else if clip.content.hasPrefix("http") {
-            return "\(timeAgo) • Safari"
-        } else if clip.content.contains("=") && clip.content.contains("{") {
-            return "3 lines • Xcode"
-        } else {
-            return timeAgo
-        }
-    }
-
-    private func timeAgoString(from date: Date) -> String {
-        let interval = Date().timeIntervalSince(date)
-        if interval < 60 {
-            return "copied \(Int(interval))s ago"
-        } else if interval < 3600 {
-            return "copied \(Int(interval / 60))m ago"
-        } else if interval < 86400 {
-            return "copied \(Int(interval / 3600))h ago"
-        } else {
-            return "copied \(Int(interval / 86400))d ago"
-        }
     }
 
     private func keyboardShortcut(for index: Int) -> String? {
@@ -583,32 +550,6 @@ struct ClipRow: View {
         showNumber && index < 9 ? "\(index + 1)" : (index == 9 ? "0" : nil)
     }
 
-    private var timeAgo: String {
-        let interval = Date().timeIntervalSince(clip.createdAt)
-        if interval < 60 {
-            return "copied \(Int(interval))s ago"
-        } else if interval < 3600 {
-            return "copied \(Int(interval / 60))m ago"
-        } else if interval < 86400 {
-            return "copied \(Int(interval / 3600))h ago"
-        } else {
-            return "copied \(Int(interval / 86400))d ago"
-        }
-    }
-
-    private var metadata: String {
-        // For now, just show time. Could detect app later.
-        if clip.type == "image" {
-            return "PNG · 1840×1040 · 312 KB"
-        } else if clip.content.hasPrefix("http") {
-            return "\(timeAgo) • Safari"
-        } else if clip.content.contains("=") && clip.content.contains("{") {
-            return "3 lines • Xcode"
-        } else {
-            return timeAgo
-        }
-    }
-
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 10) {
@@ -624,7 +565,7 @@ struct ClipRow: View {
                         .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
 
                     if showMetadata {
-                        Text(metadata)
+                        Text(clip.subtitle())
                             .font(.system(size: 11))
                             .foregroundColor(theme.textLabel)
                             .lineLimit(1)
@@ -746,13 +687,13 @@ struct MenuSnippetRow: View {
                         .lineLimit(1)
 
                     if let apps = snippet.appRules, !apps.isEmpty {
-                        let appNames = apps.compactMap { ($0 as? AppRule)?.appName }.prefix(2).joined(separator: ", ")
-                        Text(".\(snippet.abbreviation) — \(appNames)")
+                        let appNames = apps.map(\.appName).prefix(2).joined(separator: ", ")
+                        Text("\(snippet.abbreviation) — \(appNames)")
                             .font(.system(size: 11))
                             .foregroundColor(theme.textLabel)
                             .lineLimit(1)
                     } else {
-                        Text(".\(snippet.abbreviation) — anywhere")
+                        Text("\(snippet.abbreviation) — anywhere")
                             .font(.system(size: 11))
                             .foregroundColor(theme.textLabel)
                             .lineLimit(1)
@@ -762,7 +703,7 @@ struct MenuSnippetRow: View {
                 Spacer()
 
                 // Abbreviation on right
-                Text(".\(snippet.abbreviation)")
+                Text(snippet.abbreviation)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(theme.textSubtle)
             }
@@ -775,20 +716,7 @@ struct MenuSnippetRow: View {
     }
 
     private func expandSnippet() {
-        // Get the snippet content and expand it
-        Task {
-            let variableProcessor = VariableProcessor()
-            let expandedContent = await variableProcessor.process(snippet.content)
-
-            // Paste the expanded content
-            let pasteEngine = PasteEngine()
-            await pasteEngine.paste(expandedContent)
-
-            // Update statistics
-            snippet.useCount += 1
-            snippet.lastUsed = Date()
-            try? viewContext.save()
-        }
+        PasteCoordinator.shared.insert(snippet)
     }
 }
 
@@ -821,7 +749,7 @@ extension Color {
 
 #Preview {
     MenuBarPopover(
-        clipboardMonitor: ClipboardMonitor(),
+        clipboardMonitor: ClipboardMonitor(context: CoreDataStack(storeURL: nil).viewContext),
         isPresented: .constant(true)
     )
     .cfAutoTheme()

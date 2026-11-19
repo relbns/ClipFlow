@@ -95,17 +95,14 @@ struct AdvancedSettingsView: View {
 
     private func cleanUpOldData() {
         // TODO: Implement cleanup
-        print("🗑️ Cleaning up old data...")
     }
 
     private func checkForUpdates() {
         // TODO: Implement update check
-        print("🔄 Checking for updates...")
     }
 
     private func resetSettings() {
         // TODO: Implement reset
-        print("⚠️ Resetting all settings...")
     }
 
     private func openLogs() {

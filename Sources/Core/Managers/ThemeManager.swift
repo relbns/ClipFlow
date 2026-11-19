@@ -31,7 +31,6 @@ class ThemeManager: ObservableObject {
         // Apply initial theme
         applyTheme()
 
-        print("🎨 ThemeManager initialized with theme: \(currentTheme)")
     }
 
     private func applyTheme() {
@@ -40,13 +39,10 @@ class ThemeManager: ObservableObject {
         switch currentTheme {
         case "light":
             appearance = NSAppearance(named: .aqua)
-            print("🎨 Applying Light theme")
         case "dark":
             appearance = NSAppearance(named: .darkAqua)
-            print("🎨 Applying Dark theme")
         default: // "auto"
             appearance = nil // Follow system
-            print("🎨 Applying Auto theme (system default)")
         }
 
         NSApp.appearance = appearance

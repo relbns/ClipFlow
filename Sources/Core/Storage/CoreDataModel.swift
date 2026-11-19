@@ -1,296 +1,148 @@
 import CoreData
 
-/// Programmatically create the Core Data model
-/// This works in both Xcode and swift run without needing compiled .momd files
+/// The model is built in code so it works the same from `swift build` and from Xcode.
+/// v1 is the shape stores were created with before v2; it is kept only to migrate them.
 extension NSManagedObjectModel {
-    static func clipFlowModel() -> NSManagedObjectModel {
+    static let clipFlowCurrent = clipFlowModel(version: 2, bindClasses: true)
+
+    static func clipFlowModel(version: Int, bindClasses: Bool) -> NSManagedObjectModel {
         let model = NSManagedObjectModel()
 
-        // MARK: - ClipItem Entity
-        let clipItemEntity = NSEntityDescription()
-        clipItemEntity.name = "ClipItem"
-        clipItemEntity.managedObjectClassName = "ClipItem"
+        func entity(_ name: String) -> NSEntityDescription {
+            let entity = NSEntityDescription()
+            entity.name = name
+            entity.managedObjectClassName = bindClasses ? name : NSStringFromClass(NSManagedObject.self)
+            return entity
+        }
 
-        var clipItemProperties: [NSPropertyDescription] = []
+        let clipItem = entity("ClipItem")
+        var clipProperties: [NSPropertyDescription] = [
+            uuid("id"),
+            string("content", default: ""),
+            string("type", default: "text"),
+            date("createdAt"),
+            string("dataHash", default: ""),
+            attribute("isPinned", .booleanAttributeType, optional: true, default: false),
+            binary("imageData", external: false),
+            binary("rtfData", external: false),
+            transformable("fileURLs")
+        ]
+        if version >= 2 {
+            clipProperties += [
+                binary("pasteboardData", external: true),
+                optionalString("sourceAppName"),
+                optionalString("sourceBundleID"),
+                int64("byteCount"),
+                int32("pixelWidth"),
+                int32("pixelHeight")
+            ]
+        }
+        clipItem.properties = clipProperties
 
-        // id: UUID
-        let clipItemId = NSAttributeDescription()
-        clipItemId.name = "id"
-        clipItemId.attributeType = .UUIDAttributeType
-        clipItemId.isOptional = false
-        clipItemProperties.append(clipItemId)
+        let snippet = entity("Snippet")
+        snippet.properties = [
+            uuid("id"),
+            string("title", default: ""),
+            string("abbreviation", default: ""),
+            string("content", default: ""),
+            bool("isEnabled", default: true),
+            date("createdAt"),
+            date("updatedAt"),
+            string("expandTrigger", default: "delimiter"),
+            bool("caseSensitive", default: false),
+            bool("playSound", default: false),
+            bool("restrictToApps", default: false),
+            int32("useCount"),
+            optionalDate("lastUsed")
+        ]
 
-        // content: String
-        let clipItemContent = NSAttributeDescription()
-        clipItemContent.name = "content"
-        clipItemContent.attributeType = .stringAttributeType
-        clipItemContent.isOptional = false
-        clipItemContent.defaultValue = ""
-        clipItemProperties.append(clipItemContent)
+        let group = entity("SnippetGroup")
+        group.properties = [
+            uuid("id"),
+            string("name", default: ""),
+            bool("isEnabled", default: true),
+            date("createdAt"),
+            int32("sortOrder"),
+            optionalString("syncLocation"),
+            optionalString("gistId"),
+            optionalDate("lastSynced")
+        ]
 
-        // type: String
-        let clipItemType = NSAttributeDescription()
-        clipItemType.name = "type"
-        clipItemType.attributeType = .stringAttributeType
-        clipItemType.isOptional = false
-        clipItemContent.defaultValue = "text"
-        clipItemProperties.append(clipItemType)
+        let appRule = entity("AppRule")
+        var ruleProperties: [NSPropertyDescription] = [
+            uuid("id"),
+            string("bundleIdentifier", default: ""),
+            string("appName", default: "")
+        ]
+        if version >= 2 {
+            ruleProperties += [
+                bool("isEnabled", default: true),
+                bool("isDeny", default: false)
+            ]
+        }
+        appRule.properties = ruleProperties
 
-        // createdAt: Date
-        let clipItemCreatedAt = NSAttributeDescription()
-        clipItemCreatedAt.name = "createdAt"
-        clipItemCreatedAt.attributeType = .dateAttributeType
-        clipItemCreatedAt.isOptional = false
-        clipItemProperties.append(clipItemCreatedAt)
+        relate(snippet, "group", toOne: group, inverse: "snippets", inverseDelete: .cascadeDeleteRule)
+        relate(appRule, "snippet", toOne: snippet, inverse: "appRules", inverseDelete: .cascadeDeleteRule)
 
-        // dataHash: String
-        let clipItemHash = NSAttributeDescription()
-        clipItemHash.name = "dataHash"
-        clipItemHash.attributeType = .stringAttributeType
-        clipItemHash.isOptional = false
-        clipItemProperties.append(clipItemHash)
-
-        // isPinned: Bool
-        let clipItemPinned = NSAttributeDescription()
-        clipItemPinned.name = "isPinned"
-        clipItemPinned.attributeType = .booleanAttributeType
-        clipItemPinned.defaultValue = false
-        clipItemProperties.append(clipItemPinned)
-
-        // imageData: Data?
-        let clipItemImageData = NSAttributeDescription()
-        clipItemImageData.name = "imageData"
-        clipItemImageData.attributeType = .binaryDataAttributeType
-        clipItemImageData.isOptional = true
-        clipItemProperties.append(clipItemImageData)
-
-        // rtfData: Data?
-        let clipItemRtfData = NSAttributeDescription()
-        clipItemRtfData.name = "rtfData"
-        clipItemRtfData.attributeType = .binaryDataAttributeType
-        clipItemRtfData.isOptional = true
-        clipItemProperties.append(clipItemRtfData)
-
-        // fileURLs: [String]?
-        let clipItemFileURLs = NSAttributeDescription()
-        clipItemFileURLs.name = "fileURLs"
-        clipItemFileURLs.attributeType = .transformableAttributeType
-        clipItemFileURLs.valueTransformerName = NSValueTransformerName.secureUnarchiveFromDataTransformerName.rawValue
-        clipItemFileURLs.isOptional = true
-        clipItemProperties.append(clipItemFileURLs)
-
-        clipItemEntity.properties = clipItemProperties
-
-        // MARK: - Snippet Entity
-        let snippetEntity = NSEntityDescription()
-        snippetEntity.name = "Snippet"
-        snippetEntity.managedObjectClassName = "Snippet"
-
-        var snippetProperties: [NSPropertyDescription] = []
-
-        // id: UUID
-        let snippetId = NSAttributeDescription()
-        snippetId.name = "id"
-        snippetId.attributeType = .UUIDAttributeType
-        snippetId.isOptional = false
-        snippetProperties.append(snippetId)
-
-        // Basic attributes
-        let snippetTitle = createStringAttribute(name: "title", defaultValue: "")
-        snippetProperties.append(snippetTitle)
-
-        let snippetAbbr = createStringAttribute(name: "abbreviation", defaultValue: "")
-        snippetProperties.append(snippetAbbr)
-
-        let snippetContent = createStringAttribute(name: "content", defaultValue: "")
-        snippetProperties.append(snippetContent)
-
-        let snippetEnabled = createBoolAttribute(name: "isEnabled", defaultValue: true)
-        snippetProperties.append(snippetEnabled)
-
-        let snippetCreated = createDateAttribute(name: "createdAt")
-        snippetProperties.append(snippetCreated)
-
-        let snippetUpdated = createDateAttribute(name: "updatedAt")
-        snippetProperties.append(snippetUpdated)
-
-        // Expansion settings
-        let snippetTrigger = createStringAttribute(name: "expandTrigger", defaultValue: "delimiter")
-        snippetProperties.append(snippetTrigger)
-
-        let snippetCaseSensitive = createBoolAttribute(name: "caseSensitive", defaultValue: false)
-        snippetProperties.append(snippetCaseSensitive)
-
-        let snippetPlaySound = createBoolAttribute(name: "playSound", defaultValue: false)
-        snippetProperties.append(snippetPlaySound)
-
-        let snippetRestrictApps = createBoolAttribute(name: "restrictToApps", defaultValue: false)
-        snippetProperties.append(snippetRestrictApps)
-
-        // Statistics
-        let snippetUseCount = createIntAttribute(name: "useCount", defaultValue: 0)
-        snippetProperties.append(snippetUseCount)
-
-        let snippetLastUsed = NSAttributeDescription()
-        snippetLastUsed.name = "lastUsed"
-        snippetLastUsed.attributeType = .dateAttributeType
-        snippetLastUsed.isOptional = true
-        snippetProperties.append(snippetLastUsed)
-
-        snippetEntity.properties = snippetProperties
-
-        // MARK: - SnippetGroup Entity
-        let groupEntity = NSEntityDescription()
-        groupEntity.name = "SnippetGroup"
-        groupEntity.managedObjectClassName = "SnippetGroup"
-
-        var groupProperties: [NSPropertyDescription] = []
-
-        let groupId = NSAttributeDescription()
-        groupId.name = "id"
-        groupId.attributeType = .UUIDAttributeType
-        groupId.isOptional = false
-        groupProperties.append(groupId)
-
-        let groupName = createStringAttribute(name: "name", defaultValue: "")
-        groupProperties.append(groupName)
-
-        let groupEnabled = createBoolAttribute(name: "isEnabled", defaultValue: true)
-        groupProperties.append(groupEnabled)
-
-        let groupCreated = createDateAttribute(name: "createdAt")
-        groupProperties.append(groupCreated)
-
-        let groupSortOrder = createIntAttribute(name: "sortOrder", defaultValue: 0)
-        groupProperties.append(groupSortOrder)
-
-        // Sync metadata
-        let groupSyncLocation = NSAttributeDescription()
-        groupSyncLocation.name = "syncLocation"
-        groupSyncLocation.attributeType = .stringAttributeType
-        groupSyncLocation.isOptional = true
-        groupProperties.append(groupSyncLocation)
-
-        let groupGistId = NSAttributeDescription()
-        groupGistId.name = "gistId"
-        groupGistId.attributeType = .stringAttributeType
-        groupGistId.isOptional = true
-        groupProperties.append(groupGistId)
-
-        let groupLastSynced = NSAttributeDescription()
-        groupLastSynced.name = "lastSynced"
-        groupLastSynced.attributeType = .dateAttributeType
-        groupLastSynced.isOptional = true
-        groupProperties.append(groupLastSynced)
-
-        groupEntity.properties = groupProperties
-
-        // MARK: - AppRule Entity
-        let appRuleEntity = NSEntityDescription()
-        appRuleEntity.name = "AppRule"
-        appRuleEntity.managedObjectClassName = "AppRule"
-
-        var appRuleProperties: [NSPropertyDescription] = []
-
-        let appRuleId = NSAttributeDescription()
-        appRuleId.name = "id"
-        appRuleId.attributeType = .UUIDAttributeType
-        appRuleId.isOptional = false
-        appRuleProperties.append(appRuleId)
-
-        let appRuleBundleId = createStringAttribute(name: "bundleIdentifier", defaultValue: "")
-        appRuleProperties.append(appRuleBundleId)
-
-        let appRuleName = createStringAttribute(name: "appName", defaultValue: "")
-        appRuleProperties.append(appRuleName)
-
-        appRuleEntity.properties = appRuleProperties
-
-        // MARK: - Relationships
-
-        // Snippet → Group (many-to-one)
-        let snippetToGroup = NSRelationshipDescription()
-        snippetToGroup.name = "group"
-        snippetToGroup.destinationEntity = groupEntity
-        snippetToGroup.minCount = 0
-        snippetToGroup.maxCount = 1
-        snippetToGroup.deleteRule = .nullifyDeleteRule
-
-        // Group → Snippets (one-to-many)
-        let groupToSnippets = NSRelationshipDescription()
-        groupToSnippets.name = "snippets"
-        groupToSnippets.destinationEntity = snippetEntity
-        groupToSnippets.minCount = 0
-        groupToSnippets.maxCount = 0 // 0 means unlimited
-        groupToSnippets.deleteRule = .cascadeDeleteRule
-
-        snippetToGroup.inverseRelationship = groupToSnippets
-        groupToSnippets.inverseRelationship = snippetToGroup
-
-        snippetEntity.properties.append(snippetToGroup)
-        groupEntity.properties.append(groupToSnippets)
-
-        // Snippet → AppRules (one-to-many)
-        let snippetToAppRules = NSRelationshipDescription()
-        snippetToAppRules.name = "appRules"
-        snippetToAppRules.destinationEntity = appRuleEntity
-        snippetToAppRules.minCount = 0
-        snippetToAppRules.maxCount = 0
-        snippetToAppRules.deleteRule = .cascadeDeleteRule
-
-        // AppRule → Snippet (many-to-one)
-        let appRuleToSnippet = NSRelationshipDescription()
-        appRuleToSnippet.name = "snippet"
-        appRuleToSnippet.destinationEntity = snippetEntity
-        appRuleToSnippet.minCount = 0
-        appRuleToSnippet.maxCount = 1
-        appRuleToSnippet.deleteRule = .nullifyDeleteRule
-
-        snippetToAppRules.inverseRelationship = appRuleToSnippet
-        appRuleToSnippet.inverseRelationship = snippetToAppRules
-
-        snippetEntity.properties.append(snippetToAppRules)
-        appRuleEntity.properties.append(appRuleToSnippet)
-
-        // Add entities to model
-        model.entities = [clipItemEntity, snippetEntity, groupEntity, appRuleEntity]
-
+        model.entities = [clipItem, snippet, group, appRule]
         return model
     }
 
-    // Helper functions
-    private static func createStringAttribute(name: String, defaultValue: String) -> NSAttributeDescription {
-        let attr = NSAttributeDescription()
-        attr.name = name
-        attr.attributeType = .stringAttributeType
-        attr.isOptional = false
-        attr.defaultValue = defaultValue
-        return attr
+    private static func relate(
+        _ child: NSEntityDescription,
+        _ name: String,
+        toOne parent: NSEntityDescription,
+        inverse inverseName: String,
+        inverseDelete: NSDeleteRule
+    ) {
+        let toParent = NSRelationshipDescription()
+        toParent.name = name
+        toParent.destinationEntity = parent
+        toParent.minCount = 0
+        toParent.maxCount = 1
+        toParent.deleteRule = .nullifyDeleteRule
+
+        let toChildren = NSRelationshipDescription()
+        toChildren.name = inverseName
+        toChildren.destinationEntity = child
+        toChildren.minCount = 0
+        toChildren.maxCount = 0
+        toChildren.deleteRule = inverseDelete
+
+        toParent.inverseRelationship = toChildren
+        toChildren.inverseRelationship = toParent
+        child.properties.append(toParent)
+        parent.properties.append(toChildren)
     }
 
-    private static func createBoolAttribute(name: String, defaultValue: Bool) -> NSAttributeDescription {
-        let attr = NSAttributeDescription()
-        attr.name = name
-        attr.attributeType = .booleanAttributeType
-        attr.isOptional = false
-        attr.defaultValue = defaultValue
-        return attr
+    private static func attribute(_ name: String, _ type: NSAttributeType, optional: Bool, default value: Any? = nil) -> NSAttributeDescription {
+        let attribute = NSAttributeDescription()
+        attribute.name = name
+        attribute.attributeType = type
+        attribute.isOptional = optional
+        attribute.defaultValue = value
+        return attribute
     }
 
-    private static func createIntAttribute(name: String, defaultValue: Int) -> NSAttributeDescription {
-        let attr = NSAttributeDescription()
-        attr.name = name
-        attr.attributeType = .integer32AttributeType
-        attr.isOptional = false
-        attr.defaultValue = defaultValue
-        return attr
+    private static func uuid(_ name: String) -> NSAttributeDescription { attribute(name, .UUIDAttributeType, optional: false) }
+    private static func string(_ name: String, default value: String) -> NSAttributeDescription { attribute(name, .stringAttributeType, optional: false, default: value) }
+    private static func optionalString(_ name: String) -> NSAttributeDescription { attribute(name, .stringAttributeType, optional: true) }
+    private static func bool(_ name: String, default value: Bool) -> NSAttributeDescription { attribute(name, .booleanAttributeType, optional: false, default: value) }
+    private static func int32(_ name: String) -> NSAttributeDescription { attribute(name, .integer32AttributeType, optional: false, default: 0) }
+    private static func int64(_ name: String) -> NSAttributeDescription { attribute(name, .integer64AttributeType, optional: false, default: 0) }
+    private static func date(_ name: String) -> NSAttributeDescription { attribute(name, .dateAttributeType, optional: false) }
+    private static func optionalDate(_ name: String) -> NSAttributeDescription { attribute(name, .dateAttributeType, optional: true) }
+
+    private static func binary(_ name: String, external: Bool) -> NSAttributeDescription {
+        let attribute = attribute(name, .binaryDataAttributeType, optional: true)
+        attribute.allowsExternalBinaryDataStorage = external
+        return attribute
     }
 
-    private static func createDateAttribute(name: String) -> NSAttributeDescription {
-        let attr = NSAttributeDescription()
-        attr.name = name
-        attr.attributeType = .dateAttributeType
-        attr.isOptional = false
-        return attr
+    private static func transformable(_ name: String) -> NSAttributeDescription {
+        let attribute = attribute(name, .transformableAttributeType, optional: true)
+        attribute.valueTransformerName = NSValueTransformerName.secureUnarchiveFromDataTransformerName.rawValue
+        return attribute
     }
 }

@@ -47,7 +47,6 @@ struct AppearanceSettingsView: View {
                         )
                         .onChange(of: appearanceMode) { _, newValue in
                             // Theme will be applied automatically by ThemeManager observing UserDefaults
-                            print("🎨 Theme changed to: \(newValue)")
                         }
                     }
 
