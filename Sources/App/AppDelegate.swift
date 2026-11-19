@@ -223,7 +223,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .environmentObject(LanguageManager.shared)
 
-            popover.contentViewController = PopoverContentController(rootView: popoverView)
+            popover.contentViewController = NSHostingController(rootView: popoverView)
             NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.popoverAnchorWindow?.orderOut(nil)
@@ -243,7 +243,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let anchor = popoverAnchor()
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
-            popover.contentViewController?.view.window?.makeKey()
+            // The popover's window exists only after show returns; make it key then, so the first click acts.
+            DispatchQueue.main.async {
+                popover.contentViewController?.view.window?.makeKey()
+            }
         }
     }
 
