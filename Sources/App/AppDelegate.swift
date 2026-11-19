@@ -344,7 +344,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             )
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
-            window.contentMinSize = NSSize(width: 900, height: 520)
+            window.toolbar = NSToolbar(identifier: "SnippetEditor")
+            window.toolbarStyle = .unifiedCompact
+            window.contentMinSize = NSSize(width: 1020, height: 520)
             snippetEditorWindow = window
         }
         present(snippetEditorWindow)
@@ -401,7 +403,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateWindowTitles() {
-        snippetEditorWindow?.title = L("snippet_editor")
         aboutWindow?.title = L("about_clipflow")
         welcomeWindow?.title = L("welcome_title")
     }

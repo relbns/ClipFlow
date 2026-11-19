@@ -237,6 +237,12 @@ enum StoreMigrator {
             try? FileManager.default.removeItem(at: to)
             try? FileManager.default.copyItem(at: from, to: to)
         }
+        let supportFrom = externalDataFolder(of: source)
+        let supportTo = externalDataFolder(of: destination)
+        try? FileManager.default.removeItem(at: supportTo)
+        if FileManager.default.fileExists(atPath: supportFrom.path) {
+            try? FileManager.default.copyItem(at: supportFrom, to: supportTo)
+        }
     }
 
     private static func destroyStore(at url: URL, model: NSManagedObjectModel) {

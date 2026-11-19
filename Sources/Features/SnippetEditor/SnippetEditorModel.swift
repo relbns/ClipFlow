@@ -1,9 +1,10 @@
 import AppKit
+import Combine
 import CoreData
 import SwiftUI
 
-/// State and actions of the Snippet Editor. Edits write straight to the managed objects and are
-/// saved 400ms after the last change, once the abbreviation is valid.
+/// State and actions of the Snippet Editor. Edits write to the managed objects and are saved 400ms
+/// after the last change; the abbreviation reaches the object only once it is valid.
 @MainActor
 final class SnippetEditorModel: ObservableObject {
     enum Library: String { case favorites, recent }
@@ -20,16 +21,29 @@ final class SnippetEditorModel: ObservableObject {
     @Published private(set) var selectedID: NSManagedObjectID?
     @Published var collapsedGroups: Set<NSManagedObjectID> = []
     @Published private(set) var saveState: SaveState = .saved
-    /// A variable chip the user clicked; the text view inserts it at the caret.
-    @Published var pendingInsertion: String?
+    @Published var abbreviationDraft = ""
+    /// Variables the user clicked; the text view inserts each at the caret.
+    let insertions = PassthroughSubject<String, Never>()
     @Published var confirmingDelete: Snippet?
     @Published var confirmingGroupDelete: SnippetGroup?
     @Published var renamingGroupID: NSManagedObjectID?
 
     private var saveWork: DispatchWorkItem?
+    private var editingID: NSManagedObjectID?
+    private var cancellables: Set<AnyCancellable> = []
 
     init(context: NSManagedObjectContext) {
         self.context = context
+        let center = NotificationCenter.default
+        center.publisher(for: NSApplication.willTerminateNotification)
+            .merge(with: center.publisher(for: NSWindow.willCloseNotification))
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.flush() } }
+            .store(in: &cancellables)
+        center.publisher(for: .NSManagedObjectContextDidSave)
+            .filter { [context] in ($0.object as? NSManagedObjectContext)?.persistentStoreCoordinator === context.persistentStoreCoordinator }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     // MARK: - Reading
@@ -49,7 +63,15 @@ final class SnippetEditorModel: ObservableObject {
         group.snippets.filter(matchesFilter).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
+    func count(in library: Library) -> Int {
+        (try? context.count(for: request(for: library))) ?? 0
+    }
+
     func snippets(in library: Library) -> [Snippet] {
+        ((try? context.fetch(request(for: library))) ?? []).filter(matchesFilter)
+    }
+
+    private func request(for library: Library) -> NSFetchRequest<Snippet> {
         let request = Snippet.fetchRequest()
         switch library {
         case .favorites:
@@ -60,7 +82,7 @@ final class SnippetEditorModel: ObservableObject {
             request.sortDescriptors = [NSSortDescriptor(key: "lastUsed", ascending: false)]
             request.fetchLimit = 30
         }
-        return ((try? context.fetch(request)) ?? []).filter(matchesFilter)
+        return request
     }
 
     var totalCount: Int { (try? context.count(for: Snippet.fetchRequest())) ?? 0 }
@@ -75,12 +97,12 @@ final class SnippetEditorModel: ObservableObject {
 
     // MARK: - Selection
 
+    /// Saves what is pending, then selects; an abbreviation draft that never became valid is dropped.
     func select(_ snippet: Snippet?) {
-        if case .invalid = saveState, let current = selected, current.objectID != snippet?.objectID {
-            context.refresh(current, mergeChanges: false)
-            saveState = .saved
-        }
+        flush()
         selectedID = snippet?.objectID
+        abbreviationDraft = snippet?.abbreviation ?? ""
+        if saveState != .saved { saveState = .saved }
     }
 
     func selectFirstIfNeeded() {
@@ -90,33 +112,57 @@ final class SnippetEditorModel: ObservableObject {
 
     // MARK: - Editing
 
+    var abbreviationDraftError: String? {
+        selected == nil ? nil : Self.abbreviationError(abbreviationDraft)
+    }
+
+    func abbreviationEdited(_ draft: String) {
+        abbreviationDraft = draft
+        guard let snippet = selected, Self.abbreviationError(draft) == nil, snippet.abbreviation != draft else { return }
+        snippet.abbreviation = draft
+        edited()
+    }
+
     /// Call after every edit to the selected snippet.
     func edited() {
-        saveState = .saving
+        editingID = selectedID
+        if saveState != .saving { saveState = .saving }
         saveWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated { self?.commit() }
+        let work = DispatchWorkItem { [self] in
+            MainActor.assumeIsolated { self.commit() }
         }
         saveWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
 
-    func commit() {
-        if let snippet = selected, let error = Self.abbreviationError(snippet.abbreviation) {
-            saveState = .invalid(error)
-            return
-        }
-        selected?.updatedAt = Date()
-        save()
-        saveState = .saved
+    /// Saves a pending edit now instead of waiting for the debounce.
+    func flush() {
+        guard saveWork != nil else { return }
+        commit()
     }
 
-    /// The other enabled snippet with the same abbreviation, if any; only one of them would fire.
+    private func commit() {
+        saveWork?.cancel()
+        saveWork = nil
+        if let editingID, let snippet = try? context.existingObject(with: editingID) as? Snippet, !snippet.isDeleted {
+            snippet.updatedAt = Date()
+        }
+        editingID = nil
+        if save() { saveState = .saved }
+    }
+
+    /// The other enabled snippet that the same typed text would also expand, if any.
     func conflict(for snippet: Snippet) -> Snippet? {
+        guard snippet.isEnabled, snippet.group?.isEnabled != false else { return nil }
         let request = Snippet.fetchRequest()
-        request.predicate = NSPredicate(format: "abbreviation ==[c] %@ AND isEnabled == YES AND self != %@", snippet.abbreviation, snippet)
-        request.fetchLimit = 1
-        return snippet.isEnabled ? (try? context.fetch(request))?.first : nil
+        request.predicate = NSPredicate(
+            format: "abbreviation ==[c] %@ AND isEnabled == YES AND (group == nil OR group.isEnabled == YES) AND self != %@",
+            snippet.abbreviation, snippet
+        )
+        let candidates = (try? context.fetch(request)) ?? []
+        return candidates.first { other in
+            !(snippet.caseSensitive && other.caseSensitive && snippet.abbreviation != other.abbreviation)
+        }
     }
 
     @MainActor
@@ -133,6 +179,8 @@ final class SnippetEditorModel: ObservableObject {
     // MARK: - Actions
 
     func newSnippet() {
+        filterText = ""
+        library = nil
         let group = selected?.group ?? groups.first ?? newGroup(select: false)
         let snippet = Snippet(context: context)
         snippet.id = UUID()
@@ -171,7 +219,7 @@ final class SnippetEditorModel: ObservableObject {
     }
 
     func delete(_ snippet: Snippet) {
-        if selectedID == snippet.objectID { selectedID = nil }
+        if selectedID == snippet.objectID { select(nil) }
         context.delete(snippet)
         save()
         selectFirstIfNeeded()
@@ -198,7 +246,7 @@ final class SnippetEditorModel: ObservableObject {
     }
 
     func delete(_ group: SnippetGroup) {
-        if let selected, selected.group == group { selectedID = nil }
+        if let selected, selected.group == group { select(nil) }
         context.delete(group)
         save()
         selectFirstIfNeeded()
@@ -225,7 +273,8 @@ final class SnippetEditorModel: ObservableObject {
     func addAppRule(to snippet: Snippet) {
         AppExclusions.pickApplication { [weak self] bundleID, name in
             MainActor.assumeIsolated {
-                guard let self, !(snippet.appRules ?? []).contains(where: { $0.bundleIdentifier == bundleID }) else { return }
+                guard let self, !snippet.isDeleted, snippet.managedObjectContext != nil,
+                      !(snippet.appRules ?? []).contains(where: { $0.bundleIdentifier == bundleID }) else { return }
                 AppRule.create(in: self.context, bundleID: bundleID, appName: name).snippet = snippet
                 self.save()
             }
@@ -242,15 +291,20 @@ final class SnippetEditorModel: ObservableObject {
         save()
     }
 
-    func save() {
-        guard context.hasChanges else { return }
+    /// Saves the context; on failure rolls back, so one bad change cannot block every later save.
+    @discardableResult
+    func save() -> Bool {
+        defer { objectWillChange.send() }
+        guard context.hasChanges else { return true }
         do {
             try context.save()
+            return true
         } catch {
             Log.ui.error("Could not save snippets: \(error.localizedDescription, privacy: .public)")
+            context.rollback()
             saveState = .invalid(error.localizedDescription)
+            return false
         }
-        objectWillChange.send()
     }
 
     private func uniqueAbbreviation(_ base: String) -> String {

@@ -389,3 +389,8 @@
 "editor_variables_other" = "%d variables";
 "editor_snippet_count_one" = "1 snippet";
 "editor_snippet_count_other" = "%d snippets";
+"a11y_on" = "On";
+"a11y_off" = "Off";
+"a11y_collapsed" = "Collapsed";
+"a11y_expanded" = "Expanded";
+"editor_content_label" = "Snippet text";

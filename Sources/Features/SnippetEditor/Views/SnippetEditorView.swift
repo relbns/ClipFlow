@@ -50,7 +50,7 @@ private struct SnippetEditorContent: View {
                 }
             }
         }
-        .frame(minWidth: 900, idealWidth: 1080, minHeight: 520, idealHeight: 700)
+        .frame(minWidth: 1020, idealWidth: 1080, minHeight: 520, idealHeight: 700)
         .background(theme.surface)
         .ignoresSafeArea(.container, edges: .top)
         .onAppear {
@@ -86,6 +86,12 @@ private struct EditorTitleBar: View {
     let title: String
     @ObservedObject var model: SnippetEditorModel
     @Environment(\.cfTheme) private var theme
+    @Environment(\.layoutDirection) private var layoutDirection
+
+    /// The window buttons keep the side they had at launch; after an in-app language switch they sit at our trailing edge.
+    private var trafficLightsOnTrailingEdge: Bool {
+        (layoutDirection == .rightToLeft) != (NSApp.userInterfaceLayoutDirection == .rightToLeft)
+    }
 
     var body: some View {
         ZStack {
@@ -104,7 +110,8 @@ private struct EditorTitleBar: View {
                 .disabled(model.selected == nil)
                 .keyboardShortcut("d", modifiers: .command)
             }
-            .padding(.horizontal, 12)
+            .padding(.leading, 12)
+            .padding(.trailing, trafficLightsOnTrailingEdge ? 78 : 12)
         }
         .frame(height: 38)
         .background(theme.titlebarBg)
@@ -122,7 +129,7 @@ private struct EditorSidebar: View {
         VStack(spacing: 0) {
             filterField
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     SidebarCaption(title: L("editor_library"))
                     libraryRow(.favorites, icon: .star, title: L("editor_favorites"))
                     libraryRow(.recent, icon: .clock, title: L("editor_recent"))
@@ -176,13 +183,15 @@ private struct EditorSidebar: View {
     }
 
     private func libraryRow(_ library: SnippetEditorModel.Library, icon: CFIcon.IconType, title: String) -> some View {
-        SidebarRow(
-            icon: AnyView(CFIcon(type: icon, size: 13, stroke: 1.6)),
-            label: title,
-            count: model.snippets(in: library).count,
-            active: model.library == library
-        )
-        .onTapGesture { model.library = model.library == library ? nil : library }
+        Button { model.library = model.library == library ? nil : library } label: {
+            SidebarRow(
+                icon: AnyView(CFIcon(type: icon, size: 13, stroke: 1.6)),
+                label: title,
+                count: model.count(in: library),
+                active: model.library == library
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func groupRow(_ group: SnippetGroup) -> some View {
@@ -191,14 +200,17 @@ private struct EditorSidebar: View {
             if model.renamingGroupID == group.objectID {
                 GroupNameField(group: group, model: model)
             } else {
-                SidebarRow(
-                    icon: AnyView(Image(systemName: collapsed ? "chevron.forward" : "chevron.down").font(.system(size: 10, weight: .semibold))),
-                    label: group.name,
-                    count: nil,
-                    active: false,
-                    dimmed: !group.isEnabled
-                )
-                .onTapGesture { model.toggleCollapsed(group) }
+                Button { model.toggleCollapsed(group) } label: {
+                    SidebarRow(
+                        icon: AnyView(Image(systemName: collapsed ? "chevron.forward" : "chevron.down").font(.system(size: 10, weight: .semibold))),
+                        label: group.name,
+                        count: nil,
+                        active: false,
+                        dimmed: !group.isEnabled
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue(L(collapsed ? "a11y_collapsed" : "a11y_expanded"))
                 .contextMenu {
                     Button(L("editor_rename_group")) { model.renamingGroupID = group.objectID }
                     Button(group.isEnabled ? L("editor_disable_group") : L("editor_enable_group")) { model.toggleEnabled(group) }
@@ -210,15 +222,18 @@ private struct EditorSidebar: View {
     }
 
     private func snippetRow(_ snippet: Snippet, depth: Int) -> some View {
-        SidebarRow(
-            icon: AnyView(CFIcon(type: snippet.isFavorite ? .star : .bolt, size: 12, stroke: 1.6)),
-            label: snippet.title.isEmpty ? snippet.abbreviation : snippet.title,
-            count: nil,
-            active: model.selectedID == snippet.objectID,
-            depth: depth,
-            dimmed: !snippet.isEnabled || snippet.group?.isEnabled == false
-        )
-        .onTapGesture { model.select(snippet) }
+        Button { model.select(snippet) } label: {
+            SidebarRow(
+                icon: AnyView(CFIcon(type: snippet.isFavorite ? .star : .bolt, size: 12, stroke: 1.6)),
+                label: snippet.title.isEmpty ? snippet.abbreviation : snippet.title,
+                count: nil,
+                active: model.selectedID == snippet.objectID,
+                depth: depth,
+                dimmed: !snippet.isEnabled || snippet.group?.isEnabled == false
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(snippet.isFavorite ? L("editor_favorites") : "")
         .contextMenu {
             Button(snippet.isFavorite ? L("editor_unfavorite") : L("editor_favorite")) { model.toggleFavorite(snippet) }
             Button(L("duplicate")) { model.duplicate(snippet) }
@@ -286,7 +301,7 @@ private struct SidebarRow: View {
         .padding(.horizontal, 6)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(active ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 }
 
@@ -294,6 +309,7 @@ private struct GroupNameField: View {
     let group: SnippetGroup
     @ObservedObject var model: SnippetEditorModel
     @State private var name: String
+    @State private var cancelled = false
     @FocusState private var focused: Bool
     @Environment(\.cfTheme) private var theme
 
@@ -309,7 +325,10 @@ private struct GroupNameField: View {
             .font(.system(size: 13))
             .focused($focused)
             .onSubmit { model.rename(group, to: name) }
-            .onExitCommand { model.renamingGroupID = nil }
+            .onExitCommand {
+                cancelled = true
+                model.renamingGroupID = nil
+            }
             .padding(.vertical, 3)
             .padding(.horizontal, 8)
             .background(RoundedRectangle(cornerRadius: 5).fill(theme.inputBg))
@@ -317,7 +336,7 @@ private struct GroupNameField: View {
             .padding(.horizontal, 12)
             .onAppear { focused = true }
             .onChange(of: focused) { _, isFocused in
-                if !isFocused { model.rename(group, to: name) }
+                if !isFocused, !cancelled { model.rename(group, to: name) }
             }
     }
 }

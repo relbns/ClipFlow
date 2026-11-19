@@ -460,3 +460,29 @@ final class LanguageAndExclusionTests: XCTestCase {
         XCTAssertEqual(AppExclusions.decode(json).map(\.bundleID), ["com.apple.Terminal"])
     }
 }
+
+@MainActor
+final class SnippetEditorModelTests: XCTestCase {
+    func testAnInvalidAbbreviationNeverReachesTheStoreAndLeavingKeepsTheOtherEdits() throws {
+        let context = CoreDataStack(storeURL: nil).viewContext
+        let model = SnippetEditorModel(context: context)
+        model.newSnippet()
+        let first = try XCTUnwrap(model.selected)
+        model.abbreviationEdited(".sig")
+        model.flush()
+
+        model.abbreviationEdited("sig")
+        first.content = "Best regards"
+        model.edited()
+        model.toggleFavorite(first)
+        context.refresh(first, mergeChanges: true)
+        XCTAssertEqual(first.abbreviation, ".sig")
+        XCTAssertNotNil(model.abbreviationDraftError)
+
+        model.newSnippet()
+        XCTAssertNil(model.abbreviationDraftError)
+        context.refresh(first, mergeChanges: false)
+        XCTAssertEqual(first.abbreviation, ".sig")
+        XCTAssertEqual(first.content, "Best regards")
+    }
+}

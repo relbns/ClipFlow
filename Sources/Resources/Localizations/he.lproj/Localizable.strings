@@ -389,3 +389,8 @@
 "editor_variables_other" = "%d משתנים";
 "editor_snippet_count_one" = "קטע אחד";
 "editor_snippet_count_other" = "%d קטעים";
+"a11y_on" = "פועל";
+"a11y_off" = "כבוי";
+"a11y_collapsed" = "מכווץ";
+"a11y_expanded" = "פתוח";
+"editor_content_label" = "טקסט הקטע";

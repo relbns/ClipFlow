@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 // MARK: - Center
@@ -20,7 +21,7 @@ struct EditorPane: View {
             }
             triggerCard
             variableBar
-            SnippetTextEditor(text: binding(\.content), insertion: $model.pendingInsertion)
+            SnippetTextEditor(text: binding(\.content), insertions: model.insertions)
                 .background(RoundedRectangle(cornerRadius: 8).fill(theme.surfaceDeep))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(theme.stroke, lineWidth: 1))
                 .padding(EdgeInsets(top: 12, leading: 22, bottom: 12, trailing: 22))
@@ -67,6 +68,7 @@ struct EditorPane: View {
     // MARK: Banner
 
     private var bannerMessage: (text: String, conflict: Snippet?)? {
+        if let error = model.abbreviationDraftError { return (error, nil) }
         if case .invalid(let error) = model.saveState { return (error, nil) }
         if let other = model.conflict(for: snippet) { return (L("editor_conflict", other.title), other) }
         return nil
@@ -94,7 +96,8 @@ struct EditorPane: View {
             VStack(alignment: .leading, spacing: 4) {
                 CardLabel(text: L("editor_abbreviation"))
                 HStack(spacing: 8) {
-                    TextField(".sig", text: binding(\.abbreviation))
+                    TextField(".sig", text: Binding(get: { model.abbreviationDraft }, set: { model.abbreviationEdited($0) }))
+                        .accessibilityLabel(L("editor_abbreviation"))
                         .textFieldStyle(.plain)
                         .font(.system(size: 14, design: .monospaced))
                         .foregroundColor(theme.textStrong)
@@ -107,7 +110,7 @@ struct EditorPane: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 CardLabel(text: L("editor_trigger"))
-                Picker("", selection: binding(\.expandTrigger)) {
+                Picker(L("editor_trigger"), selection: binding(\.expandTrigger)) {
                     ForEach(triggers, id: \.self) { Text(L("trigger_\($0)_long")).tag($0) }
                 }
                 .labelsHidden()
@@ -135,7 +138,7 @@ struct EditorPane: View {
         HStack(spacing: 6) {
             Text(L("editor_insert")).font(.system(size: 12)).foregroundColor(theme.textSubtle).fixedSize().padding(.trailing, 4)
             ForEach(variables, id: \.self) { variable in
-                Button { model.pendingInsertion = variable } label: { CFVarChip(variable) }
+                Button { model.insertions.send(variable) } label: { CFVarChip(variable) }
                     .buttonStyle(.plain)
                     .accessibilityLabel(L("editor_insert_variable", variable))
             }
@@ -174,6 +177,7 @@ struct EditorPane: View {
     }
 
     private var saveColor: Color {
+        if model.abbreviationDraftError != nil { return BrandPalette.danger }
         switch model.saveState {
         case .saved: return BrandPalette.success
         case .saving: return BrandPalette.warning
@@ -182,6 +186,7 @@ struct EditorPane: View {
     }
 
     private var saveLabel: String {
+        if model.abbreviationDraftError != nil { return L("editor_not_saved") }
         switch model.saveState {
         case .saved: return L("editor_saved")
         case .saving: return L("editor_saving")
@@ -396,7 +401,7 @@ struct SnippetTextEditor: NSViewRepresentable {
     static let tokenPattern = try! NSRegularExpression(pattern: #"\{[^{}\n]+\}"#)
 
     @Binding var text: String
-    @Binding var insertion: String?
+    let insertions: PassthroughSubject<String, Never>
     @Environment(\.cfTheme) private var theme
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
@@ -414,43 +419,55 @@ struct SnippetTextEditor: NSViewRepresentable {
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
         textView.textContainerInset = NSSize(width: 12, height: 14)
+        textView.setAccessibilityLabel(L("editor_content_label"))
         textView.string = text
         context.coordinator.textView = textView
         context.coordinator.applyStyle(theme: theme)
+        context.coordinator.subscription = insertions.sink { [weak coordinator = context.coordinator] variable in
+            coordinator?.insert(variable)
+        }
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = context.coordinator.textView else { return }
+        let coordinator = context.coordinator
+        coordinator.text = $text
+        guard let textView = coordinator.textView else { return }
         if textView.string != text {
             textView.string = text
-        }
-        context.coordinator.applyStyle(theme: theme)
-        if let insertion {
-            textView.window?.makeFirstResponder(textView)
-            textView.insertText(insertion, replacementRange: textView.selectedRange())
-            DispatchQueue.main.async { self.insertion = nil }
+            coordinator.applyStyle(theme: theme)
+        } else if coordinator.colorScheme != theme.colorScheme {
+            coordinator.applyStyle(theme: theme)
         }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
-        @Binding var text: String
+        var text: Binding<String>
         weak var textView: NSTextView?
+        var subscription: AnyCancellable?
+        private(set) var colorScheme: ColorScheme?
         private var theme = CFTheme.light
 
         init(text: Binding<String>) {
-            _text = text
+            self.text = text
         }
 
         func textDidChange(_ notification: Notification) {
             guard let textView else { return }
-            text = textView.string
+            text.wrappedValue = textView.string
             highlightTokens()
+        }
+
+        func insert(_ variable: String) {
+            guard let textView else { return }
+            textView.window?.makeFirstResponder(textView)
+            textView.insertText(variable, replacementRange: textView.selectedRange())
         }
 
         func applyStyle(theme: CFTheme) {
             guard let textView else { return }
             self.theme = theme
+            colorScheme = theme.colorScheme
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineHeightMultiple = 1.3
             textView.font = NSFont.systemFont(ofSize: 14)
