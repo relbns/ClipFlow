@@ -387,7 +387,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let window = makeWindow(
                 rootView: welcomeView,
                 title: L("welcome_title"),
-                size: NSSize(width: 780, height: 560),
+                size: NSSize(width: 780, height: 520),
                 style: [.titled, .closable]
             )
             let delegate = WelcomeWindowDelegate { [weak self] in
