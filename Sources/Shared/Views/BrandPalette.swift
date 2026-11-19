@@ -12,6 +12,8 @@ enum BrandPalette {
     static let accentLink = Color.oklch(0.68, 0.17, 272)
     static let accentIcon = Color.oklch(0.85, 0.12, 272)
     static let sidebarActiveIcon = Color.hex(0xB8B1FF)
+    /// The popover's selected row: rgba(120,116,255,.22).
+    static let selectedRow = Color.hex(0x7874FF, alpha: 0.22)
 
     // MARK: Status
     static let warning = Color.oklch(0.70, 0.17, 60)

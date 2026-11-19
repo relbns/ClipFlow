@@ -1,56 +1,176 @@
 import AppKit
+import CoreData
 import SwiftUI
 
-/// Keyboard control of the history popover: arrows move, Return pastes, 1-9 and 0 paste directly
-/// while the search field is empty, Esc closes. Every other key goes to the search field.
+enum PopoverCategory: String, CaseIterable, Identifiable {
+    case recent, images, links, colors, text
+
+    var id: String { rawValue }
+    var titleKey: String { "cat_\(rawValue)" }
+
+    var icon: CFIcon.IconType {
+        switch self {
+        case .recent: return .clock
+        case .images: return .image
+        case .links: return .link
+        case .colors: return .swatch
+        case .text: return .text
+        }
+    }
+
+    var accent: Color {
+        switch self {
+        case .recent: return BrandPalette.Category.recent
+        case .images: return BrandPalette.Category.images
+        case .links: return BrandPalette.Category.links
+        case .colors: return BrandPalette.Category.colors
+        case .text: return BrandPalette.Category.text
+        }
+    }
+
+    func contains(_ clip: SimpleClipItem) -> Bool {
+        switch self {
+        case .recent: return true
+        case .images: return clip.kind == .image
+        case .links: return clip.kind == .url
+        case .colors: return clip.kind == .color
+        case .text: return clip.kind == .text || clip.kind == .rtf
+        }
+    }
+}
+
+struct SnippetSummary: Equatable {
+    let objectID: NSManagedObjectID
+    let title: String
+    let abbreviation: String
+    let apps: [String]
+}
+
+enum PopoverItem: Identifiable, Equatable {
+    case clip(SimpleClipItem, number: Int?)
+    case pinned(SimpleClipItem, slot: Int)
+    case category(PopoverCategory, count: Int)
+    case snippet(SnippetSummary)
+
+    var id: String {
+        switch self {
+        case .clip(let clip, _): return "clip-\(clip.id.uuidString)"
+        case .pinned(let clip, _): return "pinned-\(clip.id.uuidString)"
+        case .category(let category, _): return "category-\(category.rawValue)"
+        case .snippet(let snippet): return "snippet-\(snippet.objectID.uriRepresentation().absoluteString)"
+        }
+    }
+}
+
+struct PopoverSection: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let trailing: String?
+    let items: [PopoverItem]
+}
+
+/// What the history popover shows and how the keyboard moves through it.
 @MainActor
 final class PopoverNavigation: ObservableObject {
     static let shared = PopoverNavigation()
-    static let shortcutCount = 10
+    static let numberedCount = 10
+    static let listLimit = 30
 
     weak var clipboardMonitor: ClipboardMonitor?
+    var context: NSManagedObjectContext?
+    var defaults: UserDefaults = .standard
     var onClose: () -> Void = {}
 
     @Published var searchText = "" {
-        didSet { selectedIndex = 0 }
+        didSet { selectedItemID = nil }
     }
-    @Published private(set) var selectedIndex = 0
+    @Published var drilledCategory: PopoverCategory? {
+        didSet { selectedItemID = nil }
+    }
+    /// The selection follows the item, so pins, deletes and new clips do not move it to another row.
+    @Published private var selectedItemID: String?
+    @Published private(set) var snippets: [SnippetSummary] = []
+    weak var popoverWindow: NSWindow?
+    /// Set when the popover opens, from the screen it opens on.
+    var maxListHeight: CGFloat = 440
 
     private var eventMonitor: Any?
 
-    private enum KeyCode {
-        static let down: UInt16 = 125
-        static let up: UInt16 = 126
-        static let returnKey: UInt16 = 36
-        static let enter: UInt16 = 76
-        static let escape: UInt16 = 53
-    }
+    private var isOrganized: Bool { (defaults.string(forKey: "viewMode") ?? "organized") == "organized" }
+    private var history: [SimpleClipItem] { clipboardMonitor?.clipHistory ?? [] }
 
-    var filteredClips: [SimpleClipItem] {
-        let clips = clipboardMonitor?.clipHistory ?? []
-        guard !searchText.isEmpty else {
-            return clips.enumerated().filter { $0.offset < 30 || $0.element.isPinned }.map(\.element)
+    // MARK: - Content
+
+    var sections: [PopoverSection] {
+        if !searchText.isEmpty {
+            let results = history.filter {
+                $0.content.localizedCaseInsensitiveContains(searchText) || $0.title.localizedCaseInsensitiveContains(searchText)
+            }
+            return [numberedSection(id: "results", title: L("search_results"), clips: results)]
         }
-        return clips.filter {
-            $0.content.localizedCaseInsensitiveContains(searchText) || $0.title.localizedCaseInsensitiveContains(searchText)
+        if let category = drilledCategory {
+            return [numberedSection(id: category.rawValue, title: L(category.titleKey), clips: history.filter(category.contains))]
         }
+        guard isOrganized else {
+            return [numberedSection(id: "recent", title: L("recent_clips"), clips: history)]
+        }
+
+        var sections: [PopoverSection] = []
+        let pinned = history.filter(\.isPinned).prefix(9)
+        if !pinned.isEmpty {
+            sections.append(PopoverSection(
+                id: "pinned", title: L("section_pinned"), trailing: nil,
+                items: pinned.enumerated().map { .pinned($0.element, slot: $0.offset + 1) }
+            ))
+        }
+        sections.append(PopoverSection(
+            id: "categories", title: L("section_categories"), trailing: nil,
+            items: PopoverCategory.allCases.map { category in
+                .category(category, count: history.filter(category.contains).count)
+            }
+        ))
+        if !snippets.isEmpty {
+            sections.append(PopoverSection(id: "snippets", title: L("section_snippets"), trailing: nil, items: snippets.map { .snippet($0) }))
+        }
+        return sections
     }
 
-    /// The clips numbered 1-9 and 0 in the popover, in order.
-    var navigableClips: [SimpleClipItem] {
-        Array(filteredClips.prefix(Self.shortcutCount))
+    var items: [PopoverItem] { sections.flatMap(\.items) }
+
+    var selectedID: String? {
+        let items = items
+        if let selectedItemID, items.contains(where: { $0.id == selectedItemID }) { return selectedItemID }
+        return items.first?.id
     }
 
-    var selectedID: UUID? {
-        let clips = navigableClips
-        return clips.indices.contains(selectedIndex) ? clips[selectedIndex].id : nil
+    private var selectedIndex: Int {
+        let items = items
+        return items.firstIndex { $0.id == selectedID } ?? 0
     }
+
+    private func numberedSection(id: String, title: String, clips: [SimpleClipItem]) -> PopoverSection {
+        let shown = Array(clips.prefix(Self.listLimit))
+        return PopoverSection(
+            id: id,
+            title: title,
+            trailing: L("items_count", count: clips.count),
+            items: shown.enumerated().map { .clip($0.element, number: $0.offset < Self.numberedCount ? $0.offset + 1 : nil) }
+        )
+    }
+
+    // MARK: - Lifecycle
 
     func popoverWillShow() {
         searchText = ""
-        selectedIndex = 0
+        drilledCategory = nil
+        selectedItemID = nil
+        reloadSnippets()
         guard eventMonitor == nil else { return }
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Only keys typed in the popover; other ClipFlow windows keep theirs.
+            guard let window = event.window, MainActor.assumeIsolated({ window === PopoverNavigation.shared.popoverWindow }) else {
+                return event
+            }
             let key = KeyInput(event)
             let handled = MainActor.assumeIsolated { PopoverNavigation.shared.handle(key) }
             return handled ? nil : event
@@ -64,34 +184,183 @@ final class PopoverNavigation: ObservableObject {
         eventMonitor = nil
     }
 
-    struct KeyInput: Sendable {
-        let keyCode: UInt16
-        let hasModifiers: Bool
-        let hasCommandOnly: Bool
-        let characters: String?
-
-        init(keyCode: UInt16, hasModifiers: Bool = false, hasCommandOnly: Bool = false, characters: String? = nil) {
-            self.keyCode = keyCode
-            self.hasModifiers = hasModifiers
-            self.hasCommandOnly = hasCommandOnly
-            self.characters = characters
-        }
-
-        init(_ event: NSEvent) {
-            let modifiers = event.modifierFlags
-                .intersection(.deviceIndependentFlagsMask)
-                .subtracting([.numericPad, .function, .capsLock])
-            self.init(
-                keyCode: event.keyCode,
-                hasModifiers: !modifiers.isEmpty,
-                hasCommandOnly: modifiers == .command,
-                characters: event.charactersIgnoringModifiers
+    func reloadSnippets() {
+        guard let context else { return }
+        let request = Snippet.fetchRequest()
+        request.predicate = NSPredicate(format: "isEnabled == YES")
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "useCount", ascending: false),
+            NSSortDescriptor(key: "title", ascending: true)
+        ]
+        request.fetchLimit = 3
+        snippets = ((try? context.fetch(request)) ?? []).map { snippet in
+            SnippetSummary(
+                objectID: snippet.objectID,
+                title: snippet.title,
+                abbreviation: snippet.abbreviation,
+                apps: snippet.restrictToApps ? (snippet.appRules ?? []).filter { !$0.isDeny }.map(\.appName).sorted() : []
             )
         }
     }
 
-    /// The shortcuts the popover footer shows: ⌘E editor, ⌘, preferences, ⌘Q quit. Keys are looked up in
-    /// the current Latin layout, so they follow AZERTY or Dvorak and still work while typing Hebrew.
+    // MARK: - Actions
+
+    func select(_ item: PopoverItem) {
+        selectedItemID = item.id
+    }
+
+    func activate(_ item: PopoverItem) {
+        switch item {
+        case .clip(let clip, _), .pinned(let clip, _):
+            PasteCoordinator.shared.paste(clip)
+        case .category(let category, _):
+            drilledCategory = category
+        case .snippet(let summary):
+            guard let snippet = try? context?.existingObject(with: summary.objectID) as? Snippet else { return }
+            PasteCoordinator.shared.insert(snippet)
+        }
+    }
+
+    func goBack() {
+        drilledCategory = nil
+    }
+
+    func delete(_ clip: SimpleClipItem) {
+        let items = items
+        let index = selectedIndex
+        if items.indices.contains(index + 1) {
+            selectedItemID = items[index + 1].id
+        } else if index > 0 {
+            selectedItemID = items[index - 1].id
+        }
+        clipboardMonitor?.delete(clip)
+    }
+
+    func togglePin(_ clip: SimpleClipItem) {
+        clipboardMonitor?.setPinned(clip, !clip.isPinned)
+    }
+
+    // MARK: - Keyboard
+
+    struct KeyInput: Sendable {
+        let keyCode: UInt16
+        let modifiers: Modifiers
+        let characters: String?
+
+        struct Modifiers: OptionSet, Sendable {
+            let rawValue: Int
+            static let command = Modifiers(rawValue: 1)
+            static let option = Modifiers(rawValue: 2)
+            static let other = Modifiers(rawValue: 4)
+        }
+
+        init(keyCode: UInt16, modifiers: Modifiers = [], characters: String? = nil) {
+            self.keyCode = keyCode
+            self.modifiers = modifiers
+            self.characters = characters
+        }
+
+        init(_ event: NSEvent) {
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function, .capsLock])
+            var modifiers: Modifiers = []
+            if flags.contains(.command) { modifiers.insert(.command) }
+            if flags.contains(.option) { modifiers.insert(.option) }
+            if !flags.subtracting([.command, .option]).isEmpty { modifiers.insert(.other) }
+            self.init(keyCode: event.keyCode, modifiers: modifiers, characters: event.charactersIgnoringModifiers)
+        }
+    }
+
+    private enum KeyCode {
+        static let left: UInt16 = 123
+        static let right: UInt16 = 124
+        static let down: UInt16 = 125
+        static let up: UInt16 = 126
+        static let returnKey: UInt16 = 36
+        static let enter: UInt16 = 76
+        static let escape: UInt16 = 53
+        static let delete: UInt16 = 51
+    }
+
+    func handle(_ key: KeyInput) -> Bool {
+        if key.modifiers == .command {
+            if let digit = digit(of: key), (1...9).contains(digit) {
+                return activatePinned(slot: digit)
+            }
+            return handleCommand(keyCode: key.keyCode)
+        }
+        if key.modifiers == .option, key.keyCode == KeyCode.delete, searchText.isEmpty {
+            switch selectedItem {
+            case .clip(let clip, _)?, .pinned(let clip, _)?:
+                delete(clip)
+                return true
+            default:
+                return false
+            }
+        }
+        guard key.modifiers.isEmpty else { return false }
+
+        let rightToLeft = LanguageManager.shared.layoutDirection == .rightToLeft
+        let back = rightToLeft ? KeyCode.right : KeyCode.left
+        let forward = rightToLeft ? KeyCode.left : KeyCode.right
+
+        switch key.keyCode {
+        case KeyCode.down:
+            move(by: 1)
+            return true
+        case KeyCode.up:
+            move(by: -1)
+            return true
+        case KeyCode.returnKey, KeyCode.enter:
+            if let item = selectedItem { activate(item) }
+            return true
+        case KeyCode.escape:
+            if drilledCategory != nil, searchText.isEmpty { goBack() } else { onClose() }
+            return true
+        case back where searchText.isEmpty && drilledCategory != nil:
+            goBack()
+            return true
+        case forward where searchText.isEmpty:
+            guard let item = selectedItem, case .category = item else { return false }
+            activate(item)
+            return true
+        default:
+            break
+        }
+
+        guard searchText.isEmpty, let digit = digit(of: key) else { return false }
+        let number = digit == 0 ? 10 : digit
+        let match = items.first { item in
+            if case .clip(_, let itemNumber) = item { return itemNumber == number }
+            return false
+        }
+        guard let match else { return false }
+        activate(match)
+        return true
+    }
+
+    private var selectedItem: PopoverItem? {
+        let items = items
+        return items.indices.contains(selectedIndex) ? items[selectedIndex] : nil
+    }
+
+    private func digit(of key: KeyInput) -> Int? {
+        guard let characters = key.characters, characters.count == 1 else { return nil }
+        return Int(characters)
+    }
+
+    private func move(by delta: Int) {
+        let items = items
+        guard !items.isEmpty else { return }
+        selectedItemID = items[min(max(0, selectedIndex + delta), items.count - 1)].id
+    }
+
+    private func activatePinned(slot: Int) -> Bool {
+        guard let pinned = history.filter(\.isPinned).dropFirst(slot - 1).first else { return false }
+        PasteCoordinator.shared.paste(pinned)
+        return true
+    }
+
+    /// ⌘E editor, ⌘, preferences, ⌘Q quit, looked up in the current Latin layout.
     private func handleCommand(keyCode: UInt16) -> Bool {
         switch keyCode {
         case SyntheticKeyboard.keyCode(for: "e") ?? 14:
@@ -107,56 +376,14 @@ final class PopoverNavigation: ObservableObject {
         }
         return true
     }
-
-    func handle(_ key: KeyInput) -> Bool {
-        if key.hasCommandOnly {
-            return handleCommand(keyCode: key.keyCode)
-        }
-        guard !key.hasModifiers else { return false }
-
-        switch key.keyCode {
-        case KeyCode.down:
-            move(by: 1)
-            return true
-        case KeyCode.up:
-            move(by: -1)
-            return true
-        case KeyCode.returnKey, KeyCode.enter:
-            activate(at: selectedIndex)
-            return true
-        case KeyCode.escape:
-            onClose()
-            return true
-        default:
-            break
-        }
-
-        guard searchText.isEmpty,
-              let characters = key.characters, characters.count == 1,
-              let digit = Int(characters) else { return false }
-        activate(at: digit == 0 ? 9 : digit - 1)
-        return true
-    }
-
-    private func move(by delta: Int) {
-        let count = navigableClips.count
-        guard count > 0 else { return }
-        selectedIndex = min(max(0, selectedIndex + delta), count - 1)
-    }
-
-    private func activate(at index: Int) {
-        let clips = navigableClips
-        guard clips.indices.contains(index) else { return }
-        PasteCoordinator.shared.paste(clips[index])
-    }
 }
 
 private struct SelectedClipIDKey: EnvironmentKey {
-    static let defaultValue: UUID? = nil
+    static let defaultValue: String? = nil
 }
 
 extension EnvironmentValues {
-    var selectedClipID: UUID? {
+    var selectedPopoverItemID: String? {
         get { self[SelectedClipIDKey.self] }
         set { self[SelectedClipIDKey.self] = newValue }
     }

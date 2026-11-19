@@ -8,11 +8,28 @@ final class PasteCoordinator {
     weak var clipboardMonitor: ClipboardMonitor?
     var closePopover: () -> Void = {}
     private var target: NSRunningApplication?
+    private var activationObserver: NSObjectProtocol?
 
     /// Call just before the popover opens. When ClipFlow itself is in front, the paste goes to its key window.
     func rememberFrontmostApp() {
         let front = NSWorkspace.shared.frontmostApplication
         target = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
+        guard activationObserver == nil else { return }
+        // A popover that stays open follows the user to another app; the paste goes there.
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            MainActor.assumeIsolated {
+                guard let app, app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+                self?.target = app
+            }
+        }
+    }
+
+    func forgetFrontmostApp() {
+        if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+        activationObserver = nil
     }
 
     func paste(_ clip: SimpleClipItem) {

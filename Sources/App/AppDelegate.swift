@@ -38,6 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var menuBarPopover: NSPopover?
     private var popoverAnchorWindow: NSWindow?
+    private var outsideClickMonitor: Any?
     private var snippetEditorWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
@@ -74,6 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         PasteCoordinator.shared.clipboardMonitor = clipboardMonitor
         PasteCoordinator.shared.closePopover = { [weak self] in self?.menuBarPopover?.performClose(nil) }
         PopoverNavigation.shared.clipboardMonitor = clipboardMonitor
+        PopoverNavigation.shared.context = stack.viewContext
         PopoverNavigation.shared.onClose = { [weak self] in self?.menuBarPopover?.performClose(nil) }
 
         setupStatusItem()
@@ -147,7 +149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "ClipFlow")
+            button.image = StatusItemIcon.make()
             button.target = self
             button.action = #selector(statusBarButtonClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -216,18 +218,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     isPresented: Binding(
                         get: { popover.isShown },
                         set: { if !$0 { popover.performClose(nil) } }
-                    )
+                    ),
+                    onSizeChange: { size in
+                        if popover.contentSize != size { popover.contentSize = size }
+                    }
                 )
                 .cfAutoTheme()
                 .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
             }
             .environmentObject(LanguageManager.shared)
 
-            popover.contentViewController = NSHostingController(rootView: popoverView)
+            popover.contentViewController = PopoverContentController(rootView: popoverView)
+            popover.contentSize = NSSize(width: 340, height: 480)
             NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.popoverAnchorWindow?.orderOut(nil)
+                    self?.stopOutsideClickMonitor()
                     PopoverNavigation.shared.popoverDidClose()
+                    PasteCoordinator.shared.forgetFrontmostApp()
                 }
             }
             menuBarPopover = popover
@@ -240,14 +248,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             PasteCoordinator.shared.rememberFrontmostApp()
             PopoverNavigation.shared.popoverWillShow()
             popover.appearance = NSApp.appearance
+            let closesOnOutsideClick = UserDefaults.standard.bool(forKey: "closePopoverOnOutsideClick")
+            popover.behavior = closesOnOutsideClick ? .transient : .applicationDefined
+            if closesOnOutsideClick { startOutsideClickMonitor() }
             let anchor = popoverAnchor()
+            let screenHeight = (anchor.window?.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+            PopoverNavigation.shared.maxListHeight = max(160, min(440, screenHeight - 300))
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+            PopoverNavigation.shared.popoverWindow = popover.contentViewController?.view.window
             NSApp.activate(ignoringOtherApps: true)
             // The popover's window exists only after show returns; make it key then, so the first click acts.
             DispatchQueue.main.async {
+                PopoverNavigation.shared.popoverWindow = popover.contentViewController?.view.window
                 popover.contentViewController?.view.window?.makeKey()
             }
         }
+    }
+
+    /// A transient popover only closes on outside clicks while ClipFlow is active, which it may not be
+    /// after the global hotkey; clicks in other apps close it here.
+    private func startOutsideClickMonitor() {
+        guard outsideClickMonitor == nil else { return }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated { self?.menuBarPopover?.performClose(nil) }
+        }
+    }
+
+    private func stopOutsideClickMonitor() {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        outsideClickMonitor = nil
     }
 
     /// The status item, or the top of the mouse's screen when the item is hidden (e.g. by a menu bar manager).
@@ -282,7 +311,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openPreferences() {
         if settingsWindow == nil {
             let settingsView = DynamicLanguageWrapper {
-                SettingsView()
+                SettingsView(onTabTitle: { [weak self] title in self?.settingsWindow?.title = title })
                     .cfAutoTheme()
                     .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
             }
@@ -368,7 +397,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateWindowTitles() {
-        settingsWindow?.title = L("preferences")
         snippetEditorWindow?.title = L("snippet_editor")
         aboutWindow?.title = L("about_clipflow")
         welcomeWindow?.title = L("welcome_title")

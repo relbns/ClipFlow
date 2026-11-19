@@ -343,3 +343,14 @@
 "editor_words_one" = "מילה אחת";
 "editor_words_other" = "%d מילים";
 "launch_at_login_failed" = "לא ניתן לשנות את ההפעלה עם הכניסה למחשב";
+"search_results" = "תוצאות";
+"no_results" = "אין פריטים מתאימים";
+"pin" = "הצמדה";
+"unpin" = "ביטול הצמדה";
+"delete_clip" = "מחיקה";
+"back" = "חזרה";
+"pref_about" = "אודות ClipFlow";
+"pref_about_hint" = "גרסה, קרדיטים ורישיון.";
+"pref_about_button" = "הצגה";
+"pref_close_outside" = "סגירת ההיסטוריה בלחיצה בחוץ";
+"pref_close_outside_hint" = "כשהאפשרות כבויה, ההיסטוריה נשארת פתוחה עד שלוחצים Esc, על הקיצור או על הסמל בשורת התפריטים.";

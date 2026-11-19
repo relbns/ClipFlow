@@ -38,18 +38,44 @@ struct CFIcon: View {
     var size: CGFloat = 16
     var stroke: CGFloat = 1.6
 
-    /// Icons where an SF Symbol reads better than the design's drawing (the README prefers Symbols).
+    /// The design README asks for SF Symbols wherever one matches; only the ה glyph keeps its drawing.
     private var symbolName: String? {
         switch type {
+        case .search: return "magnifyingglass"
+        case .clock: return "clock"
+        case .image: return "photo"
         case .text: return "text.alignleft"
-        default: return nil
+        case .link: return "link"
+        case .swatch: return "square"
+        case .bolt: return "bolt"
+        case .star: return "star"
+        case .pin: return "pin"
+        case .folder: return "folder"
+        case .chevron: return "chevron.forward"
+        case .chevronDown: return "chevron.down"
+        case .plus: return "plus"
+        case .cmd: return "command"
+        case .gear: return "gearshape"
+        case .trash: return "trash"
+        case .power: return "power"
+        case .cloud: return "cloud"
+        case .check: return "checkmark"
+        case .circle: return "circle"
+        case .key: return "key"
+        case .sparkles: return "sparkles"
+        case .bracket: return "curlybraces"
+        case .arrowDown: return "arrow.down"
+        case .lock: return "lock"
+        case .dot: return "circle.fill"
+        case .info: return "info.circle"
+        case .hebrew: return nil
         }
     }
 
     var body: some View {
         if let symbolName {
             Image(systemName: symbolName)
-                .font(.system(size: size * 0.82, weight: stroke >= 1.8 ? .semibold : .medium))
+                .font(.system(size: size * (type == .dot ? 0.3 : 0.82), weight: stroke >= 1.8 ? .semibold : .medium))
                 .frame(width: size, height: size)
         } else {
             drawnIcon
