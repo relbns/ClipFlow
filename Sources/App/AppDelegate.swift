@@ -185,7 +185,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// The status item, or the mouse position when the item is hidden (e.g. by a menu bar manager).
+    /// The status item, or the top of the mouse's screen when the item is hidden (e.g. by a menu bar manager).
     private func popoverAnchor() -> NSView {
         if let button = statusItem?.button, let window = button.window,
            window.occlusionState.contains(.visible),
@@ -202,10 +202,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.isReleasedWhenClosed = false
             return window
         }()
-        anchor.setFrameOrigin(NSEvent.mouseLocation)
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
+        let top = screen?.visibleFrame.maxY ?? mouse.y
+        anchor.setFrameOrigin(NSPoint(x: mouse.x, y: top - 1))
         anchor.orderFrontRegardless()
         popoverAnchorWindow = anchor
-        Log.ui.info("Status item is not visible, opening the popover at the mouse")
+        Log.ui.info("Status item is not visible, opening the popover under the menu bar at the mouse")
         return anchor.contentView ?? NSView()
     }
 

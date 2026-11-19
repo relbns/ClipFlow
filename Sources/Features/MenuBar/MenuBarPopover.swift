@@ -10,6 +10,7 @@ struct MenuBarPopover: View {
     @AppStorage("viewMode") private var viewMode = "organized"
     @State private var searchText = ""
     @State private var snippetCount: Int = 0
+    @State private var contentHeight: CGFloat = 0
 
     @Environment(\.cfTheme) var theme
 
@@ -22,6 +23,7 @@ struct MenuBarPopover: View {
 
             // Content based on mode
             ScrollView {
+                Group {
                 switch viewMode {
                 case "simple":
                     SimpleHistoryView(
@@ -40,8 +42,13 @@ struct MenuBarPopover: View {
                         onSelect: selectClip
                     )
                 }
+                }
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: PopoverContentHeightKey.self, value: proxy.size.height)
+                })
             }
-            .frame(minHeight: 400, maxHeight: 700)
+            .onPreferenceChange(PopoverContentHeightKey.self) { contentHeight = $0 }
+            .frame(height: min(max(contentHeight, 60), maxListHeight))
 
             Divider()
 
@@ -53,6 +60,12 @@ struct MenuBarPopover: View {
         .onAppear {
             fetchSnippetCount()
         }
+    }
+
+    /// The list scrolls inside the popover, so the popover always fits under the menu bar.
+    private var maxListHeight: CGFloat {
+        let screenHeight = (NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main)?.visibleFrame.height ?? 800
+        return max(160, min(440, screenHeight - 320))
     }
 
     // MARK: - Header
@@ -239,7 +252,7 @@ struct SimpleHistoryView: View {
                     ForEach(Array(clips.prefix(10).enumerated()), id: \.element.id) { index, clip in
                         CFIconRow(
                             icon: iconForClip(clip),
-                            title: titleForClip(clip),
+                            title: clip.title,
                             subtitle: clip.subtitle(),
                             kbd: keyboardShortcut(for: index),
                             active: false
@@ -278,10 +291,6 @@ struct SimpleHistoryView: View {
         } else {
             return AnyView(CFIcon(type: .text, size: 14, stroke: 1.6))
         }
-    }
-
-    private func titleForClip(_ clip: SimpleClipItem) -> String {
-        String(clip.content.prefix(60)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func keyboardShortcut(for index: Int) -> String? {
@@ -476,7 +485,7 @@ struct CategoryGroup: View {
     let clips: [SimpleClipItem]
     let onSelect: (SimpleClipItem) -> Void
 
-    @State private var isExpanded = true
+    @State private var isExpanded = false
     @Environment(\.cfTheme) var theme
 
     var body: some View {
@@ -542,9 +551,7 @@ struct ClipRow: View {
 
     @Environment(\.cfTheme) var theme
 
-    private var displayText: String {
-        String(clip.content.prefix(60)).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    private var displayText: String { clip.title }
 
     private var keyboardShortcut: String? {
         showNumber && index < 9 ? "\(index + 1)" : (index == 9 ? "0" : nil)
@@ -754,4 +761,11 @@ extension Color {
     )
     .cfAutoTheme()
     .frame(height: 600)
+}
+
+private struct PopoverContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
 }

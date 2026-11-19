@@ -98,6 +98,20 @@ struct ClipCapture: Equatable {
 }
 
 extension SimpleClipItem {
+    /// The first line of a history row.
+    var title: String {
+        switch kind {
+        case .image:
+            return pixelWidth > 0 ? "Image \(pixelWidth)×\(pixelHeight)" : "Image"
+        case .file:
+            return URL(fileURLWithPath: content).lastPathComponent
+        default:
+            let firstLine = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                .split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+            return String(firstLine.prefix(80))
+        }
+    }
+
     /// The second line of a history row, from the clip's real data.
     func subtitle(now: Date = Date()) -> String {
         let detail: String
