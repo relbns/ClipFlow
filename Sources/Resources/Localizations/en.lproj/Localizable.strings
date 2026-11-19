@@ -282,7 +282,7 @@
 "credit_clipy_role" = "Core clipboard architecture";
 "credit_flycut_role" = "Inspiration for the Simple view";
 "license" = "License";
-"about_footer" = "© 2026 ClipFlow · Made with care in Tel Aviv";
+"about_footer" = "© 2026 ClipFlow";
 "welcome_title" = "Welcome to ClipFlow";
 "welcome_hero" = "Everything you copy.\nAnything you type often.";
 "welcome_body" = "A quiet menu bar app for clipboard history and abbreviation snippets, with first-class Hebrew and right-to-left support.";
@@ -293,7 +293,7 @@
 "welcome_step2_body" = "Needed so snippets expand as you type and picked clips paste into your app. Passwords are never saved.";
 "welcome_step3_title" = "Try your first snippet";
 "welcome_step3_body" = "Type .dd anywhere, then press Space, to get today's date.";
-"welcome_skip" = "Skip tour";
+"welcome_skip" = "Later";
 "welcome_done" = "Done";
 "new" = "New";
 "editor_new_group" = "New Group";
