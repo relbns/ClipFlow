@@ -354,3 +354,6 @@
 "pref_about_button" = "Show";
 "pref_close_outside" = "Close history on outside click";
 "pref_close_outside_hint" = "When off, the history stays open until you press Esc, the shortcut or the menu bar icon.";
+"welcome_open_settings" = "Grant access →";
+"just_now" = "just now";
+"two_minutes" = "2 min";

@@ -354,3 +354,6 @@
 "pref_about_button" = "הצגה";
 "pref_close_outside" = "סגירת ההיסטוריה בלחיצה בחוץ";
 "pref_close_outside_hint" = "כשהאפשרות כבויה, ההיסטוריה נשארת פתוחה עד שלוחצים Esc, על הקיצור או על הסמל בשורת התפריטים.";
+"welcome_open_settings" = "מתן הרשאות ←";
+"just_now" = "עכשיו";
+"two_minutes" = "לפני 2 דק׳";
