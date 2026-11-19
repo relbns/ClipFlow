@@ -185,8 +185,8 @@ struct AboutView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(width: 560, height: 520)
-        .background(theme.surfaceDeep)
+        .frame(width: 560, height: 680)
+        .background(theme.surface)
     }
 }
 

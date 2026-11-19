@@ -2,9 +2,8 @@ import AppKit
 import CoreData
 import SwiftUI
 
-/// `ClipFlow --render-snapshots <folder>` renders the main screens in light and dark to PNG files
-/// with the design's sample data, so they can be compared with `design_handoff_clipflow/screenshots`.
-/// It uses an in-memory store and its own defaults, never the user's data.
+/// `--render-snapshots <folder>` renders the screens in light and dark with the design's sample data,
+/// on an in-memory store and throwaway defaults; `--render-icon <folder>` writes the app icon set.
 @MainActor
 enum SnapshotRenderer {
     static func runIfRequested() -> Bool {
@@ -24,9 +23,12 @@ enum SnapshotRenderer {
 
     private static func renderAll(to folder: URL) {
         let stack = CoreDataStack(storeURL: nil)
-        let defaults = UserDefaults(suiteName: "clipflow-snapshots-\(UUID().uuidString)")!
+        let suite = "clipflow-snapshots"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
         AppDefaults.register(in: defaults)
-        let monitor = ClipboardMonitor(context: stack.viewContext)
+        let monitor = ClipboardMonitor(context: stack.viewContext, defaults: defaults)
         SampleData.fill(stack.viewContext, monitor: monitor)
         PopoverNavigation.shared.clipboardMonitor = monitor
 

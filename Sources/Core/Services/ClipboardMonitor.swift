@@ -11,13 +11,15 @@ final class ClipboardMonitor: ObservableObject {
     private var lastChangeCount = 0
     private let thumbnailSize: CGFloat = 64
 
-    private var maxHistoryItems: Int { max(10, UserDefaults.standard.integer(forKey: "maxHistoryItems")) }
-    private var removeDuplicates: Bool { UserDefaults.standard.bool(forKey: "removeDuplicates") }
-    private var moveUsedToTop: Bool { UserDefaults.standard.bool(forKey: "moveUsedToTop") }
+    private let defaults: UserDefaults
+    private var maxHistoryItems: Int { max(10, defaults.integer(forKey: "maxHistoryItems")) }
+    private var removeDuplicates: Bool { defaults.bool(forKey: "removeDuplicates") }
+    private var moveUsedToTop: Bool { defaults.bool(forKey: "moveUsedToTop") }
 
-    init(context: NSManagedObjectContext, pasteboard: NSPasteboard = .general) {
+    init(context: NSManagedObjectContext, pasteboard: NSPasteboard = .general, defaults: UserDefaults = .standard) {
         self.context = context
         self.pasteboard = pasteboard
+        self.defaults = defaults
         reload()
     }
 

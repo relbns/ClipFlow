@@ -358,3 +358,12 @@ final class OKLCHTests: XCTestCase {
         XCTAssertEqual(OKLCH(0.9, 0.4, 145).hex.count, 7)
     }
 }
+
+final class OKLCHDisplayP3Tests: XCTestCase {
+    func testColorsOutsideSRGBStayInsideDisplayP3() {
+        for color in [OKLCH(0.86, 0.12, 272), OKLCH(0.74, 0.17, 280), OKLCH(0.85, 0.15, 60)] {
+            let (red, green, blue) = color.displayP3
+            XCTAssertTrue([red, green, blue].allSatisfy { $0 > 0 && $0 < 1 }, "\(color) clips in Display P3")
+        }
+    }
+}

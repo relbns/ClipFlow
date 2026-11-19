@@ -780,11 +780,13 @@ extension Color {
 }
 
 #Preview {
-    MenuBarPopover(
-        clipboardMonitor: ClipboardMonitor(context: CoreDataStack(storeURL: nil).viewContext),
+    let stack = CoreDataStack(storeURL: nil)
+    return MenuBarPopover(
+        clipboardMonitor: ClipboardMonitor(context: stack.viewContext),
         isPresented: .constant(true)
     )
     .cfAutoTheme()
+    .environment(\.managedObjectContext, stack.viewContext)
     .frame(height: 600)
 }
 

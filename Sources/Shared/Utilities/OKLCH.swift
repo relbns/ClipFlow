@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// A color in OKLCH, the space the design prototype is written in, converted to sRGB the way a browser does.
+/// A color in OKLCH, the space the design prototype is written in. Rendered in Display P3 like Safari,
+/// so the light violets and the amber keep their hue instead of being clipped to sRGB.
 struct OKLCH: Equatable {
     let lightness: Double
     let chroma: Double
@@ -16,6 +17,20 @@ struct OKLCH: Equatable {
 
     /// Gamma-encoded sRGB components in 0...1, clipped to the sRGB gamut.
     var sRGB: (red: Double, green: Double, blue: Double) {
+        let (red, green, blue) = linearSRGB
+        return (Self.encode(red), Self.encode(green), Self.encode(blue))
+    }
+
+    /// Gamma-encoded Display P3 components in 0...1.
+    var displayP3: (red: Double, green: Double, blue: Double) {
+        let (red, green, blue) = linearSRGB
+        let p3Red = 0.8224621 * red + 0.1775380 * green
+        let p3Green = 0.0331941 * red + 0.9668058 * green
+        let p3Blue = 0.0170827 * red + 0.0723974 * green + 0.9105199 * blue
+        return (Self.encode(p3Red), Self.encode(p3Green), Self.encode(p3Blue))
+    }
+
+    private var linearSRGB: (Double, Double, Double) {
         let hueRadians = hue * .pi / 180
         let a = chroma * cos(hueRadians)
         let b = chroma * sin(hueRadians)
@@ -28,7 +43,7 @@ struct OKLCH: Equatable {
         let linearGreen = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s
         let linearBlue = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
 
-        return (Self.encode(linearRed), Self.encode(linearGreen), Self.encode(linearBlue))
+        return (linearRed, linearGreen, linearBlue)
     }
 
     /// `#RRGGBB`, for tests and debugging.
@@ -38,8 +53,8 @@ struct OKLCH: Equatable {
     }
 
     var color: Color {
-        let (red, green, blue) = sRGB
-        return Color(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
+        let (red, green, blue) = displayP3
+        return Color(.displayP3, red: red, green: green, blue: blue, opacity: alpha)
     }
 
     private static func encode(_ linear: Double) -> Double {
@@ -58,7 +73,7 @@ extension Color {
         opacity(percent / 100)
     }
 
-    /// `#RRGGBB` or `#RRGGBBAA` from the design's CSS.
+    /// `#RRGGBB` from the design's CSS; pass transparency as `alpha`.
     static func hex(_ value: UInt32, alpha: Double = 1) -> Color {
         Color(
             .sRGB,

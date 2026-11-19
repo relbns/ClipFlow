@@ -299,7 +299,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             aboutWindow = makeWindow(
                 rootView: aboutView,
                 title: L("about_clipflow"),
-                size: NSSize(width: 560, height: 520),
+                size: NSSize(width: 560, height: 680),
                 style: [.titled, .closable]
             )
         }
