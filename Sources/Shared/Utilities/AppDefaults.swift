@@ -13,6 +13,7 @@ enum AppDefaults {
             "playSoundOnExpand": false,
             "viewMode": "organized",
             "appearanceMode": "auto",
+            "closePopoverOnOutsideClick": true,
             "excludedApps": "[]"
         ])
     }

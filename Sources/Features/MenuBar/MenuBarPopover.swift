@@ -4,6 +4,7 @@ import SwiftUI
 struct MenuBarPopover: View {
     @ObservedObject var clipboardMonitor: ClipboardMonitor
     @Binding var isPresented: Bool
+    var onSizeChange: (CGSize) -> Void = { _ in }
     @ObservedObject private var navigation = PopoverNavigation.shared
     @AppStorage("viewMode") private var viewMode = "organized"
     @State private var contentHeight: CGFloat = 0
@@ -21,6 +22,14 @@ struct MenuBarPopover: View {
         }
         .frame(width: 340)
         .background(theme.popoverBg)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(GeometryReader { proxy in
+            Color.clear.preference(key: PopoverSizeKey.self, value: proxy.size)
+        })
+        .onPreferenceChange(PopoverSizeKey.self) { size in
+            if size != .zero { onSizeChange(size) }
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
         .environment(\.selectedPopoverItemID, navigation.selectedID)
     }
 
@@ -134,6 +143,9 @@ struct MenuBarPopover: View {
             }
             CFFooterRowBtn(icon: .gear, label: L("menu_preferences"), kbd: "⌘,") {
                 post("OpenPreferences")
+            }
+            CFFooterRowBtn(icon: .info, label: L("menu_about")) {
+                post("OpenAbout")
             }
             PopoverDivider()
             CFFooterRowBtn(icon: .trash, label: L("menu_clear_history")) {

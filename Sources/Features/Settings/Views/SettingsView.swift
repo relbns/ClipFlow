@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("preferencesTab") private var savedTab = 0
     @State private var shownTab: Int?
+    var onTabTitle: (String) -> Void = { _ in }
     @Environment(\.cfTheme) var theme
 
     private var selectedTab: Int { shownTab ?? savedTab }
@@ -18,8 +19,9 @@ struct SettingsView: View {
     ]
 
     /// The last tab is remembered, so a language switch that rebuilds the window keeps it.
-    init(initialTab: Int? = nil) {
+    init(initialTab: Int? = nil, onTabTitle: @escaping (String) -> Void = { _ in }) {
         _shownTab = State(initialValue: initialTab)
+        self.onTabTitle = onTabTitle
     }
 
     var body: some View {
@@ -42,6 +44,7 @@ struct SettingsView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .focusEffectDisabled()
                     .accessibilityLabel(L(tab.key))
                     .accessibilityAddTraits(selectedTab == index ? .isSelected : [])
                 }
@@ -67,6 +70,8 @@ struct SettingsView: View {
             .background(theme.surface)
         }
         .frame(width: 760, height: 620)
+        .onAppear { onTabTitle(L(tabs[min(selectedTab, tabs.count - 1)].key)) }
+        .onChange(of: selectedTab) { _, index in onTabTitle(L(tabs[min(index, tabs.count - 1)].key)) }
     }
 }
 

@@ -352,3 +352,5 @@
 "pref_about" = "אודות ClipFlow";
 "pref_about_hint" = "גרסה, קרדיטים ורישיון.";
 "pref_about_button" = "הצגה";
+"pref_close_outside" = "סגירת ההיסטוריה בלחיצה בחוץ";
+"pref_close_outside_hint" = "כשהאפשרות כבויה, ההיסטוריה נשארת פתוחה עד שלוחצים Esc, על הקיצור או על הסמל בשורת התפריטים.";

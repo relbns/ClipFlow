@@ -352,3 +352,5 @@
 "pref_about" = "About ClipFlow";
 "pref_about_hint" = "Version, credits and license.";
 "pref_about_button" = "Show";
+"pref_close_outside" = "Close history on outside click";
+"pref_close_outside_hint" = "When off, the history stays open until you press Esc, the shortcut or the menu bar icon.";

@@ -3,6 +3,7 @@ import SwiftUI
 struct AppearanceSettingsView: View {
     @AppStorage("appearanceMode") private var appearanceMode = "auto"
     @AppStorage("viewMode") private var viewMode = "organized"
+    @AppStorage("closePopoverOnOutsideClick") private var closeOnOutsideClick = true
 
     private let themes = ["auto", "light", "dark"]
     private let modes = ["simple", "organized"]
@@ -18,6 +19,9 @@ struct AppearanceSettingsView: View {
                     options: [L("theme_system"), L("theme_light"), L("theme_dark")]
                 )
                 .frame(maxWidth: 320)
+            }
+            CFSettingsRow(label: L("pref_close_outside"), hint: L("pref_close_outside_hint")) {
+                CFToggle(isOn: $closeOnOutsideClick).accessibilityLabel(L("pref_close_outside"))
             }
             CFSettingsRow(label: L("pref_view_mode"), hint: L("pref_view_mode_hint"), isLast: true) {
                 CFSegmentedControl(
