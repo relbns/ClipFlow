@@ -49,6 +49,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        ProcessInfo.processInfo.disableAutomaticTermination("ClipFlow runs in the menu bar without windows")
         AppDefaults.register()
 
         let stack = CoreDataStack.shared
