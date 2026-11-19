@@ -51,7 +51,7 @@ if sqlite3 /Library/Application\ Support/com.apple.TCC/TCC.db \
     echo "   ✅ GRANTED"
 else
     echo "   ❌ NOT GRANTED or needs refresh"
-    echo "   Reset with: tccutil reset Accessibility com.singalong.clipflow"
+    echo "   Reset with: tccutil reset Accessibility io.benesh.clipflow"
 fi
 echo ""
 
@@ -63,4 +63,4 @@ echo ""
 echo "💡 Quick commands:"
 echo "   Kill app:    pkill ClipFlow"
 echo "   Live logs:   log stream --predicate 'process == \"ClipFlow\"' --level debug"
-echo "   Reset TCC:   tccutil reset Accessibility com.singalong.clipflow"
+echo "   Reset TCC:   tccutil reset Accessibility io.benesh.clipflow"

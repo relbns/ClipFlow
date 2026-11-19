@@ -568,7 +568,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.singalong.clipflow;
+				PRODUCT_BUNDLE_IDENTIFIER = io.benesh.clipflow;
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -653,7 +653,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.singalong.clipflow;
+				PRODUCT_BUNDLE_IDENTIFIER = io.benesh.clipflow;
 				SDKROOT = macosx;
 			};
 			name = Release;

@@ -1,6 +1,6 @@
 name: ClipFlow
 options:
-  bundleIdPrefix: com.singalong
+  bundleIdPrefix: io.benesh
   deploymentTarget:
     macOS: "14.0"
   developmentLanguage: en
@@ -26,7 +26,7 @@ targets:
       path: Sources/Resources/Info.plist
       properties:
         CFBundleDisplayName: ClipFlow
-        CFBundleIdentifier: com.singalong.clipflow
+        CFBundleIdentifier: io.benesh.clipflow
         CFBundleName: ClipFlow
         CFBundlePackageType: APPL
         CFBundleShortVersionString: 1.0.0
@@ -45,7 +45,7 @@ targets:
       base:
         INFOPLIST_FILE: Sources/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Sources/Resources/ClipFlow.entitlements
-        PRODUCT_BUNDLE_IDENTIFIER: com.singalong.clipflow
+        PRODUCT_BUNDLE_IDENTIFIER: io.benesh.clipflow
         ENABLE_HARDENED_RUNTIME: true
 
 packages:

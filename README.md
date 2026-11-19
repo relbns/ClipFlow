@@ -54,11 +54,21 @@
 
 ### 🧭 In progress
 - The interface is being aligned with the full design (`design_handoff_clipflow/`): theme, popover, preferences, snippet editor, onboarding and full right-to-left layout.
-- iCloud sync and launch at login are not working yet. Their settings are visible but have no effect.
+- iCloud sync is planned and not built yet.
+- ClipFlow is not on the Mac App Store yet. The preparation plan is in [docs/app-store.md](docs/app-store.md).
 
 ---
 
 ## 🚀 Getting Started
+
+### Download
+
+1. Download `ClipFlow.zip` from the [latest release](https://github.com/relbns/ClipFlow/releases/latest) and unzip it.
+2. Move `ClipFlow.app` to your Applications folder.
+3. Open it. ClipFlow is not notarized by Apple yet, so the first launch is blocked: open **System Settings → Privacy & Security**, scroll to the message about ClipFlow and click **Open Anyway**.
+4. Grant the two permissions the welcome screen asks for (see [Permissions](#permissions)).
+
+The download runs on Apple Silicon and Intel Macs with macOS 14 or later. Each new version has to be allowed again in the same place, and macOS asks for the permissions again after an update.
 
 ### Requirements
 
@@ -213,10 +223,10 @@ swift test           # unit tests
 ./build-app.sh       # signed .app bundle in Build.noindex/
 ```
 
-Logs go to the unified log under the subsystem `com.singalong.clipflow`:
+Logs go to the unified log under the subsystem `io.benesh.clipflow`:
 
 ```bash
-/usr/bin/log stream --predicate 'subsystem == "com.singalong.clipflow"' --info
+/usr/bin/log stream --predicate 'subsystem == "io.benesh.clipflow"' --info
 ```
 
 ### Running in Xcode
@@ -230,6 +240,12 @@ Open `Package.swift` in Xcode, select the ClipFlow scheme and run. Text expansio
 - **Combine** for reactive programming
 - **Core Data** for persistence
 - **SwiftUI + AppKit** hybrid UI
+
+---
+
+## 🔒 Privacy
+
+ClipFlow works entirely on your Mac and sends nothing over the network. See the [privacy policy](docs/privacy-policy.md).
 
 ---
 

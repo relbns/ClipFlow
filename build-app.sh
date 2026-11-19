@@ -6,11 +6,13 @@ set -e
 #                    Accessibility / Input Monitoring trust across rebuilds
 #   --adhoc          ad-hoc signature (trust is lost on every rebuild)
 #   --notarize       Developer ID + notarization (paid Apple Developer account)
+# --universal builds for Apple Silicon and Intel, as the downloadable release does.
 # The dev identity comes from --cert, $CLIPFLOW_SIGN_IDENTITY, or the untracked
 # file .signing-identity (one line, the identity name as shown by
 # `security find-identity -v -p codesigning`).
 SIGNING_MODE="dev"
 ENTITLEMENTS_PATH="Sources/Resources/ClipFlow.entitlements"
+UNIVERSAL=0
 DEV_CERT="${CLIPFLOW_SIGN_IDENTITY:-}"
 if [ -z "$DEV_CERT" ] && [ -f .signing-identity ]; then
     DEV_CERT="$(head -1 .signing-identity)"
@@ -38,8 +40,12 @@ while [[ $# -gt 0 ]]; do
             ENTITLEMENTS_PATH="Sources/Resources/ClipFlow-Sandbox.entitlements"
             shift
             ;;
+        --universal)
+            UNIVERSAL=1
+            shift
+            ;;
         *)
-            echo "Usage: $0 [--dev|--adhoc|--notarize] [--sandbox] [--cert \"Certificate Name\"]"
+            echo "Usage: $0 [--dev|--adhoc|--notarize] [--sandbox] [--universal] [--cert \"Certificate Name\"]"
             exit 1
             ;;
     esac
@@ -63,8 +69,13 @@ echo "🔨 Building ClipFlow.app..."
 echo "📝 Signing mode: $SIGNING_MODE"
 echo ""
 
-# Build release binary
-swift build -c release
+if [ "$UNIVERSAL" = "1" ]; then
+    swift build -c release --arch arm64 --arch x86_64
+    PRODUCTS=".build/apple/Products/Release"
+else
+    swift build -c release
+    PRODUCTS=".build/release"
+fi
 
 # Create app bundle structure from scratch so removed files never linger
 APP_DIR="Build.noindex/ClipFlow.app"
@@ -74,11 +85,11 @@ mkdir -p "$APP_DIR/Contents/Resources"
 mkdir -p "$APP_DIR/Contents/Frameworks"
 
 # Copy binary
-cp .build/release/ClipFlow "$APP_DIR/Contents/MacOS/"
+cp "$PRODUCTS/ClipFlow" "$APP_DIR/Contents/MacOS/"
 
 # Copy any .framework or .bundle files produced by dependencies
-find .build/release -name "*.framework" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \; 2>/dev/null || true
-find .build/release -name "*.bundle" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+find "$PRODUCTS" -name "*.framework" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \; 2>/dev/null || true
+find "$PRODUCTS" -name "*.bundle" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 
 # Copy and fix Info.plist (replace Xcode variables + increment build)
 cp Sources/Resources/Info.plist "$APP_DIR/Contents/Info.plist.tmp"

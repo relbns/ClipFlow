@@ -486,3 +486,23 @@ final class SnippetEditorModelTests: XCTestCase {
         XCTAssertEqual(first.content, "Best regards")
     }
 }
+
+final class PreviousBundleDefaultsTests: XCTestCase {
+    func testSettingsMoveOnceAndNeverOverwriteNewOnes() {
+        let previous = "clipflow-old-\(UUID().uuidString)"
+        let current = "clipflow-new-\(UUID().uuidString)"
+        let defaults = UserDefaults.standard
+        defer {
+            defaults.removePersistentDomain(forName: previous)
+            defaults.removePersistentDomain(forName: current)
+        }
+        defaults.setPersistentDomain(["viewMode": "simple", "AppleLanguages": ["he"]], forName: previous)
+
+        PreviousBundleDefaults.migrateIfNeeded(defaults: defaults, from: previous, to: current)
+        XCTAssertEqual(defaults.persistentDomain(forName: current)?["viewMode"] as? String, "simple")
+
+        defaults.setPersistentDomain(["viewMode": "organized"], forName: current)
+        PreviousBundleDefaults.migrateIfNeeded(defaults: defaults, from: previous, to: current)
+        XCTAssertEqual(defaults.persistentDomain(forName: current)?["viewMode"] as? String, "organized")
+    }
+}
