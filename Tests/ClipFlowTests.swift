@@ -342,3 +342,19 @@ final class PopoverNavigationTests: XCTestCase {
         navigation.clipboardMonitor = nil
     }
 }
+
+final class OKLCHTests: XCTestCase {
+    func testDesignTokensConvertLikeABrowser() {
+        XCTAssertEqual(OKLCH(0.60, 0.17, 272).hex, "#5F74E4")
+        XCTAssertEqual(OKLCH(0.78, 0.14, 70).hex, "#F0A646")
+        XCTAssertEqual(OKLCH(0.70, 0.17, 145).hex, "#4DB956")
+        XCTAssertEqual(OKLCH(0.70, 0.17, 60).hex, "#E88000")
+        XCTAssertEqual(OKLCH(0.55, 0.03, 250).hex, "#657383")
+    }
+
+    func testExtremesAndGamutClipping() {
+        XCTAssertEqual(OKLCH(1, 0, 0).hex, "#FFFFFF")
+        XCTAssertEqual(OKLCH(0, 0, 0).hex, "#000000")
+        XCTAssertEqual(OKLCH(0.9, 0.4, 145).hex.count, 7)
+    }
+}

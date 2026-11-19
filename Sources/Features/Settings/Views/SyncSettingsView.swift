@@ -1,17 +1,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Public wrapper that checks Core Data availability
 struct SyncSettingsView: View {
     var body: some View {
-        CoreDataAvailabilityWrapper {
-            SyncSettingsContentView()
-        }
+        SyncSettingsContentView()
     }
 }
 
-/// Internal view with Core Data dependencies
 private struct SyncSettingsContentView: View {
+    @Environment(\.cfTheme) private var theme
     @Environment(\.managedObjectContext) private var viewContext
     @AppStorage("iCloudSyncEnabled") private var iCloudEnabled = false {
         didSet {
@@ -48,11 +45,11 @@ private struct SyncSettingsContentView: View {
                             if let lastSync = iCloudService.lastSyncDate {
                                 Text("Last synced: \(lastSync.formatted(.relative(presentation: .named)))")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(theme.textMuted)
                             } else {
                                 Text("Never synced")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(theme.textMuted)
                             }
                         }
 
@@ -71,14 +68,14 @@ private struct SyncSettingsContentView: View {
                         if let error = iCloudService.syncError {
                             Text(error.localizedDescription)
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundColor(theme.danger)
                         }
                     }
                 }
 
                 Text("Syncs all snippets and groups across your devices")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
 
             Section("Export / Import") {
@@ -92,7 +89,7 @@ private struct SyncSettingsContentView: View {
 
                 Text("Export to JSON format (Coming Soon)")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
 
             Section("Advanced Sync") {
@@ -106,7 +103,7 @@ private struct SyncSettingsContentView: View {
 
                 Text("Additional sync options will be available in future updates")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
         }
         .formStyle(.grouped)

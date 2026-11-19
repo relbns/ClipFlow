@@ -53,17 +53,21 @@ final class ClipboardMonitor: ObservableObject {
     }
 
     func record(_ capture: ClipCapture, snapshot: PasteboardSnapshot, source: NSRunningApplication?) {
+        record(capture, snapshot: snapshot, sourceName: source?.localizedName, sourceBundleID: source?.bundleIdentifier)
+    }
+
+    func record(_ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?, at date: Date = Date()) {
         if removeDuplicates, let existing = fetchItem(hash: capture.hash) {
-            existing.createdAt = Date()
-            existing.sourceAppName = source?.localizedName
-            existing.sourceBundleID = source?.bundleIdentifier
+            existing.createdAt = date
+            existing.sourceAppName = sourceName
+            existing.sourceBundleID = sourceBundleID
             saveAndReload()
             return
         }
 
         let item = ClipItem(context: context)
         item.id = UUID()
-        item.createdAt = Date()
+        item.createdAt = date
         item.type = capture.kind.rawValue
         item.content = capture.text
         item.dataHash = capture.hash
@@ -71,8 +75,8 @@ final class ClipboardMonitor: ObservableObject {
         item.byteCount = Int64(capture.byteCount)
         item.pixelWidth = Int32(capture.pixelWidth)
         item.pixelHeight = Int32(capture.pixelHeight)
-        item.sourceAppName = source?.localizedName
-        item.sourceBundleID = source?.bundleIdentifier
+        item.sourceAppName = sourceName
+        item.sourceBundleID = sourceBundleID
         item.pasteboardData = try? snapshot.encoded()
         if capture.kind == .image {
             item.imageData = thumbnail(from: snapshot)

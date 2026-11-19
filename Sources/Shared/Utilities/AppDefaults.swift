@@ -12,6 +12,7 @@ enum AppDefaults {
             "expandAfter": "delimiter",
             "playSoundOnExpand": false,
             "viewMode": "organized",
+            "appearanceMode": "auto",
             "excludedApps": "[]"
         ])
     }

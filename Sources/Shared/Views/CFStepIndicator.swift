@@ -25,7 +25,7 @@ struct CFStepIndicator: View {
                     .frame(width: 28, height: 28)
                     .shadow(
                         color: state == .active ?
-                            Color(red: 0.55, green: 0.19, blue: 0.72).opacity(0.6) :
+                            BrandPalette.stepActiveGlow :
                             .clear,
                         radius: 7,
                         x: 0,
@@ -65,7 +65,7 @@ struct CFStepIndicator: View {
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(
                     state == .active ?
-                        Color(red: 0.48, green: 0.44, blue: 1.0).opacity(0.30) :
+                        BrandPalette.stepActiveBorder :
                         .clear,
                     lineWidth: 1
                 )
@@ -79,21 +79,10 @@ struct CFStepIndicator: View {
             return AnyShapeStyle(theme.fill1)
 
         case .active:
-            // Purple gradient: oklch(.65 .17 272) → oklch(.5 .19 272)
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.65, green: 0.17, blue: 0.85),  // Top
-                        Color(red: 0.50, green: 0.19, blue: 0.72)   // Bottom
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
+            return AnyShapeStyle(LinearGradient(gradient: BrandPalette.stepActive, startPoint: .top, endPoint: .bottom))
 
         case .done:
-            // Green: oklch(.7 .17 145)
-            return AnyShapeStyle(Color(red: 0.40, green: 0.85, blue: 0.50))
+            return AnyShapeStyle(BrandPalette.success)
         }
     }
 }
@@ -130,7 +119,7 @@ struct CFStepIndicator: View {
     }
     .padding()
     .frame(width: 400)
-    .background(Color(red: 0.11, green: 0.11, blue: 0.13))
+    .background(CFTheme.dark.surface)
     .cfAutoTheme()
 }
 
@@ -159,6 +148,6 @@ struct CFStepIndicator: View {
     }
     .padding()
     .frame(width: 400)
-    .background(Color(red: 0.96, green: 0.96, blue: 0.97))
+    .background(CFTheme.light.surface)
     .cfAutoTheme()
 }

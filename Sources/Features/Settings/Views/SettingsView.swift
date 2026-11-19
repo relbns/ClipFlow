@@ -1,18 +1,22 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @State private var selectedTab = 0
+    @State private var selectedTab: Int
     @Environment(\.cfTheme) var theme
+
+    init(initialTab: Int = 0) {
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     // Tab configuration with OKLCH accent colors
     private let tabs: [(icon: CFIcon.IconType, label: String, accent: Color)] = [
-        (.gear, "General", Color(red: 0.55, green: 0.55, blue: 0.60)),      // oklch(.55 .03 250)
-        (.star, "Appearance", Color(red: 0.85, green: 0.50, blue: 0.20)),   // oklch(.65 .12 30)
-        (.bolt, "Expansion", Color(red: 0.47, green: 0.44, blue: 1.0)),     // oklch(.6 .17 272) - accent
-        (.key, "Hotkeys", Color(red: 0.40, green: 0.80, blue: 0.50)),       // oklch(.55 .12 145)
-        (.cloud, "Sync", Color(red: 0.30, green: 0.60, blue: 1.0)),         // oklch(.6 .14 220)
-        (.lock, "Privacy", Color(red: 0.35, green: 0.75, blue: 0.85)),      // oklch(.55 .12 200)
-        (.hebrew, "Language", Color(red: 0.85, green: 0.40, blue: 0.75))    // oklch(.6 .14 320)
+        (.gear, "General", BrandPalette.SettingsTab.general),
+        (.star, "Appearance", BrandPalette.SettingsTab.appearance),
+        (.bolt, "Expansion", BrandPalette.SettingsTab.expansion),
+        (.key, "Hotkeys", BrandPalette.SettingsTab.hotkeys),
+        (.cloud, "Sync", BrandPalette.SettingsTab.sync),
+        (.lock, "Privacy", BrandPalette.SettingsTab.privacy),
+        (.hebrew, "Language", BrandPalette.SettingsTab.language)
     ]
 
     var body: some View {
@@ -74,7 +78,7 @@ struct GeneralSettingsView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
-                        ClipFlowMark(size: 48, rounded: true, showBackground: true)
+                        ClipFlowMark(size: 48)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("ClipFlow")

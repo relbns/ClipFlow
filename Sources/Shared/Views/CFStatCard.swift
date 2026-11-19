@@ -59,7 +59,7 @@ struct CFStatCard: View {
     }
     .padding()
     .frame(width: 320)
-    .background(Color(red: 0.11, green: 0.11, blue: 0.13))
+    .background(CFTheme.dark.surface)
     .cfAutoTheme()
 }
 
@@ -72,6 +72,6 @@ struct CFStatCard: View {
     }
     .padding()
     .frame(width: 280)
-    .background(Color(red: 0.96, green: 0.96, blue: 0.97))
+    .background(CFTheme.light.surface)
     .cfAutoTheme()
 }

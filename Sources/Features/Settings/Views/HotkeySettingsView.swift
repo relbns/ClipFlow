@@ -2,6 +2,7 @@ import SwiftUI
 import KeyboardShortcuts
 
 struct HotkeySettingsView: View {
+    @Environment(\.cfTheme) private var theme
     var body: some View {
         Form {
             Section("Global Hotkeys") {
@@ -29,21 +30,21 @@ struct HotkeySettingsView: View {
             Section("Paste Modifiers") {
                 Text("Hold ⌥ Option while pasting to paste as plain text")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
 
                 Text("Hold ⌘ Command while pasting to paste without adding to history")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
 
             Section("Tips") {
                 Text("• Press Escape to close any menu")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
 
                 Text("• Use number keys 1-9, 0 to quickly select items")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
         }
         .formStyle(.grouped)
@@ -52,6 +53,7 @@ struct HotkeySettingsView: View {
 }
 
 struct HotkeyRow: View {
+    @Environment(\.cfTheme) private var theme
     let title: String
     let name: KeyboardShortcuts.Name
     let description: String
@@ -69,7 +71,7 @@ struct HotkeyRow: View {
 
             Text(description)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(theme.textMuted)
         }
     }
 }

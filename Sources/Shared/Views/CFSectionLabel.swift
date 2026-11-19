@@ -46,7 +46,7 @@ struct CFSectionLabel: View {
         CFSectionLabel("LIBRARY")
 
         Rectangle()
-            .fill(Color.gray.opacity(0.2))
+            .fill(CFTheme.dark.fill2)
             .frame(height: 60)
 
         // With action
@@ -54,17 +54,17 @@ struct CFSectionLabel: View {
         }
 
         Rectangle()
-            .fill(Color.gray.opacity(0.2))
+            .fill(CFTheme.dark.fill2)
             .frame(height: 100)
 
         CFSectionLabel("FAVORITES")
 
         Rectangle()
-            .fill(Color.gray.opacity(0.2))
+            .fill(CFTheme.dark.fill2)
             .frame(height: 60)
     }
     .frame(width: 230)
-    .background(Color(red: 0.10, green: 0.10, blue: 0.12))
+    .background(CFTheme.dark.surface)
     .cfAutoTheme()
 }
 
@@ -77,6 +77,6 @@ struct CFSectionLabel: View {
     }
     .padding()
     .frame(width: 230)
-    .background(Color(red: 0.93, green: 0.93, blue: 0.94))
+    .background(CFTheme.light.surface)
     .cfAutoTheme()
 }

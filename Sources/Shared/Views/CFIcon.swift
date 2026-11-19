@@ -46,7 +46,7 @@ struct CFIcon: View {
             let path = iconPath(for: type)
             context.stroke(
                 path,
-                with: .color(.primary),
+                with: .foreground,
                 style: StrokeStyle(
                     lineWidth: stroke,
                     lineCap: .round,
@@ -56,7 +56,7 @@ struct CFIcon: View {
 
             // Some icons have fills
             if let fillPath = iconFillPath(for: type) {
-                context.fill(fillPath, with: .color(.primary))
+                context.fill(fillPath, with: .foreground)
             }
         }
         .frame(width: size, height: size)

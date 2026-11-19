@@ -7,6 +7,7 @@ struct MenuBarPopover: View {
     @ObservedObject var clipboardMonitor: ClipboardMonitor
     @Binding var isPresented: Bool
     @ObservedObject private var navigation = PopoverNavigation.shared
+    @Environment(\.managedObjectContext) private var managedObjectContext
 
     @AppStorage("viewMode") private var viewMode = "organized"
     @State private var snippetCount: Int = 0
@@ -208,7 +209,7 @@ struct MenuBarPopover: View {
     }
 
     private func fetchSnippetCount() {
-        let context = CoreDataStack.shared.viewContext
+        let context = managedObjectContext
         let request: NSFetchRequest<Snippet> = Snippet.fetchRequest()
         request.predicate = NSPredicate(format: "isEnabled == YES")
 
@@ -385,7 +386,7 @@ struct OrganizedHistoryView: View {
             VStack(spacing: 2) {
                 CategoryGroup(
                     icon: .clock,
-                    iconColor: Color(red: 0.78, green: 0.14, blue: 0.70),
+                    iconColor: BrandPalette.Category.recent,
                     label: "Recent",
                     count: groups.recent.count,
                     clips: groups.recent,
@@ -397,7 +398,7 @@ struct OrganizedHistoryView: View {
                 if !groups.images.isEmpty {
                     CategoryGroup(
                         icon: .image,
-                        iconColor: Color(red: 0.74, green: 0.14, blue: 0.60),
+                        iconColor: BrandPalette.Category.images,
                         label: "Images",
                         count: groups.images.count,
                         clips: groups.images,
@@ -408,7 +409,7 @@ struct OrganizedHistoryView: View {
                 if !groups.links.isEmpty {
                     CategoryGroup(
                         icon: .link,
-                        iconColor: Color(red: 0.78, green: 0.14, blue: 0.50),
+                        iconColor: BrandPalette.Category.links,
                         label: "Links",
                         count: groups.links.count,
                         clips: groups.links,
@@ -419,7 +420,7 @@ struct OrganizedHistoryView: View {
                 if !groups.colors.isEmpty {
                     CategoryGroup(
                         icon: .swatch,
-                        iconColor: Color(red: 0.85, green: 0.14, blue: 0.45),
+                        iconColor: BrandPalette.Category.colors,
                         label: "Colors",
                         count: groups.colors.count,
                         clips: groups.colors,
@@ -430,7 +431,7 @@ struct OrganizedHistoryView: View {
                 if !groups.text.isEmpty {
                     CategoryGroup(
                         icon: .text,
-                        iconColor: Color(red: 0.68, green: 0.17, blue: 0.72),
+                        iconColor: BrandPalette.Category.text,
                         label: "Text",
                         count: groups.text.count,
                         clips: groups.text,
@@ -446,7 +447,6 @@ struct OrganizedHistoryView: View {
                 .padding(.top, 8)
 
             SnippetsListView()
-                .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
                 .padding(.bottom, 4)
         }
         .padding(8)

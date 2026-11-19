@@ -55,15 +55,15 @@ struct CFGradientBadge: View {
     HStack(spacing: 16) {
         CFGradientBadge(
             icon: .gear,
-            accent: Color(red: 0.55, green: 0.55, blue: 0.60)
+            accent: BrandPalette.SettingsTab.general
         )
         CFGradientBadge(
             icon: .star,
-            accent: Color(red: 0.85, green: 0.50, blue: 0.20)
+            accent: BrandPalette.SettingsTab.appearance
         )
         CFGradientBadge(
             icon: .bolt,
-            accent: Color(red: 0.47, green: 0.44, blue: 1.0)
+            accent: BrandPalette.SettingsTab.expansion
         )
     }
     .padding(40)

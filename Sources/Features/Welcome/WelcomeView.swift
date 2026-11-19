@@ -30,23 +30,16 @@ struct WelcomeView: View {
     // MARK: - Left Visual Panel
     private var leftVisualPanel: some View {
         ZStack {
-            // Radial gradient background
-            // radial-gradient(120% 80% at 30% 20%, oklch(.45 .15 285), oklch(.25 .08 280) 60%, oklch(.18 .04 270) 100%)
-            RadialGradient(
-                colors: [
-                    Color(red: 0.35, green: 0.28, blue: 0.52),  // oklch(.45 .15 285)
-                    Color(red: 0.21, green: 0.18, blue: 0.28),  // oklch(.25 .08 280) at 60%
-                    Color(red: 0.16, green: 0.15, blue: 0.22)   // oklch(.18 .04 270)
-                ],
-                center: UnitPoint(x: 0.3, y: 0.2),
-                startRadius: 0,
-                endRadius: 400
+            CSSRadialGradient(
+                gradient: BrandPalette.welcomePanel,
+                radii: CGSize(width: 1.2, height: 0.8),
+                center: UnitPoint(x: 0.3, y: 0.2)
             )
 
             VStack(spacing: 0) {
                 // Top: Logo + Wordmark
                 HStack(spacing: 8) {
-                    ClipFlowMark(size: 32, rounded: true, showBackground: true)
+                    ClipFlowMark(size: 32)
 
                     Text("ClipFlow")
                         .font(.system(size: 15, weight: .semibold))
@@ -200,23 +193,9 @@ struct WelcomeView: View {
     private func badgeBackgroundGradient(state: StepState) -> LinearGradient {
         switch state {
         case .done:
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.4, green: 0.85, blue: 0.6),  // Green
-                    Color(red: 0.3, green: 0.75, blue: 0.5)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            return LinearGradient(colors: [BrandPalette.success, BrandPalette.success], startPoint: .top, endPoint: .bottom)
         case .active:
-            return LinearGradient(
-                colors: [
-                    theme.brandLight,
-                    theme.accent
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            return LinearGradient(gradient: BrandPalette.stepActive, startPoint: .top, endPoint: .bottom)
         case .idle:
             return LinearGradient(
                 colors: [theme.fill1, theme.fill1],

@@ -49,12 +49,12 @@ struct CFTheme {
     let knob: Color
 
     // MARK: - Accent & Status Colors
-    let accent: Color      // oklch(.6 .17 272) → #7B71FF warm indigo
-    let brandLight: Color  // oklch(.74 .17 280)
-    let brandDeep: Color   // oklch(.50 .19 268)
-    let warning: Color     // oklch(.70 .17 60) → amber
-    let success: Color     // oklch(.70 .17 145) → green
-    let danger: Color      // #ff7a73
+    let accent: Color
+    let brandLight: Color
+    let brandDeep: Color
+    let warning: Color
+    let success: Color
+    let danger: Color
 
     // MARK: - Computed Colors
     var popoverBgSolid: Color {
@@ -145,12 +145,12 @@ struct CFTheme {
         knob: .white,
 
         // Accent & Status Colors
-        accent: Color(red: 123/255, green: 113/255, blue: 255/255),      // #7B71FF oklch(.6 .17 272)
-        brandLight: Color(red: 169/255, green: 155/255, blue: 255/255),  // oklch(.74 .17 280)
-        brandDeep: Color(red: 97/255, green: 72/255, blue: 219/255),     // oklch(.50 .19 268)
-        warning: Color(red: 234/255, green: 179/255, blue: 73/255),      // oklch(.70 .17 60) amber
-        success: Color(red: 73/255, green: 234/255, blue: 155/255),      // oklch(.70 .17 145) green
-        danger: Color(red: 255/255, green: 122/255, blue: 115/255)       // #ff7a73
+        accent: BrandPalette.accent,
+        brandLight: BrandPalette.accentLight,
+        brandDeep: BrandPalette.accentDeep,
+        warning: BrandPalette.warning,
+        success: BrandPalette.success,
+        danger: BrandPalette.danger
     )
 
     static let dark = CFTheme(
@@ -234,12 +234,12 @@ struct CFTheme {
         knob: .white,
 
         // Accent & Status Colors
-        accent: Color(red: 123/255, green: 113/255, blue: 255/255),      // #7B71FF oklch(.6 .17 272)
-        brandLight: Color(red: 169/255, green: 155/255, blue: 255/255),  // oklch(.74 .17 280)
-        brandDeep: Color(red: 97/255, green: 72/255, blue: 219/255),     // oklch(.50 .19 268)
-        warning: Color(red: 234/255, green: 179/255, blue: 73/255),      // oklch(.70 .17 60) amber
-        success: Color(red: 73/255, green: 234/255, blue: 155/255),      // oklch(.70 .17 145) green
-        danger: Color(red: 255/255, green: 122/255, blue: 115/255)       // #ff7a73
+        accent: BrandPalette.accent,
+        brandLight: BrandPalette.accentLight,
+        brandDeep: BrandPalette.accentDeep,
+        warning: BrandPalette.warning,
+        success: BrandPalette.success,
+        danger: BrandPalette.danger
     )
 }
 
@@ -284,17 +284,15 @@ extension CFTheme {
         accent.opacity(percent / 100.0)
     }
 
-    /// Category colors for Organized mode groups
-    static let categoryColors: [String: Color] = [
-        "recent": Color(red: 0.78, green: 0.14, blue: 0.70, opacity: 1.0),   // oklch(.78 .14 70) - amber
-        "images": Color(red: 0.74, green: 0.14, blue: 0.60, opacity: 1.0),   // oklch(.74 .14 200) - blue
-        "links": Color(red: 0.78, green: 0.14, blue: 0.50, opacity: 1.0),    // oklch(.78 .14 145) - green
-        "colors": Color(red: 0.78, green: 0.12, blue: 0.40, opacity: 1.0),   // oklch(.78 .12 320) - magenta
-        "text": Color(red: 0.78, green: 0.12, blue: 0.30, opacity: 1.0)      // oklch(.78 .12 30) - orange
-    ]
-
     func categoryColor(for name: String) -> Color {
-        CFTheme.categoryColors[name.lowercased()] ?? accent
+        switch name.lowercased() {
+        case "recent": return BrandPalette.Category.recent
+        case "images": return BrandPalette.Category.images
+        case "links": return BrandPalette.Category.links
+        case "colors": return BrandPalette.Category.colors
+        case "text": return BrandPalette.Category.text
+        default: return accent
+        }
     }
 }
 

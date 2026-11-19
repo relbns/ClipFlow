@@ -67,7 +67,7 @@ struct CFPopoverChrome_Previews: PreviewProvider {
             ZStack {
                 // Background to show blur effect simulation
                 LinearGradient(
-                    colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3)],
+                    colors: [BrandPalette.accent.opacity(0.3), BrandPalette.Category.colors.opacity(0.3)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -138,7 +138,7 @@ struct CFPopoverChrome_Previews: PreviewProvider {
 
             ZStack {
                 LinearGradient(
-                    colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3)],
+                    colors: [BrandPalette.accent.opacity(0.3), BrandPalette.Category.colors.opacity(0.3)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )

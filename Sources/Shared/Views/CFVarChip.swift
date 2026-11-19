@@ -45,12 +45,7 @@ struct CFVarChip: View {
         .cornerRadius(4)
     }
 
-    // Light version of accent for chip text
-    // oklch(.86 .12 272) - lighter, less saturated version
-    private var lightAccent: Color {
-        // Approximate oklch(.86 .12 272)
-        Color(red: 0.82, green: 0.80, blue: 1.0)
-    }
+    private var lightAccent: Color { BrandPalette.varChipText }
 }
 
 // MARK: - Preview
