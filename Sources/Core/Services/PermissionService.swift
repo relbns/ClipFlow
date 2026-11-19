@@ -15,14 +15,18 @@ final class PermissionService: ObservableObject {
     private var timer: Timer?
 
     private init() {
-        refresh()
+        canListen = CGPreflightListenEventAccess() || AXIsProcessTrusted()
+        canPost = CGPreflightPostEventAccess() || AXIsProcessTrusted()
+        Log.app.info("Permissions: input monitoring \(self.canListen), post events \(self.canPost)")
     }
 
     func refresh() {
         let listen = CGPreflightListenEventAccess() || AXIsProcessTrusted()
         let post = CGPreflightPostEventAccess() || AXIsProcessTrusted()
-        if listen != canListen { canListen = listen }
-        if post != canPost { canPost = post }
+        guard listen != canListen || post != canPost else { return }
+        canListen = listen
+        canPost = post
+        Log.app.info("Permissions: input monitoring \(listen), post events \(post)")
     }
 
     func startWatching() {

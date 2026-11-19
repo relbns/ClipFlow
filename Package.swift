@@ -23,6 +23,7 @@ let package = Package(
             exclude: [
                 "Resources/Info.plist",
                 "Resources/ClipFlow.entitlements",
+                "Resources/ClipFlow-Sandbox.entitlements",
                 "Resources/AppIcon.icns"
             ],
             resources: [

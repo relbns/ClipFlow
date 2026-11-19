@@ -35,6 +35,7 @@ class WelcomeWindowDelegate: NSObject, NSWindowDelegate {
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var menuBarPopover: NSPopover?
+    private var popoverAnchorWindow: NSWindow?
     private var snippetEditorWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
@@ -166,18 +167,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .cfAutoTheme()
 
             popover.contentViewController = NSHostingController(rootView: popoverView)
+            NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.popoverAnchorWindow?.orderOut(nil) }
+            }
             menuBarPopover = popover
         }
 
-        guard let popover = menuBarPopover, let button = statusItem?.button else { return }
+        guard let popover = menuBarPopover else { return }
         if popover.isShown {
             popover.performClose(nil)
         } else {
             PasteCoordinator.shared.rememberFrontmostApp()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            let anchor = popoverAnchor()
+            popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
             popover.contentViewController?.view.window?.makeKey()
         }
+    }
+
+    /// The status item, or the mouse position when the item is hidden (e.g. by a menu bar manager).
+    private func popoverAnchor() -> NSView {
+        if let button = statusItem?.button, let window = button.window,
+           window.occlusionState.contains(.visible),
+           NSScreen.screens.contains(where: { $0.frame.intersects(window.frame) }) {
+            return button
+        }
+
+        let anchor = popoverAnchorWindow ?? {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: .borderless, backing: .buffered, defer: false)
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.level = .statusBar
+            window.ignoresMouseEvents = true
+            window.isReleasedWhenClosed = false
+            return window
+        }()
+        anchor.setFrameOrigin(NSEvent.mouseLocation)
+        anchor.orderFrontRegardless()
+        popoverAnchorWindow = anchor
+        Log.ui.info("Status item is not visible, opening the popover at the mouse")
+        return anchor.contentView ?? NSView()
     }
 
     // MARK: - Windows

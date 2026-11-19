@@ -10,6 +10,7 @@ set -e
 # file .signing-identity (one line, the identity name as shown by
 # `security find-identity -v -p codesigning`).
 SIGNING_MODE="dev"
+ENTITLEMENTS_PATH="Sources/Resources/ClipFlow.entitlements"
 DEV_CERT="${CLIPFLOW_SIGN_IDENTITY:-}"
 if [ -z "$DEV_CERT" ] && [ -f .signing-identity ]; then
     DEV_CERT="$(head -1 .signing-identity)"
@@ -33,8 +34,12 @@ while [[ $# -gt 0 ]]; do
             DEV_CERT="$2"
             shift 2
             ;;
+        --sandbox)
+            ENTITLEMENTS_PATH="Sources/Resources/ClipFlow-Sandbox.entitlements"
+            shift
+            ;;
         *)
-            echo "Usage: $0 [--dev|--adhoc|--notarize] [--cert \"Certificate Name\"]"
+            echo "Usage: $0 [--dev|--adhoc|--notarize] [--sandbox] [--cert \"Certificate Name\"]"
             exit 1
             ;;
     esac
@@ -90,8 +95,7 @@ rm "$APP_DIR/Contents/Info.plist.tmp"
 
 echo "📝 Build number: $BUILD_DATE"
 
-# Keep entitlements path for signing (don't copy to app bundle)
-ENTITLEMENTS_PATH="Sources/Resources/ClipFlow.entitlements"
+echo "🔏 Entitlements: $ENTITLEMENTS_PATH"
 
 # Copy resources if they exist
 if [ -d "Sources/Resources/Assets.xcassets" ]; then
