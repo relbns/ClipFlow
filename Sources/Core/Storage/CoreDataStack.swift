@@ -156,23 +156,26 @@ final class CoreDataStack {
 }
 
 enum StoreMigrator {
-    /// Migrates a store written by an earlier in-code model. Core Data cannot infer the source
-    /// model on its own here, because there is no compiled model bundle to look it up in.
+    /// Migrates a store written by an earlier in-code model straight to the current one. Core Data cannot
+    /// infer the source model on its own here, because there is no compiled model bundle to look it up in.
     static func migrateIfNeeded(storeURL: URL, to current: NSManagedObjectModel) {
         guard FileManager.default.fileExists(atPath: storeURL.path),
               let metadata = try? NSPersistentStoreCoordinator.metadataForPersistentStore(ofType: NSSQLiteStoreType, at: storeURL),
               !current.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) else { return }
 
-        let source = NSManagedObjectModel.clipFlowModel(version: 1, bindClasses: false)
-        guard source.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) else {
+        guard let sourceVersion = NSManagedObjectModel.knownVersions.dropLast().first(where: { version in
+            NSManagedObjectModel.clipFlowModel(version: version, bindClasses: false)
+                .isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata)
+        }) else {
             Log.storage.error("Store does not match any known model version")
             return
         }
 
-        let destination = NSManagedObjectModel.clipFlowModel(version: 2, bindClasses: false)
+        let source = NSManagedObjectModel.clipFlowModel(version: sourceVersion, bindClasses: false)
+        let destination = NSManagedObjectModel.clipFlowModel(version: NSManagedObjectModel.currentVersion, bindClasses: false)
         let temporaryURL = storeURL.deletingLastPathComponent().appendingPathComponent("ClipFlow-migrating.sqlite")
         do {
-            copyStore(from: storeURL, to: storeURL.deletingLastPathComponent().appendingPathComponent("ClipFlow-v1-backup.sqlite"))
+            copyStore(from: storeURL, to: storeURL.deletingLastPathComponent().appendingPathComponent("ClipFlow-v\(sourceVersion)-backup.sqlite"))
             destroyStore(at: temporaryURL, model: destination)
 
             let mapping = try NSMappingModel.inferredMappingModel(forSourceModel: source, destinationModel: destination)
@@ -190,7 +193,7 @@ enum StoreMigrator {
                 ofType: NSSQLiteStoreType
             )
             destroyStore(at: temporaryURL, model: destination)
-            Log.storage.info("Migrated the store from model v1 to v2")
+            Log.storage.info("Migrated the store from model v\(sourceVersion) to v\(NSManagedObjectModel.currentVersion)")
         } catch {
             Log.storage.error("Store migration failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -201,7 +204,7 @@ enum StoreMigrator {
         guard let metadata = try? NSPersistentStoreCoordinator.metadataForPersistentStore(ofType: NSSQLiteStoreType, at: storeURL) else {
             return false
         }
-        return ![1, 2].contains { version in
+        return !NSManagedObjectModel.knownVersions.contains { version in
             NSManagedObjectModel.clipFlowModel(version: version, bindClasses: false)
                 .isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata)
         }

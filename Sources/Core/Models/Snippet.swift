@@ -26,6 +26,7 @@ public class Snippet: NSManagedObject, Identifiable {
 
     // App-specific expansion
     @NSManaged public var restrictToApps: Bool // If true, only expand in specified apps
+    @NSManaged public var isFavorite: Bool
 }
 
 extension Snippet {
