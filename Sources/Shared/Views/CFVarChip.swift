@@ -28,24 +28,25 @@ struct CFVarChip: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            if let icon = icon {
+            if let icon {
                 icon
             }
             Text(text)
                 .font(.system(size: 12, design: .monospaced))
+                .lineLimit(1)
         }
-        .foregroundColor(lightAccent)
+        .fixedSize()
+        .foregroundColor(theme.varChipText)
         .padding(.horizontal, 8)
         .padding(.vertical, 2)
-        .background(theme.accentMix(percent: 30))
+        .background(BrandPalette.varChip.mixed(30))
         .overlay(
             RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(theme.accentMix(percent: 35), lineWidth: 1)
+                .strokeBorder(BrandPalette.varChip.mixed(35), lineWidth: 1)
         )
         .cornerRadius(4)
     }
 
-    private var lightAccent: Color { BrandPalette.varChipText }
 }
 
 // MARK: - Preview

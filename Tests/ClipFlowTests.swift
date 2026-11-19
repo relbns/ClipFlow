@@ -191,7 +191,7 @@ final class StorageTests: XCTestCase {
             throw XCTSkip("No store fixture given")
         }
         let metadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(ofType: NSSQLiteStoreType, at: URL(fileURLWithPath: path))
-        let known = [1, 2].contains { NSManagedObjectModel.clipFlowModel(version: $0, bindClasses: false).isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) }
+        let known = NSManagedObjectModel.knownVersions.contains { NSManagedObjectModel.clipFlowModel(version: $0, bindClasses: false).isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) }
         XCTAssertTrue(known)
     }
 
@@ -226,9 +226,27 @@ final class StorageTests: XCTestCase {
         XCTAssertEqual(try context.count(for: SnippetGroup.fetchRequest()), 2)
     }
 
+    func testStoreWrittenByModelV2IsMigratedToTheCurrentModel() throws {
+        let storeURL = directory.appendingPathComponent("ClipFlow.sqlite")
+        let model = NSManagedObjectModel.clipFlowModel(version: 2, bindClasses: false)
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+        let store = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL, options: nil)
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = coordinator
+        let snippet = NSEntityDescription.insertNewObject(forEntityName: "Snippet", into: context)
+        snippet.setValuesForKeys(["id": UUID(), "title": "Date", "abbreviation": ".dd", "content": "{date}", "createdAt": Date(), "updatedAt": Date()])
+        try context.save()
+        try coordinator.remove(store)
+
+        let stack = CoreDataStack(storeURL: storeURL)
+        let migrated = try XCTUnwrap(try stack.viewContext.fetch(Snippet.fetchRequest()).first)
+        XCTAssertEqual(migrated.abbreviation, ".dd")
+        XCTAssertFalse(migrated.isFavorite)
+    }
+
     func testStoreFromANewerVersionIsLeftUntouched() throws {
         let storeURL = directory.appendingPathComponent("ClipFlow.sqlite")
-        let newer = NSManagedObjectModel.clipFlowModel(version: 2, bindClasses: false)
+        let newer = NSManagedObjectModel.clipFlowModel(version: NSManagedObjectModel.currentVersion, bindClasses: false)
         let extra = NSEntityDescription()
         extra.name = "FutureEntity"
         extra.managedObjectClassName = NSStringFromClass(NSManagedObject.self)
@@ -440,5 +458,31 @@ final class LanguageAndExclusionTests: XCTestCase {
     func testOldExclusionJSONStillDecodes() {
         let json = #"[{"id":"4F1C0E2A-1111-2222-3333-444455556666","bundleID":"com.apple.Terminal","name":"Terminal","excludeFromHistory":true,"excludeFromExpansion":false}]"#
         XCTAssertEqual(AppExclusions.decode(json).map(\.bundleID), ["com.apple.Terminal"])
+    }
+}
+
+@MainActor
+final class SnippetEditorModelTests: XCTestCase {
+    func testAnInvalidAbbreviationNeverReachesTheStoreAndLeavingKeepsTheOtherEdits() throws {
+        let context = CoreDataStack(storeURL: nil).viewContext
+        let model = SnippetEditorModel(context: context)
+        model.newSnippet()
+        let first = try XCTUnwrap(model.selected)
+        model.abbreviationEdited(".sig")
+        model.flush()
+
+        model.abbreviationEdited("sig")
+        first.content = "Best regards"
+        model.edited()
+        model.toggleFavorite(first)
+        context.refresh(first, mergeChanges: true)
+        XCTAssertEqual(first.abbreviation, ".sig")
+        XCTAssertNotNil(model.abbreviationDraftError)
+
+        model.newSnippet()
+        XCTAssertNil(model.abbreviationDraftError)
+        context.refresh(first, mergeChanges: false)
+        XCTAssertEqual(first.abbreviation, ".sig")
+        XCTAssertEqual(first.content, "Best regards")
     }
 }

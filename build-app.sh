@@ -67,7 +67,7 @@ echo ""
 swift build -c release
 
 # Create app bundle structure from scratch so removed files never linger
-APP_DIR="Build/ClipFlow.app"
+APP_DIR="Build.noindex/ClipFlow.app"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
@@ -209,10 +209,10 @@ case $SIGNING_MODE in
         # Notarize
         echo "📤 Submitting for notarization..."
         echo "   Creating ZIP..."
-        ditto -c -k --keepParent "$APP_DIR" "Build/ClipFlow.zip"
+        ditto -c -k --keepParent "$APP_DIR" "Build.noindex/ClipFlow.zip"
 
         echo "   Uploading to Apple (this may take a few minutes)..."
-        xcrun notarytool submit "Build/ClipFlow.zip" \
+        xcrun notarytool submit "Build.noindex/ClipFlow.zip" \
             --keychain-profile "notarytool" \
             --wait
 

@@ -32,6 +32,8 @@ struct CFToggle: View {
         }
         .buttonStyle(.plain)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isOn)
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityValue(L(isOn ? "a11y_on" : "a11y_off"))
     }
 }
 

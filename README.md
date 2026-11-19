@@ -76,7 +76,7 @@ cd ClipFlow
 #   security find-identity -v -p codesigning
 echo "Apple Development: Your Name (TEAMID)" > .signing-identity
 
-./build-app.sh       # builds Build/ClipFlow.app
+./build-app.sh       # builds Build.noindex/ClipFlow.app
 ./install-app.sh     # copies it to /Applications
 open /Applications/ClipFlow.app
 ```
@@ -210,7 +210,7 @@ design_handoff_clipflow/  # The design: HTML prototype, screenshots, spec
 ```bash
 swift build          # debug build
 swift test           # unit tests
-./build-app.sh       # signed .app bundle in Build/
+./build-app.sh       # signed .app bundle in Build.noindex/
 ```
 
 Logs go to the unified log under the subsystem `com.singalong.clipflow`:
