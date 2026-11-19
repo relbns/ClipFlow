@@ -213,37 +213,39 @@ struct CFSlider: View {
 struct CFSegmentedControl: View {
     @Binding var selection: Int
     let options: [String]
-    var columns: Int = 3
+    /// 0 puts every option on one row.
+    var columns: Int = 0
     @Environment(\.cfTheme) var theme
 
     var body: some View {
-        let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 4), count: columns)
+        let count = columns > 0 ? columns : options.count
+        let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 2), count: max(1, count))
 
-        LazyVGrid(columns: gridColumns, spacing: 4) {
+        LazyVGrid(columns: gridColumns, spacing: 2) {
             ForEach(0..<options.count, id: \.self) { index in
                 let isSelected = index == selection
                 Button(action: { selection = index }) {
-                    ZStack {
-                        // Background and shadow
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(isSelected ? AnyShapeStyle(theme.segSelected) : AnyShapeStyle(Color.clear))
-                            .shadow(
-                                color: isSelected ? theme.segShadow.color : .clear,
-                                radius: theme.segShadow.radius,
-                                x: theme.segShadow.x,
-                                y: theme.segShadow.y
-                            )
-
-                        // Text content
-                        Text(options[index])
-                            .font(.system(size: isSelected ? 12 : 11))
-                            .foregroundColor(isSelected ? theme.textStrong : theme.textSubtle)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, isSelected ? 6 : 5)
-                    .contentShape(Rectangle())
+                    Text(options[index])
+                        .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                        .foregroundColor(isSelected ? theme.textStrong : theme.textMuted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(isSelected ? AnyShapeStyle(theme.segSelected) : AnyShapeStyle(Color.clear))
+                                .shadow(
+                                    color: isSelected ? theme.segShadow.color : .clear,
+                                    radius: theme.segShadow.radius,
+                                    x: theme.segShadow.x,
+                                    y: theme.segShadow.y
+                                )
+                        )
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
         .padding(2)
@@ -253,7 +255,6 @@ struct CFSegmentedControl: View {
             RoundedRectangle(cornerRadius: 7)
                 .strokeBorder(theme.stroke, lineWidth: 1)
         )
-        .animation(.spring(response: 0.18), value: selection)
     }
 }
 
@@ -279,7 +280,7 @@ struct CFSettingsRow<Content: View>: View {
                         .foregroundColor(theme.textSubtle)
                 }
             }
-            .frame(width: 180, alignment: .topLeading)
+            .frame(width: 220, alignment: .topLeading)
             .padding(.top, 4)
 
             // Right column - control

@@ -21,6 +21,12 @@ enum SnapshotRenderer {
         return true
     }
 
+    private static func arguments(after flag: String) -> String? {
+        let arguments = CommandLine.arguments
+        guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
+    }
+
     private static func renderAll(to folder: URL) {
         let stack = CoreDataStack(storeURL: nil)
         let suite = "clipflow-snapshots"
@@ -32,10 +38,17 @@ enum SnapshotRenderer {
         SampleData.fill(stack.viewContext, monitor: monitor)
         PopoverNavigation.shared.clipboardMonitor = monitor
 
+        let languages = arguments(after: "--languages")?.split(separator: ",").map(String.init) ?? ["en"]
+        for language in languages {
+        LanguageManager.shared.preview(language)
+        let rtl = LanguageManager.shared.layoutDirection == .rightToLeft
         for dark in [true, false] {
-            let suffix = dark ? "d" : "l"
+            let suffix = (dark ? "d" : "l") + (language == "en" ? "" : "-\(language)")
             func save<V: View>(_ name: String, _ view: V, size: CGSize?) {
                 let themed = view
+                    .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+                    .environment(\.locale, Locale(identifier: language))
+                    .environmentObject(LanguageManager.shared)
                     .cfAutoTheme()
                     .environment(\.managedObjectContext, stack.viewContext)
                     .environment(\.colorScheme, dark ? .dark : .light)
@@ -52,6 +65,10 @@ enum SnapshotRenderer {
             save("about", AboutView(), size: CGSize(width: 560, height: 680))
             save("snip-edit", SnippetEditorView(), size: CGSize(width: 1080, height: 700))
             save("tokens", ThemeTokenSheet(), size: nil)
+            for (index, tab) in ["general", "appearance", "expansion", "hotkeys", "backup", "privacy", "language"].enumerated() where index != 2 {
+                save("prefs-\(tab)", SettingsView(initialTab: index), size: CGSize(width: 760, height: 620))
+            }
+        }
         }
         Log.app.info("Rendered snapshots to \(folder.path, privacy: .public)")
     }

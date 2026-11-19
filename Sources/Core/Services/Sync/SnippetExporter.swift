@@ -16,7 +16,9 @@ struct ExportedGroup: Codable {
     let snippets: [ExportedSnippet]
 }
 
-actor SnippetExporter {
+/// Runs on the main actor because it works with the view context.
+@MainActor
+final class SnippetExporter {
     private let context: NSManagedObjectContext
 
     init(context: NSManagedObjectContext) {

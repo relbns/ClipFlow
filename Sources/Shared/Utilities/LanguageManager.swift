@@ -1,62 +1,69 @@
 import SwiftUI
 
-/// Manages app language and layout direction
+/// The interface language: "system" follows macOS, or a fixed "en" / "he".
 @MainActor
-class LanguageManager: ObservableObject {
+final class LanguageManager: ObservableObject {
     static let shared = LanguageManager()
+    static let supported = ["en", "he"]
+    static let choiceKey = "preferredLanguage"
 
-    @Published var currentLanguage: String {
-        didSet {
-            UserDefaults.standard.set([currentLanguage], forKey: "AppleLanguages")
-            updateLayoutDirection()
-        }
-    }
-
-    @Published var layoutDirection: LayoutDirection = .leftToRight
+    /// What the user picked: "system", "en" or "he".
+    @Published private(set) var choice: String
+    /// The language actually shown, always one of `supported`.
+    @Published private(set) var currentLanguage: String
+    @Published private(set) var layoutDirection: LayoutDirection = .leftToRight
+    @Published private var cachedBundle: Bundle = .main
 
     private init() {
-        // Load saved language preference
-        if let languages = UserDefaults.standard.array(forKey: "AppleLanguages") as? [String],
-           let savedLanguage = languages.first {
-            currentLanguage = savedLanguage
+        let saved = UserDefaults.standard.string(forKey: Self.choiceKey) ?? "system"
+        choice = Self.supported.contains(saved) ? saved : "system"
+        currentLanguage = "en"
+        apply()
+    }
+
+    func setLanguage(_ newChoice: String) {
+        choice = Self.supported.contains(newChoice) ? newChoice : "system"
+        UserDefaults.standard.set(choice, forKey: Self.choiceKey)
+        apply()
+    }
+
+    var bundle: Bundle { cachedBundle }
+
+    /// Shows `language` without saving anything, for rendering snapshots.
+    func preview(_ language: String) {
+        currentLanguage = Self.supported.contains(language) ? language : "en"
+        layoutDirection = currentLanguage == "he" ? .rightToLeft : .leftToRight
+        cachedBundle = Bundle.main.path(forResource: currentLanguage, ofType: "lproj").flatMap(Bundle.init(path:)) ?? .main
+    }
+
+    private func apply() {
+        if choice == "system" {
+            // Our own override would otherwise hide the system's language from Locale and Bundle.
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+            currentLanguage = Self.resolve(Self.systemLanguages())
         } else {
-            currentLanguage = Locale.preferredLanguages.first ?? "en"
+            UserDefaults.standard.set([choice], forKey: "AppleLanguages")
+            currentLanguage = choice
         }
-
-        updateLayoutDirection()
+        layoutDirection = currentLanguage == "he" ? .rightToLeft : .leftToRight
+        cachedBundle = Bundle.main.path(forResource: currentLanguage, ofType: "lproj").flatMap(Bundle.init(path:)) ?? .main
     }
 
-    func setLanguage(_ code: String) {
-        if code == "system" {
-            currentLanguage = Locale.preferredLanguages.first ?? "en"
-        } else {
-            currentLanguage = code
-        }
+    /// The user's languages from System Settings, ignoring any per-app override.
+    static func systemLanguages() -> [String] {
+        let global = CFPreferencesCopyValue(
+            "AppleLanguages" as CFString, kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost
+        ) as? [String]
+        return global ?? Locale.preferredLanguages
     }
 
-    private func updateLayoutDirection() {
-        // Hebrew and Arabic are RTL
-        let rtlLanguages = ["he", "ar", "fa", "ur"]
-        let languageCode = String(currentLanguage.prefix(2))
-
-        layoutDirection = rtlLanguages.contains(languageCode) ? .rightToLeft : .leftToRight
-    }
-
-    var bundle: Bundle {
-        if currentLanguage == "system" {
-            return Bundle.main
+    /// The first preferred language ClipFlow has a translation for, else English.
+    static func resolve(_ preferred: [String]) -> String {
+        for language in preferred {
+            let code = String(language.prefix(2)).lowercased()
+            if code == "iw" { return "he" }
+            if supported.contains(code) { return code }
         }
-
-        // Try to find localized bundle
-        let languageCode = String(currentLanguage.prefix(2))
-
-        // Check Bundle.main for localized resources
-        if let path = Bundle.main.path(forResource: languageCode, ofType: "lproj"),
-           let bundle = Bundle(path: path) {
-            return bundle
-        }
-
-        // Fallback to main bundle
-        return Bundle.main
+        return "en"
     }
 }

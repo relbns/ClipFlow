@@ -82,7 +82,7 @@ struct MenuBarPopover: View {
             // Search - padding 8px 8px 6px
             CFInput(
                 text: $navigation.searchText,
-                placeholder: "Search clips & snippets",
+                placeholder: L("search_clipboard"),
                 prefix: AnyView(
                     CFIcon(type: .search, size: 13, stroke: 1.8)
                         .foregroundColor(theme.textSubtle)
@@ -101,27 +101,27 @@ struct MenuBarPopover: View {
         VStack(spacing: 0) {
             Divider()
 
-            CFFooterRowBtn(icon: .sparkles, label: "Snippet Editor…", kbd: "⌘E") {
+            CFFooterRowBtn(icon: .sparkles, label: L("menu_snippet_editor"), kbd: "⌘E") {
                 openSnippetEditor()
             }
 
-            CFFooterRowBtn(icon: .gear, label: "Preferences…", kbd: "⌘,") {
+            CFFooterRowBtn(icon: .gear, label: L("menu_preferences"), kbd: "⌘,") {
                 openPreferences()
             }
 
-            CFFooterRowBtn(icon: .info, label: "About ClipFlow") {
+            CFFooterRowBtn(icon: .info, label: L("menu_about")) {
                 openAbout()
             }
 
             Divider()
 
-            CFFooterRowBtn(icon: .trash, label: "Clear history") {
+            CFFooterRowBtn(icon: .trash, label: L("menu_clear_history")) {
                 Task { @MainActor in
                     clearClipboardHistory()
                 }
             }
 
-            CFFooterRowBtn(icon: .power, label: "Quit ClipFlow", kbd: "⌘Q", danger: true) {
+            CFFooterRowBtn(icon: .power, label: L("menu_quit"), kbd: "⌘Q", danger: true) {
                 NSApp.terminate(nil)
             }
 
@@ -133,15 +133,11 @@ struct MenuBarPopover: View {
 
     private var modeSwitcher: some View {
         HStack(spacing: 2) {
-            ForEach(["Simple", "Organized"], id: \.self) { mode in
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        viewMode = mode.lowercased()
-                    }
-                }) {
+            ForEach(["simple", "organized"], id: \.self) { mode in
+                Button(action: { viewMode = mode }) {
                     Group {
-                        if viewMode == mode.lowercased() {
-                            Text(mode)
+                        if viewMode == mode {
+                            Text(L("mode_\(mode)"))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(theme.textStrong)
                                 .frame(maxWidth: .infinity)
@@ -155,13 +151,14 @@ struct MenuBarPopover: View {
                                     y: theme.segShadow.y
                                 )
                         } else {
-                            Text(mode)
+                            Text(L("mode_\(mode)"))
                                 .font(.system(size: 12, weight: .regular))
                                 .foregroundColor(theme.textMuted)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 5)
                                 .background(Color.clear)
                                 .cornerRadius(5)
+                                .contentShape(Rectangle())
                         }
                     }
                     .contentShape(Rectangle())
@@ -232,7 +229,7 @@ struct SimpleHistoryView: View {
             } else {
                 // Section Header
                 HStack {
-                    Text("RECENT CLIPS")
+                    Text(L("recent_clips"))
                         .font(.system(size: 10.5, weight: .semibold))
                         .foregroundColor(theme.textLabel)
                         .textCase(.uppercase)
@@ -240,7 +237,7 @@ struct SimpleHistoryView: View {
 
                     Spacer()
 
-                    Text("\(clips.count) items")
+                    Text(L("items_count", clips.count))
                         .font(.system(size: 10.5))
                         .foregroundColor(theme.textSubtle)
                 }
@@ -308,7 +305,7 @@ struct SimpleHistoryView: View {
             CFIcon(type: .clock, size: 32, stroke: 1.4)
                 .foregroundColor(theme.textFaint)
 
-            Text("No clipboard history")
+            Text(L("no_history"))
                 .font(.system(size: 13))
                 .foregroundColor(theme.textMuted)
         }
@@ -359,7 +356,7 @@ struct OrganizedHistoryView: View {
 
             // PINNED Section
             if !pinnedClips.isEmpty {
-                CFSectionLabel("PINNED")
+                CFSectionLabel(L("section_pinned"))
                     .padding(.horizontal, 8)
                     .padding(.top, 8)
 
@@ -379,7 +376,7 @@ struct OrganizedHistoryView: View {
             }
 
             // CATEGORIES Section Label
-            CFSectionLabel("CATEGORIES")
+            CFSectionLabel(L("section_categories"))
                 .padding(.horizontal, 8)
                 .padding(.top, pinnedClips.isEmpty ? 8 : 8)
 
@@ -387,7 +384,7 @@ struct OrganizedHistoryView: View {
                 CategoryGroup(
                     icon: .clock,
                     iconColor: BrandPalette.Category.recent,
-                    label: "Recent",
+                    label: L("cat_recent"),
                     count: groups.recent.count,
                     clips: groups.recent,
                     onSelect: onSelect,
@@ -399,7 +396,7 @@ struct OrganizedHistoryView: View {
                     CategoryGroup(
                         icon: .image,
                         iconColor: BrandPalette.Category.images,
-                        label: "Images",
+                        label: L("cat_images"),
                         count: groups.images.count,
                         clips: groups.images,
                         onSelect: onSelect
@@ -410,7 +407,7 @@ struct OrganizedHistoryView: View {
                     CategoryGroup(
                         icon: .link,
                         iconColor: BrandPalette.Category.links,
-                        label: "Links",
+                        label: L("cat_links"),
                         count: groups.links.count,
                         clips: groups.links,
                         onSelect: onSelect
@@ -421,7 +418,7 @@ struct OrganizedHistoryView: View {
                     CategoryGroup(
                         icon: .swatch,
                         iconColor: BrandPalette.Category.colors,
-                        label: "Colors",
+                        label: L("cat_colors"),
                         count: groups.colors.count,
                         clips: groups.colors,
                         onSelect: onSelect
@@ -432,7 +429,7 @@ struct OrganizedHistoryView: View {
                     CategoryGroup(
                         icon: .text,
                         iconColor: BrandPalette.Category.text,
-                        label: "Text",
+                        label: L("cat_text"),
                         count: groups.text.count,
                         clips: groups.text,
                         onSelect: onSelect
@@ -442,7 +439,7 @@ struct OrganizedHistoryView: View {
             .padding(.bottom, 2)
 
             // SNIPPETS Section
-            CFSectionLabel("SNIPPETS")
+            CFSectionLabel(L("section_snippets"))
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
 
@@ -681,7 +678,7 @@ struct SnippetsListView: View {
             }
 
             if snippets.isEmpty {
-                Text("No snippets yet")
+                Text(L("no_snippets"))
                     .font(.system(size: 13))
                     .foregroundColor(theme.textMuted)
                     .padding(.vertical, 12)
@@ -720,12 +717,12 @@ struct MenuSnippetRow: View {
 
                     if let apps = snippet.appRules, !apps.isEmpty {
                         let appNames = apps.map(\.appName).prefix(2).joined(separator: ", ")
-                        Text("\(snippet.abbreviation) — \(appNames)")
+                        Text("\(snippet.abbreviation) · \(appNames)")
                             .font(.system(size: 11))
                             .foregroundColor(theme.textLabel)
                             .lineLimit(1)
                     } else {
-                        Text("\(snippet.abbreviation) — anywhere")
+                        Text("\(snippet.abbreviation) · \(L("everywhere"))")
                             .font(.system(size: 11))
                             .foregroundColor(theme.textLabel)
                             .lineLimit(1)

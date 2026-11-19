@@ -67,11 +67,13 @@ final class PopoverNavigation: ObservableObject {
     struct KeyInput: Sendable {
         let keyCode: UInt16
         let hasModifiers: Bool
+        let hasCommandOnly: Bool
         let characters: String?
 
-        init(keyCode: UInt16, hasModifiers: Bool = false, characters: String? = nil) {
+        init(keyCode: UInt16, hasModifiers: Bool = false, hasCommandOnly: Bool = false, characters: String? = nil) {
             self.keyCode = keyCode
             self.hasModifiers = hasModifiers
+            self.hasCommandOnly = hasCommandOnly
             self.characters = characters
         }
 
@@ -79,11 +81,37 @@ final class PopoverNavigation: ObservableObject {
             let modifiers = event.modifierFlags
                 .intersection(.deviceIndependentFlagsMask)
                 .subtracting([.numericPad, .function, .capsLock])
-            self.init(keyCode: event.keyCode, hasModifiers: !modifiers.isEmpty, characters: event.characters)
+            self.init(
+                keyCode: event.keyCode,
+                hasModifiers: !modifiers.isEmpty,
+                hasCommandOnly: modifiers == .command,
+                characters: event.charactersIgnoringModifiers
+            )
         }
     }
 
+    /// The shortcuts the popover footer shows: ⌘E editor, ⌘, preferences, ⌘Q quit. Matched by key
+    /// position, as macOS does for ⌘ shortcuts, so they also work with a Hebrew layout.
+    private func handleCommand(keyCode: UInt16) -> Bool {
+        switch keyCode {
+        case 14:
+            onClose()
+            NotificationCenter.default.post(name: NSNotification.Name("OpenSnippetEditor"), object: nil)
+        case 43:
+            onClose()
+            NotificationCenter.default.post(name: NSNotification.Name("OpenPreferences"), object: nil)
+        case 12:
+            NSApp.terminate(nil)
+        default:
+            return false
+        }
+        return true
+    }
+
     func handle(_ key: KeyInput) -> Bool {
+        if key.hasCommandOnly {
+            return handleCommand(keyCode: key.keyCode)
+        }
         guard !key.hasModifiers else { return false }
 
         switch key.keyCode {

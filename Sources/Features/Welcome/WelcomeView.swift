@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 /// Welcome/Onboarding screen
@@ -11,8 +12,8 @@ import SwiftUI
 struct WelcomeView: View {
     @Environment(\.cfTheme) var theme
     @Binding var isPresented: Bool
-    @AppStorage("launchAtLogin") private var launchAtLogin = false
-    @State private var currentStep: Int = 2 // Step 2 is "Grant Accessibility"
+    @ObservedObject private var permissions = PermissionService.shared
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var onGetStarted: () -> Void
 
@@ -53,14 +54,14 @@ struct WelcomeView: View {
 
                 // Center: Hero text
                 VStack(spacing: 12) {
-                    Text("Everything you copy.\nAnything you type\noften.")
+                    Text(L("welcome_hero"))
                         .font(.system(size: 28, weight: .semibold))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.leading)
                         .lineSpacing(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text("A quiet menubar app for clipboard history and abbreviation snippets — with first-class Hebrew & RTL.")
+                    Text(L("welcome_body"))
                         .font(.system(size: 13))
                         .foregroundColor(Color.white.opacity(0.75))
                         .lineSpacing(3)
@@ -89,7 +90,7 @@ struct WelcomeView: View {
         VStack(spacing: 0) {
             // Header
             VStack(alignment: .leading, spacing: 8) {
-                Text("THREE QUICK STEPS")
+                Text(L("welcome_steps"))
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundColor(theme.textLabel)
                     .textCase(.uppercase)
@@ -103,22 +104,22 @@ struct WelcomeView: View {
                 stepCard(
                     number: 1,
                     state: .done,
-                    title: "Pin ClipFlow to your menubar",
-                    body: "ClipFlow lives up here — there's no Dock icon. Drag the menubar item to where you'd like."
+                    title: L("welcome_step1_title"),
+                    body: L("welcome_step1_body")
                 )
 
                 stepCard(
                     number: 2,
-                    state: .active,
-                    title: "Grant Accessibility permission",
-                    body: "Required so snippets can expand as you type. We never read passwords or secure fields."
+                    state: permissions.isGranted ? .done : .active,
+                    title: L("welcome_step2_title"),
+                    body: L("welcome_step2_body")
                 )
 
                 stepCard(
                     number: 3,
-                    state: .idle,
-                    title: "Try your first snippet",
-                    body: "We've added .dd for today's date. Type it anywhere, then press space."
+                    state: permissions.isGranted ? .active : .idle,
+                    title: L("welcome_step3_title"),
+                    body: L("welcome_step3_body")
                 )
             }
             .padding(.horizontal, 32)
@@ -205,6 +206,15 @@ struct WelcomeView: View {
         }
     }
 
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+        } catch {
+            Log.app.error("Launch at login change failed: \(error.localizedDescription, privacy: .public)")
+        }
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
     // MARK: - Footer
     private var footerView: some View {
         VStack(spacing: 0) {
@@ -215,9 +225,10 @@ struct WelcomeView: View {
             HStack {
                 // Left: Launch at login toggle
                 HStack(spacing: 8) {
-                    CFCustomToggle(isOn: $launchAtLogin)
+                    CFToggle(isOn: Binding(get: { launchAtLogin }, set: setLaunchAtLogin))
+                        .accessibilityLabel(L("pref_launch_at_login"))
 
-                    Text("Launch at login")
+                    Text(L("pref_launch_at_login"))
                         .font(.system(size: 13))
                         .foregroundColor(theme.text)
                 }
@@ -231,7 +242,7 @@ struct WelcomeView: View {
                         UserDefaults.standard.set(true, forKey: "hasCompletedWelcome")
                         isPresented = false
                     }) {
-                        Text("Skip tour")
+                        Text(L("welcome_skip"))
                             .font(.system(size: 12))
                             .foregroundColor(theme.textMuted)
                             .padding(.horizontal, 12)
@@ -240,30 +251,28 @@ struct WelcomeView: View {
                     .buttonStyle(.plain)
 
                     Button(action: {
-                        // Mark welcome as completed
                         UserDefaults.standard.set(true, forKey: "hasCompletedWelcome")
-                        onGetStarted()
-                        PermissionService.shared.request()
-                        if !PermissionService.shared.isGranted {
-                            PermissionService.shared.openSystemSettings()
+                        if permissions.isGranted {
+                            onGetStarted()
+                            return
+                        }
+                        permissions.request()
+                        if !permissions.isGranted {
+                            permissions.openSystemSettings()
                         }
                     }) {
                         HStack(spacing: 6) {
-                            Text("Open System Settings")
+                            Text(permissions.isGranted ? L("welcome_done") : L("perm_button"))
                                 .font(.system(size: 12, weight: .medium))
 
-                            Image(systemName: "arrow.right")
+                            Image(systemName: "arrow.forward")
                                 .font(.system(size: 10, weight: .semibold))
                         }
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(
-                            LinearGradient(
-                                colors: [theme.brandLight, theme.accent],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                            LinearGradient(gradient: BrandPalette.primaryButton, startPoint: .top, endPoint: .bottom)
                         )
                         .cornerRadius(6)
                         .shadow(color: theme.accent.opacity(0.3), radius: 3, x: 0, y: 2)
@@ -284,7 +293,7 @@ struct WelcomeView: View {
                     .font(.system(size: 10))
                     .foregroundColor(theme.textSubtle)
 
-                Text("Search clipboard...")
+                Text(L("search_clipboard"))
                     .font(.system(size: 10))
                     .foregroundColor(theme.textSubtle)
             }
@@ -295,7 +304,7 @@ struct WelcomeView: View {
             .padding(6)
 
             // Section
-            Text("RECENT")
+            Text(L("recent_clips"))
                 .font(.system(size: 8, weight: .semibold))
                 .foregroundColor(theme.textLabel)
                 .frame(maxWidth: .infinity, alignment: .leading)

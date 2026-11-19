@@ -367,3 +367,34 @@ final class OKLCHDisplayP3Tests: XCTestCase {
         }
     }
 }
+
+@MainActor
+final class LanguageAndExclusionTests: XCTestCase {
+    func testSystemLanguageResolvesToASupportedTranslation() {
+        XCTAssertEqual(LanguageManager.resolve(["he-IL", "en-US"]), "he")
+        XCTAssertEqual(LanguageManager.resolve(["iw"]), "he")
+        XCTAssertEqual(LanguageManager.resolve(["fr-FR", "en-GB"]), "en")
+        XCTAssertEqual(LanguageManager.resolve(["fr-FR"]), "en")
+        XCTAssertEqual(LanguageManager.resolve([]), "en")
+    }
+
+    func testAnAppIsExcludedPerScopeWithASingleEntry() {
+        var apps: [ExcludedApp] = []
+        apps = apps.adding(bundleID: "com.1password", name: "1Password", to: .history)
+        apps = apps.adding(bundleID: "com.1password", name: "1Password", to: .expansion)
+        XCTAssertEqual(apps.count, 1)
+        XCTAssertTrue(apps[0].excludeFromHistory && apps[0].excludeFromExpansion)
+
+        apps = apps.removing(bundleID: "com.1password", from: .history)
+        XCTAssertEqual(apps.count, 1)
+        XCTAssertFalse(apps[0].excludeFromHistory)
+
+        apps = apps.removing(bundleID: "com.1password", from: .expansion)
+        XCTAssertTrue(apps.isEmpty)
+    }
+
+    func testOldExclusionJSONStillDecodes() {
+        let json = #"[{"id":"4F1C0E2A-1111-2222-3333-444455556666","bundleID":"com.apple.Terminal","name":"Terminal","excludeFromHistory":true,"excludeFromExpansion":false}]"#
+        XCTAssertEqual(AppExclusions.decode(json).map(\.bundleID), ["com.apple.Terminal"])
+    }
+}
