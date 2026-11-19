@@ -70,6 +70,8 @@ swift build -c release
 APP_DIR="Build/ClipFlow.app"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
+# Keep Spotlight from listing this build next to the installed app.
+touch Build/.metadata_never_index
 mkdir -p "$APP_DIR/Contents/Resources"
 mkdir -p "$APP_DIR/Contents/Frameworks"
 
