@@ -244,6 +244,11 @@ struct CFTheme {
 }
 
 // MARK: - Environment Key
+extension CFTheme {
+    var varChipText: Color { colorScheme == .dark ? BrandPalette.varChipText : BrandPalette.varChipTextOnLight }
+    var caret: Color { colorScheme == .dark ? BrandPalette.accentText : BrandPalette.accentDeep }
+}
+
 private struct CFThemeKey: EnvironmentKey {
     static let defaultValue = CFTheme.light
 }

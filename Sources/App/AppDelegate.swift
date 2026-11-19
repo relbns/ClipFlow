@@ -330,18 +330,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openSnippetEditor() {
         if snippetEditorWindow == nil {
             let editorView = DynamicLanguageWrapper {
-                SnippetEditorView()
+                SnippetEditorView(onTitleChange: { [weak self] title in self?.snippetEditorWindow?.title = title })
                     .cfAutoTheme()
                     .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
             }
             .environmentObject(LanguageManager.shared)
 
-            snippetEditorWindow = makeWindow(
+            let window = makeWindow(
                 rootView: editorView,
                 title: L("snippet_editor"),
                 size: NSSize(width: 1080, height: 700),
-                style: [.titled, .closable, .resizable, .miniaturizable]
+                style: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView]
             )
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.contentMinSize = NSSize(width: 900, height: 520)
+            snippetEditorWindow = window
         }
         present(snippetEditorWindow)
     }

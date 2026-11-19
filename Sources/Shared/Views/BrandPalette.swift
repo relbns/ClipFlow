@@ -28,6 +28,8 @@ enum BrandPalette {
     static let primaryButtonBorder = Color.oklch(0.50, 0.19, 272)
     static let varChip = Color.oklch(0.62, 0.15, 272)
     static let varChipText = Color.oklch(0.86, 0.12, 272)
+    /// The design's chip text is light on dark only; on light surfaces it takes the deep accent.
+    static let varChipTextOnLight = Color.oklch(0.45, 0.17, 272)
     static let stepActive = Gradient(colors: [.oklch(0.65, 0.17, 272), .oklch(0.50, 0.19, 272)])
     static let stepActiveGlow = Color.oklch(0.55, 0.19, 272, alpha: 0.6)
     static let stepActiveBorder = Color.hex(0x7B71FF, alpha: 0.30)
