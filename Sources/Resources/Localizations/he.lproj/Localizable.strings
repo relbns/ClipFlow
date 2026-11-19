@@ -73,7 +73,6 @@
 "about_clipflow" = "אודות ClipFlow";
 
 /* Snippet Editor */
-"snippets" = "קטעי טקסט";
 "new_group" = "קבוצה חדשה";
 "new_snippet" = "קטע טקסט חדש";
 "select_snippet" = "בחר קטע טקסט לעריכה";
@@ -108,8 +107,6 @@
 "global_hotkeys" = "קיצורי מקשים גלובליים";
 "main_menu" = "תפריט ראשי";
 "snippets_menu" = "תפריט קטעי טקסט";
-"snippet_editor" = "עורך קטעי הטקסט";
-"clear_history" = "נקה היסטוריה";
 "open_clipboard_menu" = "פתח תפריט היסטוריית לוח";
 "open_snippets_menu" = "פתח תפריט קטעי טקסט";
 "open_snippet_editor" = "פתח חלון עורך קטעי טקסט";

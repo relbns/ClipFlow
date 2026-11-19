@@ -73,7 +73,6 @@
 "about_clipflow" = "About ClipFlow";
 
 /* Snippet Editor */
-"snippets" = "Snippets";
 "new_group" = "New Group";
 "new_snippet" = "New Snippet";
 "select_snippet" = "Select a snippet to edit";
@@ -108,8 +107,6 @@
 "global_hotkeys" = "Global Hotkeys";
 "main_menu" = "Main Menu";
 "snippets_menu" = "Snippets Menu";
-"snippet_editor" = "Snippet Editor";
-"clear_history" = "Clear History";
 "open_clipboard_menu" = "Open clipboard history menu";
 "open_snippets_menu" = "Open snippets menu";
 "open_snippet_editor" = "Open snippet editor window";
