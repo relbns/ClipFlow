@@ -82,13 +82,17 @@ final class PopoverNavigation: ObservableObject {
     var onClose: () -> Void = {}
 
     @Published var searchText = "" {
-        didSet { selectedIndex = 0 }
+        didSet { selectedItemID = nil }
     }
     @Published var drilledCategory: PopoverCategory? {
-        didSet { selectedIndex = 0 }
+        didSet { selectedItemID = nil }
     }
-    @Published private(set) var selectedIndex = 0
+    /// The selection follows the item, so pins, deletes and new clips do not move it to another row.
+    @Published private var selectedItemID: String?
     @Published private(set) var snippets: [SnippetSummary] = []
+    weak var popoverWindow: NSWindow?
+    /// Set when the popover opens, from the screen it opens on.
+    var maxListHeight: CGFloat = 440
 
     private var eventMonitor: Any?
 
@@ -135,7 +139,13 @@ final class PopoverNavigation: ObservableObject {
 
     var selectedID: String? {
         let items = items
-        return items.indices.contains(selectedIndex) ? items[selectedIndex].id : nil
+        if let selectedItemID, items.contains(where: { $0.id == selectedItemID }) { return selectedItemID }
+        return items.first?.id
+    }
+
+    private var selectedIndex: Int {
+        let items = items
+        return items.firstIndex { $0.id == selectedID } ?? 0
     }
 
     private func numberedSection(id: String, title: String, clips: [SimpleClipItem]) -> PopoverSection {
@@ -153,10 +163,14 @@ final class PopoverNavigation: ObservableObject {
     func popoverWillShow() {
         searchText = ""
         drilledCategory = nil
-        selectedIndex = 0
+        selectedItemID = nil
         reloadSnippets()
         guard eventMonitor == nil else { return }
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Only keys typed in the popover; other ClipFlow windows keep theirs.
+            guard let window = event.window, MainActor.assumeIsolated({ window === PopoverNavigation.shared.popoverWindow }) else {
+                return event
+            }
             let key = KeyInput(event)
             let handled = MainActor.assumeIsolated { PopoverNavigation.shared.handle(key) }
             return handled ? nil : event
@@ -192,7 +206,7 @@ final class PopoverNavigation: ObservableObject {
     // MARK: - Actions
 
     func select(_ item: PopoverItem) {
-        if let index = items.firstIndex(of: item) { selectedIndex = index }
+        selectedItemID = item.id
     }
 
     func activate(_ item: PopoverItem) {
@@ -212,8 +226,14 @@ final class PopoverNavigation: ObservableObject {
     }
 
     func delete(_ clip: SimpleClipItem) {
+        let items = items
+        let index = selectedIndex
+        if items.indices.contains(index + 1) {
+            selectedItemID = items[index + 1].id
+        } else if index > 0 {
+            selectedItemID = items[index - 1].id
+        }
         clipboardMonitor?.delete(clip)
-        selectedIndex = min(selectedIndex, max(0, items.count - 1))
     }
 
     func togglePin(_ clip: SimpleClipItem) {
@@ -268,10 +288,14 @@ final class PopoverNavigation: ObservableObject {
             }
             return handleCommand(keyCode: key.keyCode)
         }
-        if key.modifiers == .option, key.keyCode == KeyCode.delete {
-            guard case .clip(let clip, _)? = selectedItem else { return false }
-            delete(clip)
-            return true
+        if key.modifiers == .option, key.keyCode == KeyCode.delete, searchText.isEmpty {
+            switch selectedItem {
+            case .clip(let clip, _)?, .pinned(let clip, _)?:
+                delete(clip)
+                return true
+            default:
+                return false
+            }
         }
         guard key.modifiers.isEmpty else { return false }
 
@@ -309,7 +333,8 @@ final class PopoverNavigation: ObservableObject {
             if case .clip(_, let itemNumber) = item { return itemNumber == number }
             return false
         }
-        if let match { activate(match) }
+        guard let match else { return false }
+        activate(match)
         return true
     }
 
@@ -324,9 +349,9 @@ final class PopoverNavigation: ObservableObject {
     }
 
     private func move(by delta: Int) {
-        let count = items.count
-        guard count > 0 else { return }
-        selectedIndex = min(max(0, selectedIndex + delta), count - 1)
+        let items = items
+        guard !items.isEmpty else { return }
+        selectedItemID = items[min(max(0, selectedIndex + delta), items.count - 1)].id
     }
 
     private func activatePinned(slot: Int) -> Bool {

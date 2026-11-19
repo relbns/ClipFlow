@@ -68,9 +68,6 @@ struct MenuBarPopover: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     let sections = navigation.sections
-                    if sections.allSatisfy({ $0.items.isEmpty }) {
-                        emptyState
-                    }
                     ForEach(sections) { section in
                         PopoverSectionHeader(title: section.title, trailing: section.trailing)
                         ForEach(section.items) { item in
@@ -78,13 +75,16 @@ struct MenuBarPopover: View {
                         }
                         Spacer().frame(height: 4)
                     }
+                    if sections.allSatisfy({ $0.items.isEmpty }) {
+                        emptyState
+                    }
                 }
                 .background(GeometryReader { proxy in
                     Color.clear.preference(key: PopoverContentHeightKey.self, value: proxy.size.height)
                 })
             }
             .onPreferenceChange(PopoverContentHeightKey.self) { contentHeight = $0 }
-            .frame(height: min(max(contentHeight, 60), maxListHeight))
+            .frame(height: min(max(contentHeight, 60), navigation.maxListHeight))
             .onChange(of: navigation.selectedID) { _, id in
                 if let id { scroller.scrollTo(id) }
             }
@@ -126,12 +126,6 @@ struct MenuBarPopover: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
-    }
-
-    /// The list scrolls inside the popover, so the popover always fits under the menu bar.
-    private var maxListHeight: CGFloat {
-        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
-        return max(160, min(440, (screen?.visibleFrame.height ?? 800) - 300))
     }
 
     // MARK: - Footer

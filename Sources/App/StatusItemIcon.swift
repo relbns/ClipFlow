@@ -8,8 +8,6 @@ enum StatusItemIcon {
             let transform = AffineTransform(scaleByX: scale, byY: scale)
 
             let back = NSBezierPath(roundedRect: NSRect(x: 9, y: 6, width: 11, height: 13), xRadius: 2, yRadius: 2)
-            back.move(to: NSPoint(x: 12.5, y: 6))
-            back.line(to: NSPoint(x: 12.5, y: 5))
             back.transform(using: transform)
             back.lineWidth = 1.6 * scale
             back.lineCapStyle = .round

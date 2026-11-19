@@ -235,6 +235,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.popoverAnchorWindow?.orderOut(nil)
                     self?.stopOutsideClickMonitor()
                     PopoverNavigation.shared.popoverDidClose()
+                    PasteCoordinator.shared.forgetFrontmostApp()
                 }
             }
             menuBarPopover = popover
@@ -251,10 +252,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             popover.behavior = closesOnOutsideClick ? .transient : .applicationDefined
             if closesOnOutsideClick { startOutsideClickMonitor() }
             let anchor = popoverAnchor()
+            let screenHeight = (anchor.window?.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+            PopoverNavigation.shared.maxListHeight = max(160, min(440, screenHeight - 300))
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+            PopoverNavigation.shared.popoverWindow = popover.contentViewController?.view.window
             NSApp.activate(ignoringOtherApps: true)
             // The popover's window exists only after show returns; make it key then, so the first click acts.
             DispatchQueue.main.async {
+                PopoverNavigation.shared.popoverWindow = popover.contentViewController?.view.window
                 popover.contentViewController?.view.window?.makeKey()
             }
         }

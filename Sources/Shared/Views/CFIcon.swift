@@ -75,7 +75,7 @@ struct CFIcon: View {
     var body: some View {
         if let symbolName {
             Image(systemName: symbolName)
-                .font(.system(size: size * 0.82, weight: stroke >= 1.8 ? .semibold : .medium))
+                .font(.system(size: size * (type == .dot ? 0.3 : 0.82), weight: stroke >= 1.8 ? .semibold : .medium))
                 .frame(width: size, height: size)
         } else {
             drawnIcon

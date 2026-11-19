@@ -353,6 +353,7 @@ final class PopoverNavigationTests: XCTestCase {
     func testOrganizedModeShowsCategoriesAndDrillsIn() {
         defaults.set("organized", forKey: "viewMode")
         XCTAssertEqual(navigation.sections.map(\.id), ["categories"])
+        XCTAssertFalse(navigation.handle(.init(keyCode: 19, characters: "2")), "a digit with no numbered row goes to the search field")
         XCTAssertTrue(navigation.handle(.init(keyCode: 125)))
         XCTAssertTrue(navigation.handle(.init(keyCode: 125)))
         XCTAssertEqual(navigation.selectedID, "category-links")
@@ -375,11 +376,14 @@ final class PopoverNavigationTests: XCTestCase {
 
     func testPinnedClipsGetCommandSlots() {
         defaults.set("organized", forKey: "viewMode")
-        monitor.setPinned(monitor.clipHistory[2], true)
+        let pinnedClip = monitor.clipHistory[2]
+        monitor.setPinned(pinnedClip, true)
         guard case .pinned(_, let slot)? = navigation.sections.first?.items.first else {
             return XCTFail("expected a pinned row first")
         }
         XCTAssertEqual(slot, 1)
+        XCTAssertTrue(navigation.handle(.init(keyCode: 51, modifiers: .option)), "⌥⌫ deletes a pinned row too")
+        XCTAssertFalse(monitor.clipHistory.contains { $0.id == pinnedClip.id })
     }
 }
 
