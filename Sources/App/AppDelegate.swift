@@ -55,9 +55,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let stack = CoreDataStack.shared
         stack.prepareDefaultData()
+        if let issue = stack.loadIssue {
+            DispatchQueue.main.async { Self.showStoreAlert(for: issue) }
+        }
 
-        clipboardMonitor = ClipboardMonitor(context: stack.viewContext)
-        textExpansionEngine = TextExpansionEngine(context: stack.viewContext)
+        clipboardMonitor = ClipboardMonitor(context: stack.makeServiceContext())
+        textExpansionEngine = TextExpansionEngine(context: stack.makeServiceContext())
+        PasteEngine.shared.beforeWrite = { [weak self] in self?.clipboardMonitor.checkPasteboard() }
         keystrokeMonitor.onEvent = { [weak self] event in self?.textExpansionEngine.handle(event) }
 
         PasteCoordinator.shared.clipboardMonitor = clipboardMonitor
@@ -76,6 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         permissions.startWatching()
         permissions.$canListen
             .removeDuplicates()
+            .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateTextExpansionState() }
             .store(in: &cancellables)
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
@@ -100,6 +105,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         keystrokeMonitor.stop()
         clipboardMonitor?.stopMonitoring()
+    }
+
+    private static func showStoreAlert(for issue: CoreDataStack.LoadIssue) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        switch issue {
+        case .newerVersion:
+            alert.messageText = L("store_newer_title")
+            alert.informativeText = L("store_newer_message")
+        case .movedAside(let url):
+            alert.messageText = L("store_moved_title")
+            alert.informativeText = L("store_moved_message", url.path)
+            alert.addButton(withTitle: L("show_in_finder"))
+            alert.addButton(withTitle: "OK")
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn, case .movedAside(let url) = issue {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
     }
 
     // MARK: - Setup

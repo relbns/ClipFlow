@@ -28,7 +28,9 @@ final class PopoverNavigation: ObservableObject {
 
     var filteredClips: [SimpleClipItem] {
         let clips = clipboardMonitor?.clipHistory ?? []
-        guard !searchText.isEmpty else { return Array(clips.prefix(30)) }
+        guard !searchText.isEmpty else {
+            return clips.enumerated().filter { $0.offset < 30 || $0.element.isPinned }.map(\.element)
+        }
         return clips.filter {
             $0.content.localizedCaseInsensitiveContains(searchText) || $0.title.localizedCaseInsensitiveContains(searchText)
         }

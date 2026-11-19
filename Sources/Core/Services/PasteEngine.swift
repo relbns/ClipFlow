@@ -23,19 +23,43 @@ final class PasteEngine {
     private let pasteboard = NSPasteboard.general
     private let restoreDelay: TimeInterval = 0.5
 
+    private struct PendingRestore {
+        let original: PasteboardSnapshot?
+        let temporaryChangeCount: Int
+        let work: DispatchWorkItem
+    }
+    private var pendingRestore: PendingRestore?
+
+    /// Runs before ClipFlow writes to the pasteboard, so a copy made a moment earlier still reaches history.
+    var beforeWrite: () -> Void = {}
+
     /// Types text into the frontmost app through the pasteboard and puts the user's clipboard back afterwards.
     func insert(_ rendered: RenderedSnippet, replacingTyped deleteCount: Int) {
-        let saved = PasteboardSnapshot.capture(from: pasteboard)
+        SyntheticKeyboard.deleteBackward(count: deleteCount)
+
+        let original: PasteboardSnapshot?
+        if let pending = pendingRestore, pasteboard.changeCount == pending.temporaryChangeCount {
+            pending.work.cancel()
+            original = pending.original
+        } else {
+            pendingRestore?.work.cancel()
+            original = PasteboardSnapshot.capture(from: pasteboard, maxBytes: .max)
+        }
         let ourCount = write(.text(rendered.text, transient: true))
 
-        SyntheticKeyboard.deleteBackward(count: deleteCount)
         SyntheticKeyboard.paste()
         SyntheticKeyboard.moveLeft(count: rendered.cursorOffsetFromEnd)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay) { [weak self] in
-            guard let self, self.pasteboard.changeCount == ourCount, let saved else { return }
-            self.write(saved)
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.pendingRestore = nil
+                guard self.pasteboard.changeCount == ourCount, let original else { return }
+                self.write(original)
+            }
         }
+        pendingRestore = PendingRestore(original: original, temporaryChangeCount: ourCount, work: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay, execute: work)
     }
 
     /// Puts a history clip on the pasteboard, where it stays, and pastes it into `target`.
@@ -53,6 +77,7 @@ final class PasteEngine {
 
     @discardableResult
     private func write(_ snapshot: PasteboardSnapshot) -> Int {
+        beforeWrite()
         let count = snapshot.write(to: pasteboard)
         OwnPasteboardWrites.shared.record(count)
         return count

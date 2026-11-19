@@ -83,13 +83,7 @@ final class TextExpansionEngine {
         if snippet.playSound || UserDefaults.standard.bool(forKey: "playSoundOnExpand") {
             NSSound(named: "Tink")?.play()
         }
-        snippet.useCount += 1
-        snippet.lastUsed = Date()
-        do {
-            try context.save()
-        } catch {
-            Log.storage.error("Could not save snippet statistics: \(error.localizedDescription, privacy: .public)")
-        }
+        CoreDataStack.shared.recordSnippetUse(snippet.objectID)
     }
 
     private func reloadIfNeeded() {

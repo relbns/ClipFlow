@@ -25,6 +25,12 @@ final class AbbreviationMatcherTests: XCTestCase {
         XCTAssertNil(AbbreviationMatcher.match(buffer: ".sig ", candidates: [candidate(".sig", trigger: .tab)], frontmostApp: "app"))
     }
 
+    func testDelimiterTriggerIgnoresTabAndReturnBecauseTheyMoveFocusOrSend() {
+        XCTAssertNil(AbbreviationMatcher.match(buffer: ".sig\t", candidates: [candidate(".sig")], frontmostApp: "app"))
+        XCTAssertNil(AbbreviationMatcher.match(buffer: ".sig\r", candidates: [candidate(".sig")], frontmostApp: "app"))
+        XCTAssertNotNil(AbbreviationMatcher.match(buffer: ".sig,", candidates: [candidate(".sig")], frontmostApp: "app"))
+    }
+
     func testAnyTriggerExpandsAsSoonAsTheAbbreviationIsTyped() {
         let match = AbbreviationMatcher.match(buffer: "x .sig", candidates: [candidate(".sig", trigger: .any)], frontmostApp: "app")
         XCTAssertEqual(match, AbbreviationMatch(candidateID: ".sig", deleteCount: 4, trailingText: ""))
@@ -204,6 +210,50 @@ final class StorageTests: XCTestCase {
         XCTAssertEqual(groups.count, 1)
         XCTAssertEqual(groups.first?.snippets.count, 1)
         XCTAssertEqual(groups.first?.snippets.first?.useCount, 3)
+    }
+
+    func testGroupsTheUserCreatedAreNeverMerged() throws {
+        let stack = CoreDataStack(storeURL: nil)
+        let context = stack.viewContext
+        for offset in 0..<2 {
+            let group = makeGroup("New Group", in: context, createdAt: Date(timeIntervalSince1970: Double(offset)))
+            makeSnippet(".x\(offset)", in: group, useCount: 0)
+        }
+        try context.save()
+
+        SnippetLibraryRepair.mergeDuplicates(in: context)
+
+        XCTAssertEqual(try context.count(for: SnippetGroup.fetchRequest()), 2)
+    }
+
+    func testStoreFromANewerVersionIsLeftUntouched() throws {
+        let storeURL = directory.appendingPathComponent("ClipFlow.sqlite")
+        let newer = NSManagedObjectModel.clipFlowModel(version: 2, bindClasses: false)
+        let extra = NSEntityDescription()
+        extra.name = "FutureEntity"
+        extra.managedObjectClassName = NSStringFromClass(NSManagedObject.self)
+        newer.entities.append(extra)
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: newer)
+        let store = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL, options: nil)
+        try coordinator.remove(store)
+        let before = try Data(contentsOf: storeURL)
+
+        let stack = CoreDataStack(storeURL: storeURL)
+
+        XCTAssertEqual(stack.loadIssue, .newerVersion)
+        XCTAssertEqual(try Data(contentsOf: storeURL), before)
+    }
+
+    func testMovingAStoreAsideTakesItsExternalDataWithIt() throws {
+        let storeURL = directory.appendingPathComponent("ClipFlow.sqlite")
+        try Data("db".utf8).write(to: storeURL)
+        let external = StoreMigrator.externalDataFolder(of: storeURL)
+        try FileManager.default.createDirectory(at: external, withIntermediateDirectories: true)
+
+        let moved = try XCTUnwrap(StoreMigrator.moveAside(storeURL: storeURL, suffix: "unreadable"))
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: external.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: StoreMigrator.externalDataFolder(of: moved).path))
     }
 
     func testStarterSnippetsAreSeededOnceAndOnlyIntoAnEmptyStore() throws {

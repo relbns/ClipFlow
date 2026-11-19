@@ -64,7 +64,7 @@ enum AbbreviationMatcher {
         case .space:
             return char == " "
         case .delimiter:
-            return char.isWhitespace || char.isPunctuation || char.isSymbol
+            return (char.isWhitespace && !char.isNewline && char != "\t") || char.isPunctuation || char.isSymbol
         case .tab:
             return char == "\t"
         case .enter:

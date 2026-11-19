@@ -9,12 +9,10 @@ final class PasteCoordinator {
     var closePopover: () -> Void = {}
     private var target: NSRunningApplication?
 
-    /// Call just before the popover opens, while the user's app is still frontmost.
+    /// Call just before the popover opens. When ClipFlow itself is in front, the paste goes to its key window.
     func rememberFrontmostApp() {
         let front = NSWorkspace.shared.frontmostApplication
-        if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-            target = front
-        }
+        target = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
     }
 
     func paste(_ clip: SimpleClipItem) {
@@ -29,14 +27,13 @@ final class PasteCoordinator {
 
     func insert(_ snippet: Snippet) {
         let content = snippet.content
+        let snippetID = snippet.objectID
         closePopover()
         let target = target
         Task { @MainActor in
             guard let rendered = await SnippetRenderer.render(content, returningFocusTo: target) else { return }
             await PasteEngine.shared.insert(rendered, into: target)
-            snippet.useCount += 1
-            snippet.lastUsed = Date()
-            CoreDataStack.shared.save()
+            CoreDataStack.shared.recordSnippetUse(snippetID)
         }
     }
 }

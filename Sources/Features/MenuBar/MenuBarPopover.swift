@@ -371,6 +371,7 @@ struct OrganizedHistoryView: View {
                             showMetadata: true,
                             onSelect: { onSelect(clip) }
                         )
+                        .id("pinned-\(clip.id.uuidString)")
                     }
                 }
                 .padding(.bottom, 4)

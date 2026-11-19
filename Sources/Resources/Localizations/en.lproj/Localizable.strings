@@ -163,3 +163,10 @@
 /* Snippet prompts */
 "fill_in_snippet" = "Fill in the snippet";
 "insert" = "Insert";
+
+/* Data store problems */
+"store_newer_title" = "ClipFlow's data is from a newer version";
+"store_newer_message" = "Your snippets and history were saved by a newer ClipFlow. They are untouched, but changes made now will not be saved. Install the latest ClipFlow to keep working with them.";
+"store_moved_title" = "ClipFlow could not read its data";
+"store_moved_message" = "The file was kept here and a new, empty library was started:\n%@";
+"show_in_finder" = "Show in Finder";

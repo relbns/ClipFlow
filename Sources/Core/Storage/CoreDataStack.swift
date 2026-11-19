@@ -4,7 +4,15 @@ import Foundation
 final class CoreDataStack {
     static let shared = CoreDataStack(storeURL: CoreDataStack.defaultStoreURL)
 
+    enum LoadIssue: Equatable {
+        /// The store was written by a newer ClipFlow. It is left untouched and nothing is saved this session.
+        case newerVersion
+        /// The store could not be read and was renamed to this file; a fresh store was created.
+        case movedAside(URL)
+    }
+
     let persistentContainer: NSPersistentContainer
+    private(set) var loadIssue: LoadIssue?
 
     var viewContext: NSManagedObjectContext {
         persistentContainer.viewContext
@@ -20,25 +28,38 @@ final class CoreDataStack {
         let model = NSManagedObjectModel.clipFlowCurrent
         persistentContainer = NSPersistentContainer(name: "ClipFlow", managedObjectModel: model)
 
-        let description: NSPersistentStoreDescription
-        if let storeURL {
-            try? FileManager.default.createDirectory(at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            StoreMigrator.migrateIfNeeded(storeURL: storeURL, to: model)
-            description = NSPersistentStoreDescription(url: storeURL)
-        } else {
-            description = NSPersistentStoreDescription()
-            description.type = NSInMemoryStoreType
+        let inMemory = NSPersistentStoreDescription()
+        inMemory.type = NSInMemoryStoreType
+
+        guard let storeURL else {
+            persistentContainer.persistentStoreDescriptions = [inMemory]
+            persistentContainer.loadPersistentStores { _, _ in }
+            configureViewContext()
+            return
         }
-        description.shouldMigrateStoreAutomatically = true
-        description.shouldInferMappingModelAutomatically = true
-        persistentContainer.persistentStoreDescriptions = [description]
+
+        try? FileManager.default.createDirectory(at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if StoreMigrator.isFromUnknownVersion(storeURL: storeURL) {
+            Log.storage.fault("The store was written by a newer ClipFlow; it is left untouched")
+            loadIssue = .newerVersion
+            persistentContainer.persistentStoreDescriptions = [inMemory]
+            persistentContainer.loadPersistentStores { _, _ in }
+            configureViewContext()
+            return
+        }
+
+        StoreMigrator.migrateIfNeeded(storeURL: storeURL, to: model)
+        let onDisk = NSPersistentStoreDescription(url: storeURL)
+        onDisk.shouldMigrateStoreAutomatically = false
+        onDisk.shouldInferMappingModelAutomatically = false
+        persistentContainer.persistentStoreDescriptions = [onDisk]
 
         var loadError: Error?
         persistentContainer.loadPersistentStores { _, error in loadError = error }
 
-        if let loadError, let storeURL {
+        if let loadError {
             Log.storage.error("Could not open the store, starting a fresh one: \(loadError.localizedDescription, privacy: .public)")
-            StoreMigrator.moveAside(storeURL: storeURL, suffix: "unreadable")
+            loadIssue = StoreMigrator.moveAside(storeURL: storeURL, suffix: "unreadable").map(LoadIssue.movedAside)
             persistentContainer.loadPersistentStores { _, error in
                 if let error {
                     Log.storage.fault("Could not create a fresh store: \(error.localizedDescription, privacy: .public)")
@@ -46,9 +67,38 @@ final class CoreDataStack {
             }
         }
 
+        configureViewContext()
+    }
+
+    private func configureViewContext() {
         viewContext.automaticallyMergesChangesFromParent = true
         viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     }
+
+    /// A context of its own for background services, so their saves never commit the editor's unsaved edits.
+    func makeServiceContext() -> NSManagedObjectContext {
+        let mainContext = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        mainContext.persistentStoreCoordinator = persistentContainer.persistentStoreCoordinator
+        mainContext.automaticallyMergesChangesFromParent = true
+        mainContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        return mainContext
+    }
+
+    /// Counts a use of a snippet in its own context.
+    func recordSnippetUse(_ objectID: NSManagedObjectID) {
+        let context = statsContext
+        guard let snippet = try? context.existingObject(with: objectID) as? Snippet else { return }
+        snippet.useCount += 1
+        snippet.lastUsed = Date()
+        do {
+            try context.save()
+        } catch {
+            Log.storage.error("Could not save snippet statistics: \(error.localizedDescription, privacy: .public)")
+            context.rollback()
+        }
+    }
+
+    private lazy var statsContext = makeServiceContext()
 
     func save() {
         guard viewContext.hasChanges else { return }
@@ -63,7 +113,11 @@ final class CoreDataStack {
 
     /// Seeds the starter snippets only into an empty store, so no launch path can add them twice.
     func prepareDefaultData(defaults: UserDefaults = .standard) {
-        SnippetLibraryRepair.mergeDuplicates(in: viewContext)
+        guard loadIssue != .newerVersion else { return }
+        if !defaults.bool(forKey: "hasRepairedStarterDuplicates") {
+            SnippetLibraryRepair.mergeDuplicates(in: viewContext)
+            defaults.set(true, forKey: "hasRepairedStarterDuplicates")
+        }
 
         let groupCount = (try? viewContext.count(for: SnippetGroup.fetchRequest())) ?? 0
         let snippetCount = (try? viewContext.count(for: Snippet.fetchRequest())) ?? 0
@@ -71,7 +125,7 @@ final class CoreDataStack {
 
         let group = SnippetGroup(context: viewContext)
         group.id = UUID()
-        group.name = "Personal"
+        group.name = SnippetLibraryRepair.starterGroupName
         group.isEnabled = true
         group.createdAt = Date()
         group.sortOrder = 0
@@ -142,13 +196,35 @@ enum StoreMigrator {
         }
     }
 
-    static func moveAside(storeURL: URL, suffix: String) {
+    /// True when the store has readable metadata that matches no model this build knows.
+    static func isFromUnknownVersion(storeURL: URL) -> Bool {
+        guard let metadata = try? NSPersistentStoreCoordinator.metadataForPersistentStore(ofType: NSSQLiteStoreType, at: storeURL) else {
+            return false
+        }
+        return ![1, 2].contains { version in
+            NSManagedObjectModel.clipFlowModel(version: version, bindClasses: false)
+                .isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata)
+        }
+    }
+
+    /// Returns the new location of the main store file.
+    @discardableResult
+    static func moveAside(storeURL: URL, suffix: String) -> URL? {
         let stamp = Int(Date().timeIntervalSince1970)
+        let movedStore = URL(fileURLWithPath: storeURL.deletingPathExtension().path + "-\(suffix)-\(stamp).sqlite")
         for extensionSuffix in ["", "-wal", "-shm"] {
             let file = URL(fileURLWithPath: storeURL.path + extensionSuffix)
-            let target = URL(fileURLWithPath: storeURL.deletingPathExtension().path + "-\(suffix)-\(stamp).sqlite" + extensionSuffix)
+            let target = URL(fileURLWithPath: movedStore.path + extensionSuffix)
             try? FileManager.default.moveItem(at: file, to: target)
         }
+        try? FileManager.default.moveItem(at: externalDataFolder(of: storeURL), to: externalDataFolder(of: movedStore))
+        return FileManager.default.fileExists(atPath: movedStore.path) ? movedStore : nil
+    }
+
+    /// Where Core Data keeps attributes stored outside the SQLite file.
+    static func externalDataFolder(of storeURL: URL) -> URL {
+        let name = storeURL.deletingPathExtension().lastPathComponent
+        return storeURL.deletingLastPathComponent().appendingPathComponent(".\(name)_SUPPORT", isDirectory: true)
     }
 
     private static func copyStore(from source: URL, to destination: URL) {
@@ -171,9 +247,13 @@ enum StoreMigrator {
 }
 
 enum SnippetLibraryRepair {
-    /// Folds groups that share a name into the oldest one, then removes snippets that are exact copies.
+    static let starterGroupName = "Personal"
+
+    /// Earlier builds could seed the starter group more than once. Folds those copies into the oldest
+    /// one and removes exact duplicate snippets inside it. Groups the user created are never touched.
     static func mergeDuplicates(in context: NSManagedObjectContext) {
         let request = SnippetGroup.fetchRequest()
+        request.predicate = NSPredicate(format: "name ==[c] %@", starterGroupName)
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
         guard let groups = try? context.fetch(request) else { return }
 

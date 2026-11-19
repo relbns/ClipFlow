@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import CoreGraphics
 
 /// Posts keystrokes tagged with a marker, so ClipFlow's own event tap can ignore them.
@@ -19,7 +20,32 @@ enum SyntheticKeyboard {
     }
 
     static func paste() {
-        tap(Key.v, flags: .maskCommand)
+        tap(keyCode(for: "v") ?? Key.v, flags: .maskCommand)
+    }
+
+    /// The key that types `character` in the current Latin layout, so Cmd+V stays Cmd+V on Dvorak or AZERTY.
+    static func keyCode(for character: Character) -> CGKeyCode? {
+        guard let source = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let property = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
+        let layoutData = Unmanaged<CFData>.fromOpaque(property).takeUnretainedValue() as Data
+        let target = String(character)
+
+        return layoutData.withUnsafeBytes { buffer -> CGKeyCode? in
+            guard let layout = buffer.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return nil }
+            for code in 0..<CGKeyCode(128) {
+                var deadKeyState: UInt32 = 0
+                var length = 0
+                var characters = [UniChar](repeating: 0, count: 4)
+                let status = UCKeyTranslate(
+                    layout, code, UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
+                    OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
+                )
+                if status == noErr, String(utf16CodeUnits: characters, count: length) == target {
+                    return code
+                }
+            }
+            return nil
+        }
     }
 
     static func moveLeft(count: Int) {
