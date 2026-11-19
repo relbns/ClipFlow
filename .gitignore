@@ -84,3 +84,4 @@ ClipFlow.xcarchive/
 # Local code-signing identity for build-app.sh
 .signing-identity
 Build/
+Build.noindex/

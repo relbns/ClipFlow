@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-APP_DIR="Build/ClipFlow.app"
-RELEASE_DIR="Build/Release"
+APP_DIR="Build.noindex/ClipFlow.app"
+RELEASE_DIR="Build.noindex/Release"
 VERSION=$(defaults read "$(pwd)/$APP_DIR/Contents/Info.plist" CFBundleShortVersionString)
 BUILD=$(defaults read "$(pwd)/$APP_DIR/Contents/Info.plist" CFBundleVersion)
 
@@ -120,15 +120,15 @@ cd - > /dev/null
 
 echo ""
 echo "✅ Release package created:"
-echo "   📦 Build/ClipFlow-v$VERSION.zip"
-echo "   📝 Build/Release/INSTALL.txt"
-echo "   📄 Build/Release/RELEASE_NOTES.md"
+echo "   📦 Build.noindex/ClipFlow-v$VERSION.zip"
+echo "   📝 Build.noindex/Release/INSTALL.txt"
+echo "   📄 Build.noindex/Release/RELEASE_NOTES.md"
 echo ""
 echo "Next steps:"
 echo "1. Test the ZIP on a clean Mac"
-echo "2. Edit Build/Release/RELEASE_NOTES.md with changelog"
+echo "2. Edit Build.noindex/Release/RELEASE_NOTES.md with changelog"
 echo "3. Create GitHub release:"
-echo "   gh release create v$VERSION Build/ClipFlow-v$VERSION.zip"
+echo "   gh release create v$VERSION Build.noindex/ClipFlow-v$VERSION.zip"
 echo "   --title \"ClipFlow v$VERSION\""
-echo "   --notes-file Build/Release/RELEASE_NOTES.md"
+echo "   --notes-file Build.noindex/Release/RELEASE_NOTES.md"
 echo ""

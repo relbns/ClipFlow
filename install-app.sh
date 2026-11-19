@@ -16,7 +16,7 @@ if pgrep -x "ClipFlow" > /dev/null; then
 fi
 
 $SUDO rm -rf "$APP"
-$SUDO cp -R Build/ClipFlow.app /Applications/
+$SUDO cp -R Build.noindex/ClipFlow.app /Applications/
 
 echo "✅ Installed. Run: open $APP"
 echo "   On first run macOS asks for Accessibility and Input Monitoring."
