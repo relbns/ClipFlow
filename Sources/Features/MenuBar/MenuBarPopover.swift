@@ -4,11 +4,11 @@ import CoreData
 /// Modern SwiftUI MenuBar Popover - replaces NSMenu
 @MainActor
 struct MenuBarPopover: View {
-    let clipboardMonitor: ClipboardMonitor
+    @ObservedObject var clipboardMonitor: ClipboardMonitor
     @Binding var isPresented: Bool
+    @ObservedObject private var navigation = PopoverNavigation.shared
 
     @AppStorage("viewMode") private var viewMode = "organized"
-    @State private var searchText = ""
     @State private var snippetCount: Int = 0
     @State private var contentHeight: CGFloat = 0
 
@@ -22,6 +22,7 @@ struct MenuBarPopover: View {
             Divider()
 
             // Content based on mode
+            ScrollViewReader { scroller in
             ScrollView {
                 Group {
                 switch viewMode {
@@ -49,6 +50,12 @@ struct MenuBarPopover: View {
             }
             .onPreferenceChange(PopoverContentHeightKey.self) { contentHeight = $0 }
             .frame(height: min(max(contentHeight, 60), maxListHeight))
+            .onChange(of: navigation.selectedID) { _, id in
+                guard let id else { return }
+                scroller.scrollTo(id)
+            }
+            }
+            .environment(\.selectedClipID, navigation.selectedID)
 
             Divider()
 
@@ -73,7 +80,7 @@ struct MenuBarPopover: View {
         VStack(spacing: 0) {
             // Search - padding 8px 8px 6px
             CFInput(
-                text: $searchText,
+                text: $navigation.searchText,
                 placeholder: "Search clips & snippets",
                 prefix: AnyView(
                     CFIcon(type: .search, size: 13, stroke: 1.8)
@@ -172,15 +179,7 @@ struct MenuBarPopover: View {
 
     // MARK: - Helpers
     private var filteredClips: [SimpleClipItem] {
-        let clips = clipboardMonitor.clipHistory
-
-        if searchText.isEmpty {
-            return Array(clips.prefix(30))
-        }
-
-        return clips.filter { clip in
-            clip.content.localizedCaseInsensitiveContains(searchText)
-        }
+        navigation.filteredClips
     }
 
     private func selectClip(_ clip: SimpleClipItem) {
@@ -223,6 +222,7 @@ struct SimpleHistoryView: View {
     let onSelect: (SimpleClipItem) -> Void
 
     @Environment(\.cfTheme) var theme
+    @Environment(\.selectedClipID) private var selectedClipID
 
     var body: some View {
         VStack(spacing: 0) {
@@ -255,7 +255,7 @@ struct SimpleHistoryView: View {
                             title: clip.title,
                             subtitle: clip.subtitle(),
                             kbd: keyboardShortcut(for: index),
-                            active: false
+                            active: clip.id == selectedClipID
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -332,8 +332,7 @@ struct OrganizedHistoryView: View {
         var text: [SimpleClipItem] = []
 
         for clip in clips {
-            // Recent (first 5)
-            if recent.count < 5 {
+            if recent.count < PopoverNavigation.shortcutCount {
                 recent.append(clip)
             }
 
@@ -389,7 +388,9 @@ struct OrganizedHistoryView: View {
                     label: "Recent",
                     count: groups.recent.count,
                     clips: groups.recent,
-                    onSelect: onSelect
+                    onSelect: onSelect,
+                    initiallyExpanded: true,
+                    showNumbers: true
                 )
 
                 if !groups.images.isEmpty {
@@ -484,9 +485,29 @@ struct CategoryGroup: View {
     let count: Int
     let clips: [SimpleClipItem]
     let onSelect: (SimpleClipItem) -> Void
-
-    @State private var isExpanded = false
+    var showNumbers = false
+    @State private var isExpanded: Bool
     @Environment(\.cfTheme) var theme
+
+    init(
+        icon: CFIcon.IconType,
+        iconColor: Color,
+        label: String,
+        count: Int,
+        clips: [SimpleClipItem],
+        onSelect: @escaping (SimpleClipItem) -> Void,
+        initiallyExpanded: Bool = false,
+        showNumbers: Bool = false
+    ) {
+        self.icon = icon
+        self.iconColor = iconColor
+        self.label = label
+        self.count = count
+        self.clips = clips
+        self.onSelect = onSelect
+        self.showNumbers = showNumbers
+        _isExpanded = State(initialValue: initiallyExpanded)
+    }
 
     var body: some View {
         VStack(spacing: 4) {
@@ -526,11 +547,11 @@ struct CategoryGroup: View {
             // Items
             if isExpanded {
                 VStack(spacing: 2) {
-                    ForEach(Array(clips.prefix(5).enumerated()), id: \.element.id) { index, clip in
+                    ForEach(Array(clips.prefix(PopoverNavigation.shortcutCount).enumerated()), id: \.element.id) { index, clip in
                         ClipRow(
                             clip: clip,
                             index: index,
-                            showNumber: false,
+                            showNumber: showNumbers,
                             onSelect: { onSelect(clip) }
                         )
                     }
@@ -553,8 +574,11 @@ struct ClipRow: View {
 
     private var displayText: String { clip.title }
 
+    @Environment(\.selectedClipID) private var selectedClipID
+
     private var keyboardShortcut: String? {
-        showNumber && index < 9 ? "\(index + 1)" : (index == 9 ? "0" : nil)
+        guard showNumber, index < PopoverNavigation.shortcutCount else { return nil }
+        return index == 9 ? "0" : "\(index + 1)"
     }
 
     var body: some View {
@@ -585,7 +609,7 @@ struct ClipRow: View {
                 }
             }
             .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
-            .background(Color.clear)
+            .background(showNumber && clip.id == selectedClipID ? theme.accentMix(percent: 22) : Color.clear)
             .cornerRadius(6)
         }
         .buttonStyle(PlainHoverButtonStyle())

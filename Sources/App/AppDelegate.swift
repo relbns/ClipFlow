@@ -62,6 +62,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         PasteCoordinator.shared.clipboardMonitor = clipboardMonitor
         PasteCoordinator.shared.closePopover = { [weak self] in self?.menuBarPopover?.performClose(nil) }
+        PopoverNavigation.shared.clipboardMonitor = clipboardMonitor
+        PopoverNavigation.shared.onClose = { [weak self] in self?.menuBarPopover?.performClose(nil) }
 
         setupStatusItem()
         setupHotkeys()
@@ -168,7 +170,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             popover.contentViewController = NSHostingController(rootView: popoverView)
             NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.popoverAnchorWindow?.orderOut(nil) }
+                MainActor.assumeIsolated {
+                    self?.popoverAnchorWindow?.orderOut(nil)
+                    PopoverNavigation.shared.popoverDidClose()
+                }
             }
             menuBarPopover = popover
         }
@@ -178,6 +183,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             popover.performClose(nil)
         } else {
             PasteCoordinator.shared.rememberFrontmostApp()
+            PopoverNavigation.shared.popoverWillShow()
             let anchor = popoverAnchor()
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)

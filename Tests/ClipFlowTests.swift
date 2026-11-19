@@ -260,3 +260,35 @@ final class StorageTests: XCTestCase {
         try coordinator.remove(store)
     }
 }
+
+@MainActor
+final class PopoverNavigationTests: XCTestCase {
+    func testArrowsMoveWithinTheNumberedClipsAndDigitsOnlyWorkWithAnEmptySearch() {
+        let stack = CoreDataStack(storeURL: nil)
+        let monitor = ClipboardMonitor(context: stack.viewContext)
+        for index in 1...12 {
+            let snapshot = PasteboardSnapshot.text("clip \(index)", transient: false)
+            monitor.record(ClipCapture.classify(snapshot)!, snapshot: snapshot, source: nil)
+        }
+
+        let navigation = PopoverNavigation.shared
+        navigation.clipboardMonitor = monitor
+        navigation.searchText = ""
+        XCTAssertEqual(navigation.navigableClips.count, 10)
+        XCTAssertEqual(navigation.selectedID, navigation.navigableClips[0].id)
+
+        XCTAssertTrue(navigation.handle(.init(keyCode: 126)))
+        XCTAssertEqual(navigation.selectedID, navigation.navigableClips[0].id)
+        for _ in 0..<15 { _ = navigation.handle(.init(keyCode: 125)) }
+        XCTAssertEqual(navigation.selectedID, navigation.navigableClips[9].id)
+
+        XCTAssertFalse(navigation.handle(.init(keyCode: 125, hasModifiers: true)))
+        XCTAssertTrue(navigation.handle(.init(keyCode: 18, characters: "1")))
+
+        navigation.searchText = "clip 1"
+        XCTAssertEqual(navigation.selectedID, navigation.navigableClips[0].id)
+        XCTAssertFalse(navigation.handle(.init(keyCode: 18, characters: "1")))
+        XCTAssertFalse(navigation.handle(.init(keyCode: 0, characters: "a")))
+        navigation.clipboardMonitor = nil
+    }
+}
