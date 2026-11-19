@@ -51,6 +51,7 @@ struct WelcomeView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .offset(x: 40, y: 40)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
                 .environment(\.cfTheme, .dark)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -148,7 +149,7 @@ private struct MiniPopoverPreview: View {
                 .padding(EdgeInsets(top: 6, leading: 14, bottom: 4, trailing: 14))
 
             row(icon: AnyView(Image(systemName: "link")), title: "github.com/relbns/ClipFlow", subtitle: L("just_now"), kbd: "1", active: true)
-            row(icon: AnyView(Image(systemName: "text.alignleft")), title: "Thanks for the quick…", subtitle: L("two_minutes"), kbd: "2")
+            row(icon: AnyView(Image(systemName: "text.alignleft")), title: L("welcome_sample_clip"), subtitle: L("two_minutes"), kbd: "2")
             row(icon: AnyView(RoundedRectangle(cornerRadius: 3).fill(Color.hex(0xFF5733)).frame(width: 14, height: 14)), title: "#FF5733", subtitle: L("clip_hex_color"), kbd: "3")
                 .padding(.bottom, 6)
         }

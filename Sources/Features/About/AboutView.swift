@@ -2,7 +2,6 @@ import SwiftUI
 
 /// The About window, built from `design_handoff_clipflow/design/components/about.jsx`.
 struct AboutView: View {
-    @Environment(\.openURL) private var openURL
     @Environment(\.cfTheme) private var theme
 
     private var version: String {
