@@ -1,9 +1,20 @@
 #!/bin/bash
 set -e
 
-# Parse arguments
-SIGNING_MODE="adhoc"  # Default: ad-hoc signing for distribution
-DEV_CERT="Apple Development: arielbenesh@gmail.com (5TC494SL83)"
+# Signing modes:
+#   --dev (default)  sign with a stable Apple Development identity, so macOS keeps
+#                    Accessibility / Input Monitoring trust across rebuilds
+#   --adhoc          ad-hoc signature (trust is lost on every rebuild)
+#   --notarize       Developer ID + notarization (paid Apple Developer account)
+# The dev identity comes from --cert, $CLIPFLOW_SIGN_IDENTITY, or the untracked
+# file .signing-identity (one line, the identity name as shown by
+# `security find-identity -v -p codesigning`).
+SIGNING_MODE="dev"
+ENTITLEMENTS_PATH="Sources/Resources/ClipFlow.entitlements"
+DEV_CERT="${CLIPFLOW_SIGN_IDENTITY:-}"
+if [ -z "$DEV_CERT" ] && [ -f .signing-identity ]; then
+    DEV_CERT="$(head -1 .signing-identity)"
+fi
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -11,7 +22,7 @@ while [[ $# -gt 0 ]]; do
             SIGNING_MODE="dev"
             shift
             ;;
-        --release)
+        --adhoc|--release)
             SIGNING_MODE="adhoc"
             shift
             ;;
@@ -23,18 +34,30 @@ while [[ $# -gt 0 ]]; do
             DEV_CERT="$2"
             shift 2
             ;;
+        --sandbox)
+            ENTITLEMENTS_PATH="Sources/Resources/ClipFlow-Sandbox.entitlements"
+            shift
+            ;;
         *)
-            echo "Usage: $0 [--dev|--release|--notarize] [--cert \"Certificate Name\"]"
-            echo ""
-            echo "Modes:"
-            echo "  --dev        Sign with development certificate (for local testing)"
-            echo "  --release    Ad-hoc signing (default, for GitHub distribution)"
-            echo "  --notarize   Sign with Developer ID + notarize (requires Apple Developer account)"
-            echo "  --cert       Specify custom certificate name"
+            echo "Usage: $0 [--dev|--adhoc|--notarize] [--sandbox] [--cert \"Certificate Name\"]"
             exit 1
             ;;
     esac
 done
+
+if [ "$SIGNING_MODE" = "dev" ]; then
+    if [ -z "$DEV_CERT" ]; then
+        echo "❌ No signing identity. Set CLIPFLOW_SIGN_IDENTITY, pass --cert, or write it to .signing-identity"
+        echo "   Available identities:"
+        security find-identity -v -p codesigning | sed 's/^/   /'
+        echo "   Or build with --adhoc (macOS will forget the app's permissions on every rebuild)."
+        exit 1
+    fi
+    if ! security find-identity -v -p codesigning | grep -qF "\"$DEV_CERT\""; then
+        echo "❌ Signing identity not found in Keychain: $DEV_CERT"
+        exit 1
+    fi
+fi
 
 echo "🔨 Building ClipFlow.app..."
 echo "📝 Signing mode: $SIGNING_MODE"
@@ -43,8 +66,9 @@ echo ""
 # Build release binary
 swift build -c release
 
-# Create app bundle structure
+# Create app bundle structure from scratch so removed files never linger
 APP_DIR="Build/ClipFlow.app"
+rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 mkdir -p "$APP_DIR/Contents/Frameworks"
@@ -52,21 +76,7 @@ mkdir -p "$APP_DIR/Contents/Frameworks"
 # Copy binary
 cp .build/release/ClipFlow "$APP_DIR/Contents/MacOS/"
 
-# Fix Sparkle framework @rpath reference
-echo "🔧 Fixing framework paths..."
-install_name_tool -change \
-    "@rpath/Sparkle.framework/Versions/B/Sparkle" \
-    "@executable_path/../Frameworks/Sparkle.framework/Versions/B/Sparkle" \
-    "$APP_DIR/Contents/MacOS/ClipFlow"
-
-# Copy frameworks (Sparkle, etc.)
-echo "📦 Copying frameworks..."
-if [ -f ".build/release/Sparkle.framework/Sparkle" ]; then
-    cp -R .build/release/Sparkle.framework "$APP_DIR/Contents/Frameworks/"
-    echo "   ✅ Sparkle.framework"
-fi
-
-# Copy any other .framework or .bundle files
+# Copy any .framework or .bundle files produced by dependencies
 find .build/release -name "*.framework" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \; 2>/dev/null || true
 find .build/release -name "*.bundle" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
 
@@ -85,8 +95,7 @@ rm "$APP_DIR/Contents/Info.plist.tmp"
 
 echo "📝 Build number: $BUILD_DATE"
 
-# Keep entitlements path for signing (don't copy to app bundle)
-ENTITLEMENTS_PATH="Sources/Resources/ClipFlow.entitlements"
+echo "🔏 Entitlements: $ENTITLEMENTS_PATH"
 
 # Copy resources if they exist
 if [ -d "Sources/Resources/Assets.xcassets" ]; then
@@ -117,9 +126,8 @@ case $SIGNING_MODE in
                 if [ -e "$framework" ]; then
                     echo "   Signing $(basename "$framework")..."
                     codesign --force --sign "$DEV_CERT" \
-                        --timestamp \
                         --options runtime \
-                        "$framework/Versions/A" 2>/dev/null || true
+                        "$framework"
                 fi
             done
         fi
@@ -128,26 +136,18 @@ case $SIGNING_MODE in
         if [ -f "$ENTITLEMENTS_PATH" ]; then
             codesign --force --sign "$DEV_CERT" \
                 --entitlements "$ENTITLEMENTS_PATH" \
-                --timestamp \
                 --options runtime \
                 "$APP_DIR"
         else
             codesign --force --sign "$DEV_CERT" \
-                --timestamp \
                 --options runtime \
                 "$APP_DIR"
         fi
-
-        if [ $? -eq 0 ]; then
-            echo "✅ Signed with: $DEV_CERT"
-        else
-            echo "❌ Signing failed - check certificate name"
-            exit 1
-        fi
+        echo "✅ Signed with: $DEV_CERT"
         ;;
 
     adhoc)
-        echo "   Mode: Ad-hoc (unsigned, for distribution)"
+        echo "   Mode: Ad-hoc"
         # Ad-hoc signing - no certificate needed
         codesign --force --deep --sign - "$APP_DIR" 2>/dev/null
         echo "✅ Ad-hoc signed (users will need to allow in System Settings)"
@@ -232,10 +232,4 @@ echo ""
 echo "✅ Built: $APP_DIR"
 echo ""
 
-if [ "$SIGNING_MODE" = "adhoc" ]; then
-    echo "📦 For GitHub distribution, run: ./package-release.sh"
-    echo ""
-elif [ "$SIGNING_MODE" = "dev" ]; then
-    echo "📦 For local installation, run: ./install-app.sh"
-    echo ""
-fi
+echo "📦 To install locally, run: ./install-app.sh"

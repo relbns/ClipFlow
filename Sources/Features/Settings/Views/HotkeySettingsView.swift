@@ -7,15 +7,9 @@ struct HotkeySettingsView: View {
             Section("Global Hotkeys") {
                 VStack(alignment: .leading, spacing: 12) {
                     HotkeyRow(
-                        title: "Main Menu",
-                        name: .showMainMenu,
-                        description: "Open clipboard history menu"
-                    )
-
-                    HotkeyRow(
-                        title: "Snippets Menu",
-                        name: .showSnippetsMenu,
-                        description: "Open snippets menu"
+                        title: "Clipboard History",
+                        name: .showHistoryMenu,
+                        description: "Open the clipboard history popover"
                     )
 
                     HotkeyRow(

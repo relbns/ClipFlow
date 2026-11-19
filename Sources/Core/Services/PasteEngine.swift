@@ -1,80 +1,97 @@
 import AppKit
 
-/// Handles pasting clipboard items to applications
-actor PasteEngine {
+/// Pasteboard change counts written by ClipFlow itself, so history does not record them.
+@MainActor
+final class OwnPasteboardWrites {
+    static let shared = OwnPasteboardWrites()
+    private var counts: [Int] = []
 
-    /// Paste content to the frontmost application
-    func paste(_ content: String) async {
-        print("📝 PasteEngine.paste called with content: \(content.prefix(100))")
-
-        // Check for {cursor} marker
-        let cursorMarker = "{cursor}"
-        let hasCursor = content.contains(cursorMarker)
-
-        // Remove cursor marker and calculate position
-        let cleanContent = content.replacingOccurrences(of: cursorMarker, with: "")
-        print("📝 Clean content (after removing {cursor}): \(cleanContent.prefix(100))")
-        let cursorOffset = hasCursor ? content.distance(from: content.range(of: cursorMarker)!.upperBound, to: content.endIndex) : 0
-
-        // Save current clipboard
-        let savedClipboard = NSPasteboard.general.string(forType: .string)
-
-        // Put new content on clipboard
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(cleanContent, forType: .string)
-
-        // Wait for clipboard to update (increased from 10ms)
-        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-
-        // Simulate Cmd+V
-        await simulatePaste()
-
-        // If cursor marker exists, move cursor to that position
-        if hasCursor && cursorOffset > 0 {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms wait for paste
-            await moveCursorLeft(count: cursorOffset)
-        }
-
-        // Restore original clipboard after longer delay
-        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
-        if let saved = savedClipboard {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(saved, forType: .string)
-        }
+    func record(_ changeCount: Int) {
+        counts.append(changeCount)
+        if counts.count > 32 { counts.removeFirst(counts.count - 32) }
     }
 
-    @MainActor
-    private func simulatePaste() {
-        // Create Cmd+V key event
-        let source = CGEventSource(stateID: .hidSystemState)
+    func contains(_ changeCount: Int) -> Bool {
+        counts.contains(changeCount)
+    }
+}
 
-        let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true) // Cmd
-        let vDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)    // V
-        let vUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-        let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false)
+@MainActor
+final class PasteEngine {
+    static let shared = PasteEngine()
 
-        cmdDown?.flags = .maskCommand
-        vDown?.flags = .maskCommand
+    private let pasteboard = NSPasteboard.general
+    private let restoreDelay: TimeInterval = 0.5
 
-        cmdDown?.post(tap: .cghidEventTap)
-        vDown?.post(tap: .cghidEventTap)
-        vUp?.post(tap: .cghidEventTap)
-        cmdUp?.post(tap: .cghidEventTap)
+    private struct PendingRestore {
+        let original: PasteboardSnapshot?
+        let temporaryChangeCount: Int
+        let work: DispatchWorkItem
+    }
+    private var pendingRestore: PendingRestore?
+
+    /// Runs before ClipFlow writes to the pasteboard, so a copy made a moment earlier still reaches history.
+    var beforeWrite: () -> Void = {}
+
+    /// Types text into the frontmost app through the pasteboard and puts the user's clipboard back afterwards.
+    func insert(_ rendered: RenderedSnippet, replacingTyped deleteCount: Int) {
+        SyntheticKeyboard.deleteBackward(count: deleteCount)
+
+        let original: PasteboardSnapshot?
+        if let pending = pendingRestore, pasteboard.changeCount == pending.temporaryChangeCount {
+            pending.work.cancel()
+            original = pending.original
+        } else {
+            pendingRestore?.work.cancel()
+            original = PasteboardSnapshot.capture(from: pasteboard, maxBytes: .max)
+        }
+        let ourCount = write(.text(rendered.text, transient: true))
+
+        SyntheticKeyboard.paste()
+        SyntheticKeyboard.moveLeft(count: rendered.cursorOffsetFromEnd)
+
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.pendingRestore = nil
+                guard self.pasteboard.changeCount == ourCount, let original else { return }
+                self.write(original)
+            }
+        }
+        pendingRestore = PendingRestore(original: original, temporaryChangeCount: ourCount, work: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay, execute: work)
     }
 
-    @MainActor
-    private func moveCursorLeft(count: Int) {
-        let source = CGEventSource(stateID: .hidSystemState)
+    /// Puts a history clip on the pasteboard, where it stays, and pastes it into `target`.
+    func paste(_ snapshot: PasteboardSnapshot, into target: NSRunningApplication?) async {
+        write(snapshot)
+        await activate(target)
+        SyntheticKeyboard.paste()
+    }
 
-        for _ in 0..<count {
-            let leftDown = CGEvent(keyboardEventSource: source, virtualKey: 0x7B, keyDown: true)  // Left arrow
-            let leftUp = CGEvent(keyboardEventSource: source, virtualKey: 0x7B, keyDown: false)
+    /// Inserts rendered snippet text into `target` without touching the user's clipboard for long.
+    func insert(_ rendered: RenderedSnippet, into target: NSRunningApplication?) async {
+        await activate(target)
+        insert(rendered, replacingTyped: 0)
+    }
 
-            leftDown?.post(tap: .cghidEventTap)
-            leftUp?.post(tap: .cghidEventTap)
+    @discardableResult
+    private func write(_ snapshot: PasteboardSnapshot) -> Int {
+        beforeWrite()
+        let count = snapshot.write(to: pasteboard)
+        OwnPasteboardWrites.shared.record(count)
+        return count
+    }
 
-            // Small delay between arrow presses
-            usleep(5000) // 5ms
+    func activate(_ target: NSRunningApplication?) async {
+        guard let target, !target.isTerminated else { return }
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier != target.processIdentifier {
+            target.activate()
+            for _ in 0..<50 {
+                if NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier { break }
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
         }
+        try? await Task.sleep(nanoseconds: 60_000_000)
     }
 }

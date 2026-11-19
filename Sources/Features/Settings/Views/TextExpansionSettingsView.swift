@@ -103,60 +103,36 @@ struct TextExpansionSettingsView: View {
 }
 
 struct PermissionStatusView: View {
-    @State private var hasAccessibility = AXIsProcessTrusted()
-    @State private var checkTimer: Timer?
+    @ObservedObject private var permissions = PermissionService.shared
 
     var body: some View {
         Group {
-            if hasAccessibility {
+            if permissions.isGranted {
                 CFBanner.success(
                     icon: AnyView(CFIcon(type: .check, size: 18, stroke: 1.8)),
-                    title: "Accessibility permission granted",
-                    message: "ClipFlow can monitor keystrokes for text expansion."
+                    title: "Permissions granted",
+                    message: "ClipFlow can expand snippets and paste into other apps."
                 )
             } else {
                 CFBanner.accessibility(
-                    title: "Accessibility permission required",
-                    message: "ClipFlow needs Accessibility access to enable text expansion. Without it, snippets won't expand as you type.",
+                    title: "Accessibility and Input Monitoring required",
+                    message: "ClipFlow needs both permissions to expand snippets as you type and to paste the item you pick. Without them, only clipboard history works.",
                     action: AnyView(
                         CFToolbarBtn(
                             label: "Open System Settings",
                             primary: true
                         ) {
-                            openAccessibilitySettings()
+                            permissions.request()
+                            if !permissions.isGranted {
+                                permissions.openSystemSettings()
+                            }
                         }
                     )
                 )
             }
         }
         .onAppear {
-            hasAccessibility = AXIsProcessTrusted()
-            startPeriodicCheck()
-        }
-        .onDisappear {
-            checkTimer?.invalidate()
-            checkTimer = nil
-        }
-    }
-
-    private func startPeriodicCheck() {
-        // Check every 2 seconds if permission status changed
-        checkTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            let newStatus = AXIsProcessTrusted()
-            if newStatus != hasAccessibility {
-                hasAccessibility = newStatus
-                print("🔐 Accessibility permission status changed: \(newStatus)")
-            }
-        }
-    }
-
-    private func openAccessibilitySettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
-
-        // Immediate recheck after opening settings
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            hasAccessibility = AXIsProcessTrusted()
+            permissions.refresh()
         }
     }
 }

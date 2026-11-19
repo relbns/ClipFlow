@@ -81,7 +81,7 @@ struct CoreDataAvailabilityWrapper<Content: View>: View {
             _ = try context.fetch(fetchRequest)
             isCoreDataAvailable = true
         } catch let error as NSError {
-            print("⚠️ Core Data not available: \(error.localizedDescription)")
+            Log.storage.error("Core Data not available: \(error.localizedDescription, privacy: .public)")
             isCoreDataAvailable = false
         }
     }

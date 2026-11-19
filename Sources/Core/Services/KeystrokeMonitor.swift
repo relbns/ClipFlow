@@ -1,141 +1,129 @@
 import Cocoa
-import Combine
 
-/// Monitors all keystrokes system-wide using CGEventTap
+enum TypingEvent {
+    case characters(String)
+    case deleteBackward
+    case reset
+}
+
+/// A listen-only event tap: it sees keystrokes and clicks but never delays or changes them.
 @MainActor
-class KeystrokeMonitor: ObservableObject {
-    @Published var typedBuffer: String = ""
-    @Published var isMonitoring: Bool = false
+final class KeystrokeMonitor {
+    private(set) var isMonitoring = false
+    var onEvent: (TypingEvent) -> Void = { _ in }
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private let maxBufferLength = 50
 
-    private let textExpansionEngine: TextExpansionEngine
-
-    init(textExpansionEngine: TextExpansionEngine) {
-        self.textExpansionEngine = textExpansionEngine
+    private enum KeyCode {
+        static let delete: Int64 = 51
+        static let resetting: Set<Int64> = [53, 115, 116, 117, 119, 121, 123, 124, 125, 126]
     }
 
-    func startMonitoring() throws {
-        // Check Accessibility permissions
-        let trusted = AXIsProcessTrusted()
-        guard trusted else {
-            throw ExpansionError.accessibilityPermissionDenied
-        }
+    func start() -> Bool {
+        guard !isMonitoring else { return true }
 
-        // Create event tap for keyDown events
-        let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
+        let mask: CGEventMask = [CGEventType.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
+            .reduce(0) { $0 | (1 << $1.rawValue) }
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: eventMask,
-            callback: { proxy, type, event, refcon in
-                guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
-                let monitor = Unmanaged<KeystrokeMonitor>.fromOpaque(refcon).takeUnretainedValue()
-
-                Task { @MainActor in
-                    return await monitor.handleKeyEvent(proxy: proxy, type: type, event: event)
-                }
-
-                return Unmanaged.passUnretained(event)
-            },
+            options: .listenOnly,
+            eventsOfInterest: mask,
+            callback: keystrokeTapCallback,
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            throw ExpansionError.failedToCreateEventTap
+            Log.expansion.error("Could not create the keyboard event tap")
+            return false
         }
 
-        self.eventTap = tap
-        self.runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
+        eventTap = tap
+        runLoopSource = source
         isMonitoring = true
-        print("⌨️ Keystroke monitoring started")
+        Log.expansion.info("Keyboard monitoring started")
+        return true
     }
 
-    func stopMonitoring() {
+    func stop() {
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
-            if let source = runLoopSource {
-                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
-            }
+            CFMachPortInvalidate(tap)
+        }
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
         eventTap = nil
         runLoopSource = nil
         isMonitoring = false
-        print("⌨️ Keystroke monitoring stopped")
+        Log.expansion.info("Keyboard monitoring stopped")
     }
 
-    private func handleKeyEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) async -> Unmanaged<CGEvent> {
-        guard type == .keyDown else { return Unmanaged.passUnretained(event) }
+    fileprivate func handle(type: CGEventType, event: CGEvent) {
+        switch type {
+        case .tapDisabledByTimeout, .tapDisabledByUserInput:
+            if let tap = eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+                Log.expansion.notice("Event tap was disabled by the system and has been re-enabled")
+            }
+            onEvent(.reset)
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            onEvent(.reset)
+        case .keyDown:
+            handleKeyDown(event)
+        default:
+            break
+        }
+    }
+
+    private func handleKeyDown(_ event: CGEvent) {
+        guard !SyntheticKeyboard.isSynthetic(event) else { return }
+
+        if !event.flags.isDisjoint(with: [.maskCommand, .maskControl]) {
+            onEvent(.reset)
+            return
+        }
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-
-        // Get typed character
-        guard let chars = event.keyboardEventCharacters, !chars.isEmpty else {
-            return Unmanaged.passUnretained(event)
+        if keyCode == KeyCode.delete {
+            onEvent(.deleteBackward)
+        } else if KeyCode.resetting.contains(keyCode) {
+            onEvent(.reset)
+        } else if let characters = event.typedCharacters {
+            let isFunctionKey = characters.unicodeScalars.contains { $0.properties.generalCategory == .privateUse }
+            onEvent(isFunctionKey ? .reset : .characters(characters))
         }
-
-        // Handle special keys
-        if isDeleteKey(keyCode) {
-            if !typedBuffer.isEmpty {
-                typedBuffer.removeLast()
-            }
-            return Unmanaged.passUnretained(event)
-        }
-
-        if isResetKey(keyCode) {
-            typedBuffer = ""
-            return Unmanaged.passUnretained(event)
-        }
-
-        // Add to buffer
-        typedBuffer.append(chars)
-        if typedBuffer.count > maxBufferLength {
-            typedBuffer = String(typedBuffer.suffix(maxBufferLength))
-        }
-
-        // Try to match snippet
-        if let match = await textExpansionEngine.findMatch(in: typedBuffer, triggerChar: chars.last) {
-            print("🎯 Match found: \(match.snippet.abbreviation) → \(match.snippet.title)")
-
-            // Clear matched part from buffer
-            typedBuffer = ""
-
-            // Trigger expansion (delete abbreviation + trigger character)
-            await textExpansionEngine.expand(match, includingTrigger: true)
-        }
-
-        return Unmanaged.passUnretained(event)
-    }
-
-    private func isDeleteKey(_ keyCode: Int64) -> Bool {
-        return keyCode == 51 // Delete/Backspace
-    }
-
-    private func isResetKey(_ keyCode: Int64) -> Bool {
-        return keyCode == 53 // Escape
     }
 }
 
-enum ExpansionError: Error {
-    case accessibilityPermissionDenied
-    case failedToCreateEventTap
+private func keystrokeTapCallback(
+    proxy: CGEventTapProxy,
+    type: CGEventType,
+    event: CGEvent,
+    refcon: UnsafeMutableRawPointer?
+) -> Unmanaged<CGEvent>? {
+    if let refcon {
+        let monitor = Unmanaged<KeystrokeMonitor>.fromOpaque(refcon).takeUnretainedValue()
+        MainActor.assumeIsolated {
+            monitor.handle(type: type, event: event)
+        }
+    }
+    return Unmanaged.passUnretained(event)
 }
 
 extension CGEvent {
-    var keyboardEventCharacters: String? {
-        // Get Unicode string from event
-        let maxLength = 10
+    var typedCharacters: String? {
         var length = 0
-        var chars = [UniChar](repeating: 0, count: maxLength)
-
-        keyboardGetUnicodeString(maxStringLength: maxLength, actualStringLength: &length, unicodeString: &chars)
-
+        var buffer = [UniChar](repeating: 0, count: 8)
+        keyboardGetUnicodeString(maxStringLength: buffer.count, actualStringLength: &length, unicodeString: &buffer)
         guard length > 0 else { return nil }
-        return String(utf16CodeUnits: chars, count: length)
+        let characters = String(utf16CodeUnits: buffer, count: length)
+        return characters.unicodeScalars.allSatisfy({ $0.properties.generalCategory == .control && $0 != "\r" && $0 != "\t" })
+            ? nil
+            : characters
     }
 }

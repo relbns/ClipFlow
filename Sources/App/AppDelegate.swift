@@ -1,4 +1,5 @@
 import Cocoa
+import Combine
 import SwiftUI
 
 /// Wrapper that dynamically updates layout direction based on language changes
@@ -33,185 +34,150 @@ class WelcomeWindowDelegate: NSObject, NSWindowDelegate {
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
-    private var clipboardMonitor: ClipboardMonitor?
-    private var menuBarController: MenuBarController?
     private var menuBarPopover: NSPopover?
-    private var hotkeyManager: HotkeyManager?
-    private var appContextMonitor: AppContextMonitor?
+    private var popoverAnchorWindow: NSWindow?
     private var snippetEditorWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var aboutWindow: NSWindow?
     private var welcomeWindow: NSWindow?
     private var welcomeWindowDelegate: WelcomeWindowDelegate?
 
-    // Text Expansion
-    private var textExpansionEngine: TextExpansionEngine?
-    private var keystrokeMonitor: KeystrokeMonitor?
-    private var hasShownAccessibilityAlert = false
-
-    // Theme
-    // private var themeManager: ThemeManager?
+    private var clipboardMonitor: ClipboardMonitor!
+    private var textExpansionEngine: TextExpansionEngine!
+    private let keystrokeMonitor = KeystrokeMonitor()
+    private let permissions = PermissionService.shared
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSLog("🚀 ClipFlow applicationDidFinishLaunching started")
+        NSApp.setActivationPolicy(.accessory)
+        ProcessInfo.processInfo.disableAutomaticTermination("ClipFlow runs in the menu bar without windows")
+        AppDefaults.register()
 
-        // Initialize theme manager
-        // themeManager = ThemeManager.shared
-        // NSLog("✅ Theme manager initialized")
-
-        // Create default snippets on first launch
-        CoreDataStack.shared.createDefaultSnippetsIfNeeded()
-
-        // Initialize services
-        clipboardMonitor = ClipboardMonitor()
-        appContextMonitor = AppContextMonitor()
-        NSLog("✅ Clipboard and context monitors initialized")
-
-        // Initialize text expansion
-        let context = CoreDataStack.shared.viewContext
-        textExpansionEngine = TextExpansionEngine(context: context)
-        if let engine = textExpansionEngine {
-            NSLog("✅ TextExpansionEngine created")
-            keystrokeMonitor = KeystrokeMonitor(textExpansionEngine: engine)
-            NSLog("✅ KeystrokeMonitor created")
-
-            // Preload snippet cache for better performance
-            engine.refreshCache()
-            NSLog("✅ Snippet cache preloaded")
-        } else {
-            NSLog("❌ Failed to create TextExpansionEngine")
+        let stack = CoreDataStack.shared
+        stack.prepareDefaultData()
+        if let issue = stack.loadIssue {
+            DispatchQueue.main.async { Self.showStoreAlert(for: issue) }
         }
 
-        // Create menu bar controller (keep for fallback)
-        if let monitor = clipboardMonitor {
-            menuBarController = MenuBarController(clipboardMonitor: monitor, appDelegate: self)
-        }
+        clipboardMonitor = ClipboardMonitor(context: stack.makeServiceContext())
+        textExpansionEngine = TextExpansionEngine(context: stack.makeServiceContext())
+        PasteEngine.shared.beforeWrite = { [weak self] in self?.clipboardMonitor.checkPasteboard() }
+        keystrokeMonitor.onEvent = { [weak self] event in self?.textExpansionEngine.handle(event) }
 
-        // Setup hotkeys
-        hotkeyManager = HotkeyManager.shared
+        PasteCoordinator.shared.clipboardMonitor = clipboardMonitor
+        PasteCoordinator.shared.closePopover = { [weak self] in self?.menuBarPopover?.performClose(nil) }
+        PopoverNavigation.shared.clipboardMonitor = clipboardMonitor
+        PopoverNavigation.shared.onClose = { [weak self] in self?.menuBarPopover?.performClose(nil) }
+
+        setupStatusItem()
         setupHotkeys()
+        setupNotifications()
 
-        // Create status bar item
+        if UserDefaults.standard.bool(forKey: "startMonitoring") {
+            clipboardMonitor.startMonitoring()
+        }
+
+        permissions.startWatching()
+        permissions.$canListen
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateTextExpansionState() }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateTextExpansionState() }
+            .store(in: &cancellables)
+
+        let hasCompletedWelcome = UserDefaults.standard.bool(forKey: "hasCompletedWelcome")
+        if !hasCompletedWelcome && !UserDefaults.standard.bool(forKey: "hasLaunchedBefore") {
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.openWelcome()
+            }
+        } else if isTextExpansionEnabled && !permissions.isGranted {
+            permissions.request()
+        }
+
+        updateTextExpansionState()
+        Log.app.info("ClipFlow started")
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        keystrokeMonitor.stop()
+        clipboardMonitor?.stopMonitoring()
+    }
+
+    private static func showStoreAlert(for issue: CoreDataStack.LoadIssue) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        switch issue {
+        case .newerVersion:
+            alert.messageText = L("store_newer_title")
+            alert.informativeText = L("store_newer_message")
+        case .movedAside(let url):
+            alert.messageText = L("store_moved_title")
+            alert.informativeText = L("store_moved_message", url.path)
+            alert.addButton(withTitle: L("show_in_finder"))
+            alert.addButton(withTitle: "OK")
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn, case .movedAside(let url) = issue {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+
+    // MARK: - Setup
+
+    private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-
         if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "ClipFlow")
             button.target = self
             button.action = #selector(statusBarButtonClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-
-        // Setup notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(openPreferences),
-            name: NSNotification.Name("OpenPreferences"),
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(openSnippetEditor),
-            name: NSNotification.Name("OpenSnippetEditor"),
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(openAbout),
-            name: NSNotification.Name("OpenAbout"),
-            object: nil
-        )
-
-        // Start monitoring
-        Task { @MainActor in
-            NSLog("🔄 Starting monitors...")
-            clipboardMonitor?.startMonitoring()
-            appContextMonitor?.startMonitoring()
-            NSLog("✅ Clipboard and context monitoring started")
-
-            // Start text expansion if enabled (default: true)
-            // Use explicit Bool conversion to avoid type mismatch crashes
-            let expansionEnabled: Bool
-            if let value = UserDefaults.standard.value(forKey: "textExpansionEnabled") as? Bool {
-                expansionEnabled = value
-            } else if let value = UserDefaults.standard.value(forKey: "textExpansionEnabled") as? Int {
-                expansionEnabled = value != 0
-            } else {
-                expansionEnabled = true // default
-                UserDefaults.standard.set(true, forKey: "textExpansionEnabled")
-            }
-            NSLog("📋 Text expansion setting: \(expansionEnabled)")
-            if expansionEnabled {
-                NSLog("🎯 Calling startTextExpansion()...")
-                startTextExpansion()
-            } else {
-                NSLog("⚠️ Text expansion is disabled in settings")
-            }
-        }
-
-        // Observe text expansion setting changes (specific key only)
-        UserDefaults.standard.addObserver(
-            self,
-            forKeyPath: "textExpansionEnabled",
-            options: [.new],
-            context: nil
-        )
-
-        // Show welcome screen on first launch ONLY
-        // Check both hasLaunchedBefore flag and if we've ever shown the welcome
-        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
-        let hasCompletedWelcome = UserDefaults.standard.bool(forKey: "hasCompletedWelcome")
-
-        if !hasLaunchedBefore && !hasCompletedWelcome {
-            NSLog("👋 First launch detected - showing welcome screen")
-            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
-
-            // Delay to ensure app is fully initialized
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.openWelcome()
-            }
-        } else {
-            NSLog("✅ Not first launch (hasLaunchedBefore: \(hasLaunchedBefore), hasCompletedWelcome: \(hasCompletedWelcome))")
-        }
-
-        // Hide dock icon (menu bar app only)
-        NSApp.setActivationPolicy(.accessory)
     }
 
     private func setupHotkeys() {
-        hotkeyManager?.setupHotkeys(
-            onMainMenu: { [weak self] in
-                Task { @MainActor in
-                    self?.showMenuPopover()
-                }
-            },
-            onHistoryMenu: { [weak self] in
-                Task { @MainActor in
-                    self?.showMenuPopover()
-                }
-            },
-            onSnippetsMenu: {
-                print("📋 Snippets menu")
-            },
-            onSnippetEditor: { [weak self] in
-                Task { @MainActor in
-                    self?.openSnippetEditor()
-                }
-            },
-            onClearHistory: { [weak self] in
-                Task { @MainActor in
-                    self?.clipboardMonitor?.clearHistory()
-                }
-            }
+        HotkeyManager.shared.setupHotkeys(
+            onHistoryMenu: { [weak self] in self?.showMenuPopover() },
+            onSnippetEditor: { [weak self] in self?.openSnippetEditor() },
+            onClearHistory: { [weak self] in self?.clipboardMonitor.clearHistory() }
         )
     }
+
+    private func setupNotifications() {
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(openPreferences), name: NSNotification.Name("OpenPreferences"), object: nil)
+        center.addObserver(self, selector: #selector(openSnippetEditor), name: NSNotification.Name("OpenSnippetEditor"), object: nil)
+        center.addObserver(self, selector: #selector(openAbout), name: NSNotification.Name("OpenAbout"), object: nil)
+    }
+
+    // MARK: - Text expansion
+
+    private var isTextExpansionEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "textExpansionEnabled")
+    }
+
+    /// Idempotent: starts the tap once expansion is on and Input Monitoring is granted, stops it otherwise.
+    private func updateTextExpansionState() {
+        let shouldRun = isTextExpansionEnabled && permissions.canListen
+        if shouldRun && !keystrokeMonitor.isMonitoring {
+            if !keystrokeMonitor.start() {
+                Log.expansion.error("Text expansion could not start although permission is granted")
+            }
+        } else if !shouldRun && keystrokeMonitor.isMonitoring {
+            keystrokeMonitor.stop()
+        }
+    }
+
+    // MARK: - Popover
 
     @objc private func statusBarButtonClicked() {
         showMenuPopover()
     }
 
     private func showMenuPopover() {
-        guard let clipboardMonitor = clipboardMonitor else { return }
-
         if menuBarPopover == nil {
             let popover = NSPopover()
             popover.behavior = .transient
@@ -227,251 +193,156 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .cfAutoTheme()
 
             popover.contentViewController = NSHostingController(rootView: popoverView)
+            NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.popoverAnchorWindow?.orderOut(nil)
+                    PopoverNavigation.shared.popoverDidClose()
+                }
+            }
             menuBarPopover = popover
         }
 
-        if let button = statusItem?.button {
-            if menuBarPopover?.isShown == true {
-                menuBarPopover?.performClose(nil)
-            } else {
-                menuBarPopover?.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            }
+        guard let popover = menuBarPopover else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            PasteCoordinator.shared.rememberFrontmostApp()
+            PopoverNavigation.shared.popoverWillShow()
+            let anchor = popoverAnchor()
+            popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+            NSApp.activate(ignoringOtherApps: true)
+            popover.contentViewController?.view.window?.makeKey()
         }
     }
 
-    @objc func openPreferences() {
-        print("🔧 AppDelegate.openPreferences() called")
+    /// The status item, or the top of the mouse's screen when the item is hidden (e.g. by a menu bar manager).
+    private func popoverAnchor() -> NSView {
+        if let button = statusItem?.button, let window = button.window,
+           window.occlusionState.contains(.visible),
+           NSScreen.screens.contains(where: { $0.frame.intersects(window.frame) }) {
+            return button
+        }
 
+        let anchor = popoverAnchorWindow ?? {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: .borderless, backing: .buffered, defer: false)
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.level = .statusBar
+            window.ignoresMouseEvents = true
+            window.isReleasedWhenClosed = false
+            return window
+        }()
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
+        let top = screen?.visibleFrame.maxY ?? mouse.y
+        anchor.setFrameOrigin(NSPoint(x: mouse.x, y: top - 1))
+        anchor.orderFrontRegardless()
+        popoverAnchorWindow = anchor
+        Log.ui.info("Status item is not visible, opening the popover under the menu bar at the mouse")
+        return anchor.contentView ?? NSView()
+    }
+
+    // MARK: - Windows
+
+    @objc func openPreferences() {
         if settingsWindow == nil {
-            print("📝 Creating new settings window")
-            let languageManager = LanguageManager.shared
             let settingsView = DynamicLanguageWrapper {
                 SettingsView()
                     .cfAutoTheme()
             }
-            .environmentObject(languageManager)
+            .environmentObject(LanguageManager.shared)
 
-            let hostingController = NSHostingController(rootView: settingsView)
-
-            let window = NSWindow(contentViewController: hostingController)
-            window.title = L("preferences")
-            window.setContentSize(NSSize(width: 760, height: 620))
-            window.styleMask = [.titled, .closable, .miniaturizable]
-            window.center()
-
-            settingsWindow = window
-            print("✅ Settings window created")
-        } else {
-            print("♻️ Reusing existing settings window")
+            settingsWindow = makeWindow(
+                rootView: settingsView,
+                title: L("preferences"),
+                size: NSSize(width: 760, height: 620),
+                style: [.titled, .closable, .miniaturizable]
+            )
         }
-
-        settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        print("✅ Settings window should be visible now")
+        present(settingsWindow)
     }
 
     @objc func openSnippetEditor() {
-        print("📋 AppDelegate.openSnippetEditor() called")
-
         if snippetEditorWindow == nil {
-            print("📝 Creating new editor window")
-            let languageManager = LanguageManager.shared
             let editorView = DynamicLanguageWrapper {
                 SnippetEditorView()
                     .cfAutoTheme()
                     .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
             }
-            .environmentObject(languageManager)
+            .environmentObject(LanguageManager.shared)
 
-            let hostingController = NSHostingController(rootView: editorView)
-
-            let window = NSWindow(contentViewController: hostingController)
-            window.title = L("snippet_editor")
-            window.setContentSize(NSSize(width: 1080, height: 700))
-            window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-            window.center()
-
-            snippetEditorWindow = window
-            print("✅ Editor window created")
-        } else {
-            print("♻️ Reusing existing editor window")
+            snippetEditorWindow = makeWindow(
+                rootView: editorView,
+                title: L("snippet_editor"),
+                size: NSSize(width: 1080, height: 700),
+                style: [.titled, .closable, .resizable, .miniaturizable]
+            )
         }
-
-        snippetEditorWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        print("✅ Editor window should be visible now")
+        present(snippetEditorWindow)
     }
 
     @objc func openAbout() {
-        print("ℹ️ AppDelegate.openAbout() called")
-
         if aboutWindow == nil {
-            print("📝 Creating new about window")
-            let languageManager = LanguageManager.shared
             let aboutView = DynamicLanguageWrapper {
                 AboutView()
                     .cfAutoTheme()
             }
-            .environmentObject(languageManager)
+            .environmentObject(LanguageManager.shared)
 
-            let hostingController = NSHostingController(rootView: aboutView)
-
-            let window = NSWindow(contentViewController: hostingController)
-            window.title = L("about_clipflow")
-            window.setContentSize(NSSize(width: 560, height: 520))
-            window.styleMask = [.titled, .closable]
-            window.center()
-
-            aboutWindow = window
-            print("✅ About window created")
-        } else {
-            print("♻️ Reusing existing about window")
+            aboutWindow = makeWindow(
+                rootView: aboutView,
+                title: L("about_clipflow"),
+                size: NSSize(width: 560, height: 520),
+                style: [.titled, .closable]
+            )
         }
-
-        aboutWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        print("✅ About window should be visible now")
+        present(aboutWindow)
     }
 
     @objc func openWelcome() {
-        print("👋 AppDelegate.openWelcome() called")
-
         if welcomeWindow == nil {
-            print("📝 Creating new welcome window")
-            let languageManager = LanguageManager.shared
-
-            // Create a state wrapper for the welcome view
-            class WelcomeState: ObservableObject {
-                @Published var isPresented = true
+            let close: () -> Void = { [weak self] in
+                self?.welcomeWindow?.close()
             }
-            let state = WelcomeState()
-
             let welcomeView = DynamicLanguageWrapper {
                 WelcomeView(
-                    isPresented: .init(
-                        get: { state.isPresented },
-                        set: { state.isPresented = $0 }
-                    ),
-                    onGetStarted: { [weak self] in
-                        self?.welcomeWindow?.close()
-                        self?.welcomeWindow = nil
-                    }
+                    isPresented: Binding(get: { true }, set: { if !$0 { close() } }),
+                    onGetStarted: close
                 )
                 .cfAutoTheme()
             }
-            .environmentObject(languageManager)
+            .environmentObject(LanguageManager.shared)
 
-            let hostingController = NSHostingController(rootView: welcomeView)
-
-            let window = NSWindow(contentViewController: hostingController)
-            window.title = "Welcome to ClipFlow"
-            window.setContentSize(NSSize(width: 780, height: 560))
-            window.styleMask = [NSWindow.StyleMask.titled, NSWindow.StyleMask.closable]
-            window.center()
-
-            // Close and cleanup when window is closed
+            let window = makeWindow(
+                rootView: welcomeView,
+                title: "Welcome to ClipFlow",
+                size: NSSize(width: 780, height: 560),
+                style: [.titled, .closable]
+            )
             let delegate = WelcomeWindowDelegate { [weak self] in
                 self?.welcomeWindow = nil
                 self?.welcomeWindowDelegate = nil
             }
-            self.welcomeWindowDelegate = delegate
             window.delegate = delegate
-
+            window.isReleasedWhenClosed = false
+            welcomeWindowDelegate = delegate
             welcomeWindow = window
-            print("✅ Welcome window created")
-        } else {
-            print("♻️ Reusing existing welcome window")
         }
+        present(welcomeWindow)
+    }
 
-        welcomeWindow?.makeKeyAndOrderFront(nil)
+    private func makeWindow<Content: View>(rootView: Content, title: String, size: NSSize, style: NSWindow.StyleMask) -> NSWindow {
+        let window = NSWindow(contentViewController: NSHostingController(rootView: rootView))
+        window.title = title
+        window.setContentSize(size)
+        window.styleMask = style
+        window.isReleasedWhenClosed = false
+        window.center()
+        return window
+    }
+
+    private func present(_ window: NSWindow?) {
+        window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        print("✅ Welcome window should be visible now")
-    }
-
-    // MARK: - Text Expansion
-    private func startTextExpansion() {
-        NSLog("🎬 startTextExpansion() called")
-
-        guard let monitor = keystrokeMonitor else {
-            NSLog("❌ KeystrokeMonitor not initialized - cannot start text expansion")
-            return
-        }
-        NSLog("✅ KeystrokeMonitor exists")
-
-        // Check accessibility permission first
-        let hasPermission = AXIsProcessTrusted()
-        NSLog("🔐 Accessibility permission status: \(hasPermission)")
-
-        // Don't restart if already monitoring
-        if monitor.isMonitoring {
-            NSLog("✅ Text expansion already running")
-            return
-        }
-        NSLog("▶️ Attempting to start keystroke monitoring...")
-
-        do {
-            try monitor.startMonitoring()
-            NSLog("✅✅✅ Text expansion started successfully!")
-        } catch {
-            NSLog("❌❌❌ Failed to start text expansion: \(error)")
-            NSLog("Error type: \(type(of: error))")
-            // Only show alert for permission denied (not other errors)
-            if case ExpansionError.accessibilityPermissionDenied = error {
-                NSLog("⚠️ Error is accessibilityPermissionDenied")
-                // Only show alert once per session
-                if !hasShownAccessibilityAlert {
-                    hasShownAccessibilityAlert = true
-                    NSLog("🚨 Showing accessibility alert")
-                    showAccessibilityAlert()
-                } else {
-                    NSLog("⚠️ Permission still denied (alert already shown)")
-                }
-            } else {
-                NSLog("⚠️ Error is NOT accessibilityPermissionDenied, it's: \(error)")
-            }
-        }
-    }
-
-    private func stopTextExpansion() {
-        keystrokeMonitor?.stopMonitoring()
-        print("🛑 Text expansion stopped")
-    }
-
-    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        if keyPath == "textExpansionEnabled" {
-            textExpansionSettingChanged()
-        }
-    }
-
-    private func textExpansionSettingChanged() {
-        let isEnabled = UserDefaults.standard.object(forKey: "textExpansionEnabled") as? Bool ?? true
-        let isCurrentlyMonitoring = keystrokeMonitor?.isMonitoring ?? false
-
-        // Only change state if needed
-        if isEnabled && !isCurrentlyMonitoring {
-            startTextExpansion()
-        } else if !isEnabled && isCurrentlyMonitoring {
-            stopTextExpansion()
-        }
-        // Otherwise, already in correct state - do nothing
-    }
-
-    private func showAccessibilityAlert() {
-        // Defer alert to avoid being called during transaction
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Accessibility Permission Required"
-            alert.informativeText = "ClipFlow needs Accessibility permission to enable text expansion. Please grant permission in System Settings."
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "Open System Settings")
-            alert.addButton(withTitle: "Cancel")
-
-            let response = alert.runModal()
-            if response == .alertFirstButtonReturn {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-        }
     }
 }

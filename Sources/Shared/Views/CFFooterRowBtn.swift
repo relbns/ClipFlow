@@ -65,21 +65,17 @@ struct CFFooterRowBtn: View {
             Divider()
 
             CFFooterRowBtn(icon: .sparkles, label: "Snippet Editor…", kbd: "⌘E") {
-                print("Open editor")
             }
 
             CFFooterRowBtn(icon: .gear, label: "Preferences…", kbd: "⌘,") {
-                print("Open preferences")
             }
 
             Divider()
 
             CFFooterRowBtn(icon: .trash, label: "Clear history") {
-                print("Clear history")
             }
 
             CFFooterRowBtn(icon: .power, label: "Quit ClipFlow", kbd: "⌘Q", danger: true) {
-                print("Quit")
             }
         }
         .background(Color.black.opacity(0.07))
@@ -97,17 +93,13 @@ struct CFFooterRowBtn: View {
 #Preview("Footer Row Buttons - Light") {
     VStack(spacing: 0) {
         CFFooterRowBtn(icon: .sparkles, label: "Snippet Editor…", kbd: "⌘E") {
-            print("Editor")
         }
         CFFooterRowBtn(icon: .gear, label: "Preferences…", kbd: "⌘,") {
-            print("Preferences")
         }
         Divider()
         CFFooterRowBtn(icon: .trash, label: "Clear history") {
-            print("Clear")
         }
         CFFooterRowBtn(icon: .power, label: "Quit", danger: true) {
-            print("Quit")
         }
     }
     .frame(width: 340)

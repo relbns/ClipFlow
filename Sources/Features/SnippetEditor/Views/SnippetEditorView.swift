@@ -87,7 +87,6 @@ private struct SnippetEditorContentView: View {
     }
 
     private func createGroup() {
-        print("➕ Creating new group...")
         withAnimation {
             let newGroup = SnippetGroup(context: viewContext)
             newGroup.id = UUID()
@@ -98,21 +97,17 @@ private struct SnippetEditorContentView: View {
 
             do {
                 try viewContext.save()
-                print("✅ Group created successfully: \(newGroup.name)")
             } catch {
-                print("❌ Failed to create group: \(error)")
+                Log.ui.error("Failed to create group: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
 
     private func createSnippet() {
-        print("➕ Creating new snippet...")
 
         guard let group = selectedGroup ?? groups.first else {
-            print("❌ No group available! groups.count = \(groups.count)")
 
             // Create default group if none exists
-            print("📂 Creating default group first...")
             let defaultGroup = SnippetGroup(context: viewContext)
             defaultGroup.id = UUID()
             defaultGroup.name = "Default"
@@ -122,9 +117,8 @@ private struct SnippetEditorContentView: View {
 
             do {
                 try viewContext.save()
-                print("✅ Default group created")
             } catch {
-                print("❌ Failed to create default group: \(error)")
+                Log.ui.error("Failed to create default group: \(error.localizedDescription, privacy: .public)")
                 return
             }
 
@@ -133,7 +127,6 @@ private struct SnippetEditorContentView: View {
             return
         }
 
-        print("📂 Using group: \(group.name)")
 
         withAnimation {
             let newSnippet = Snippet(context: viewContext)
@@ -153,9 +146,8 @@ private struct SnippetEditorContentView: View {
             do {
                 try viewContext.save()
                 selectedSnippet = newSnippet
-                print("✅ Snippet created successfully: \(newSnippet.title)")
             } catch {
-                print("❌ Failed to create snippet: \(error)")
+                Log.ui.error("Failed to create snippet: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -195,9 +187,8 @@ private struct SnippetEditorContentView: View {
             do {
                 try viewContext.save()
                 selectedSnippet = duplicate
-                print("✅ Snippet duplicated: \(duplicate.title)")
             } catch {
-                print("❌ Failed to duplicate snippet: \(error)")
+                Log.ui.error("Failed to duplicate snippet: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -211,9 +202,8 @@ private struct SnippetEditorContentView: View {
 
             do {
                 try viewContext.save()
-                print("✅ Snippet deleted")
             } catch {
-                print("❌ Failed to delete snippet: \(error)")
+                Log.ui.error("Failed to delete snippet: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -365,7 +355,8 @@ private struct SnippetDetailView: View {
                     Text("Delimiter (space, tab, punct)").tag("delimiter")
                     Text("Space only").tag("space")
                     Text("Any character").tag("any")
-                    Text("Tab only").tag("enter")
+                    Text("Tab only").tag("tab")
+                    Text("Enter only").tag("enter")
                 }
 
                 Toggle("Case sensitive", isOn: $snippet.caseSensitive)
@@ -694,7 +685,7 @@ private struct GroupsPanel: View {
         do {
             try viewContext.save()
         } catch {
-            print("❌ Failed to delete group: \(error)")
+            Log.ui.error("Failed to delete group: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

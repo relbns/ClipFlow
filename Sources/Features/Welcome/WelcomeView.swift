@@ -264,9 +264,9 @@ struct WelcomeView: View {
                         // Mark welcome as completed
                         UserDefaults.standard.set(true, forKey: "hasCompletedWelcome")
                         onGetStarted()
-                        // Open System Settings for Accessibility
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                            NSWorkspace.shared.open(url)
+                        PermissionService.shared.request()
+                        if !PermissionService.shared.isGranted {
+                            PermissionService.shared.openSystemSettings()
                         }
                     }) {
                         HStack(spacing: 6) {
@@ -380,13 +380,11 @@ struct WelcomeView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
             WelcomeView(isPresented: .constant(true)) {
-                print("Get Started tapped")
             }
             .cfAutoTheme()
             .previewDisplayName("Welcome - Light")
 
             WelcomeView(isPresented: .constant(true)) {
-                print("Get Started tapped")
             }
             .cfAutoTheme()
             .preferredColorScheme(.dark)

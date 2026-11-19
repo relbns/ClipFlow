@@ -392,7 +392,6 @@ struct CFShowcase: View {
                         .frame(height: 40)
 
                     CFSectionLabel("GROUPS") {
-                        print("Add group")
                     }
                     Rectangle()
                         .fill(theme.fill1)

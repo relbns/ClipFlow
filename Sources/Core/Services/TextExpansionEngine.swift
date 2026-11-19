@@ -1,192 +1,116 @@
-import Foundation
-import CoreData
 import AppKit
+import CoreData
 
-/// Handles text expansion matching and execution
 @MainActor
-class TextExpansionEngine {
+final class TextExpansionEngine {
     private let context: NSManagedObjectContext
-    private let pasteEngine: PasteEngine
-    private let variableProcessor: VariableProcessor
-
-    // Performance: Cache snippets to avoid Core Data query on every keystroke
-    private var snippetCache: [CachedSnippet] = []
-    private var cacheLastUpdated: Date = .distantPast
-    private var cachedFrontmostApp: String = ""
-    private var frontmostAppCacheTime: Date = .distantPast
-
-    struct Match {
-        let snippet: Snippet
-        let abbreviationLength: Int
-    }
-
-    struct CachedSnippet {
-        let snippet: Snippet
-        let abbreviation: String
-        let triggerType: ExpandTrigger
-        let restrictToApps: Bool
-        let allowedApps: [String]
-
-        init(snippet: Snippet) {
-            self.snippet = snippet
-            self.abbreviation = snippet.abbreviation
-            self.triggerType = snippet.expandTriggerType
-            self.restrictToApps = snippet.restrictToApps
-            self.allowedApps = snippet.appRules?.compactMap { $0.bundleIdentifier } ?? []
-        }
-    }
+    private var buffer = TypingBuffer()
+    private var candidates: [ExpansionCandidate] = []
+    private var snippetIDs: [String: NSManagedObjectID] = [:]
+    private var needsReload = true
+    private var isExpanding = false
+    private var observers: [NSObjectProtocol] = []
 
     init(context: NSManagedObjectContext) {
         self.context = context
-        self.pasteEngine = PasteEngine()
-        self.variableProcessor = VariableProcessor()
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .NSManagedObjectContextObjectsDidChange, object: context, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.needsReload = true }
+        })
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.buffer.reset() }
+        })
     }
 
-    /// Refresh snippet cache from Core Data
-    func refreshCache() {
-        let request: NSFetchRequest<Snippet> = Snippet.fetchRequest()
-        request.predicate = NSPredicate(format: "isEnabled == YES")
+    func handle(_ event: TypingEvent) {
+        switch event {
+        case .reset:
+            buffer.reset()
+        case .deleteBackward:
+            buffer.deleteBackward()
+        case .characters(let characters):
+            guard !isExpanding else { return }
+            buffer.append(characters)
+            evaluate()
+            if characters.contains(where: { $0 == "\r" || $0 == "\n" || $0 == "\t" }) {
+                buffer.reset()
+            }
+        }
+    }
 
-        guard let snippets = try? context.fetch(request) else {
-            snippetCache = []
+    private func evaluate() {
+        guard let target = NSWorkspace.shared.frontmostApplication,
+              target.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+        let bundleID = target.bundleIdentifier ?? ""
+        guard !AppExclusions.expansion.contains(bundleID) else { return }
+
+        reloadIfNeeded()
+        guard let match = AbbreviationMatcher.match(buffer: buffer.text, candidates: candidates, frontmostApp: bundleID),
+              let objectID = snippetIDs[match.candidateID],
+              let snippet = try? context.existingObject(with: objectID) as? Snippet else { return }
+
+        buffer.reset()
+        expand(snippet, match: match, in: target)
+    }
+
+    private func expand(_ snippet: Snippet, match: AbbreviationMatch, in target: NSRunningApplication) {
+        let content = snippet.content
+        if SnippetTemplate.prompts(in: content).isEmpty {
+            let rendered = SnippetRenderer.renderWithoutPrompts(content)
+            finish(snippet, rendered: rendered, match: match)
             return
         }
 
-        // Cache snippet data for fast lookup
-        snippetCache = snippets.map { CachedSnippet(snippet: $0) }
-        cacheLastUpdated = Date()
-        print("🔄 Snippet cache refreshed: \(snippetCache.count) snippets")
-    }
-
-    /// Get frontmost app with caching (avoid expensive call on every keystroke)
-    private func getFrontmostAppBundleID() -> String {
-        let now = Date()
-        // Cache for 100ms - app switches don't happen faster than this
-        if now.timeIntervalSince(frontmostAppCacheTime) < 0.1 {
-            return cachedFrontmostApp
-        }
-
-        if let app = NSWorkspace.shared.frontmostApplication {
-            cachedFrontmostApp = app.bundleIdentifier ?? ""
-        } else {
-            cachedFrontmostApp = ""
-        }
-        frontmostAppCacheTime = now
-        return cachedFrontmostApp
-    }
-
-    /// Find matching snippet in the typed buffer (optimized for performance)
-    nonisolated func findMatch(in buffer: String, triggerChar: Character?) -> Match? {
-        // This method must be synchronous and fast - called on every keystroke
-        // We use the cached data only, no Core Data queries
-
-        return MainActor.assumeIsolated {
-            // Refresh cache if empty or stale (older than 30 seconds)
-            if snippetCache.isEmpty || Date().timeIntervalSince(cacheLastUpdated) > 30 {
-                refreshCache()
-            }
-
-            // Get frontmost app (with caching)
-            let frontmostApp = getFrontmostAppBundleID()
-
-            // Check trigger character first
-            guard let trigger = triggerChar else { return nil }
-
-            // Buffer might include trigger char at end - strip it for matching
-            let bufferWithoutTrigger = buffer.dropLast()
-            guard !bufferWithoutTrigger.isEmpty else { return nil }
-
-            // Fast path: Try to find a match in cached snippets
-            for cached in snippetCache {
-                let abbrev = cached.abbreviation
-
-                // Quick check: buffer (without trigger) must end with abbreviation
-                guard bufferWithoutTrigger.hasSuffix(abbrev) else { continue }
-
-                // Check app-specific rules
-                if cached.restrictToApps {
-                    if !cached.allowedApps.isEmpty && !cached.allowedApps.contains(frontmostApp) {
-                        continue
-                    }
-                }
-
-                // Check if trigger matches the required type
-                if isValidTrigger(trigger, for: cached.triggerType) {
-                    return Match(snippet: cached.snippet, abbreviationLength: abbrev.count)
-                }
-            }
-
-            return nil
+        isExpanding = true
+        Task { @MainActor in
+            defer { self.isExpanding = false }
+            guard let rendered = await SnippetRenderer.render(content, returningFocusTo: target) else { return }
+            self.finish(snippet, rendered: rendered, match: match)
         }
     }
 
-    /// Expand a matched snippet (async - runs in background)
-    func expand(_ match: Match, includingTrigger: Bool = false) async {
-        let snippet = match.snippet
+    private func finish(_ snippet: Snippet, rendered: RenderedSnippet, match: AbbreviationMatch) {
+        let trailing = match.trailingText
+        let output = RenderedSnippet(
+            text: rendered.text + trailing,
+            cursorOffsetFromEnd: rendered.cursorOffsetFromEnd > 0 ? rendered.cursorOffsetFromEnd + trailing.count : 0
+        )
+        PasteEngine.shared.insert(output, replacingTyped: match.deleteCount)
 
-        // Delete the abbreviation + trigger character (backspaces)
-        let deleteCount = match.abbreviationLength + (includingTrigger ? 1 : 0)
-        deleteCharacters(count: deleteCount)
-
-        // Small delay for deletion to complete
-        try? await Task.sleep(nanoseconds: 5_000_000) // 5ms
-
-        // Process variables in content
-        let processedContent = await variableProcessor.process(snippet.content)
-
-        // Paste the expanded text
-        await pasteEngine.paste(processedContent)
-
-        // Play sound if enabled
-        if snippet.playSound {
-            playExpansionSound()
+        if snippet.playSound || UserDefaults.standard.bool(forKey: "playSoundOnExpand") {
+            NSSound(named: "Tink")?.play()
         }
-
-        // Update statistics
-        updateStatistics(for: snippet)
+        CoreDataStack.shared.recordSnippetUse(snippet.objectID)
     }
 
-    private func isValidTrigger(_ char: Character, for trigger: ExpandTrigger) -> Bool {
-        switch trigger {
-        case .any:
-            return true
-        case .space:
-            return char == " "
-        case .delimiter:
-            return char.isWhitespace || char.isPunctuation
-        case .tab:
-            return char == "\t"
-        case .enter:
-            return char == "\n" || char == "\r"
+    private func reloadIfNeeded() {
+        guard needsReload else { return }
+        needsReload = false
+
+        let request = Snippet.fetchRequest()
+        request.predicate = NSPredicate(format: "isEnabled == YES AND (group == nil OR group.isEnabled == YES)")
+        let snippets = (try? context.fetch(request)) ?? []
+
+        snippetIDs = [:]
+        candidates = snippets.map { snippet in
+            let id = snippet.objectID.uriRepresentation().absoluteString
+            snippetIDs[id] = snippet.objectID
+            let rules = (snippet.appRules ?? []).filter(\.isEnabled)
+            let allowed = Set(rules.filter { !$0.isDeny }.map(\.bundleIdentifier))
+            let denied = Set(rules.filter(\.isDeny).map(\.bundleIdentifier))
+            return ExpansionCandidate(
+                id: id,
+                abbreviation: snippet.abbreviation.trimmingCharacters(in: .whitespacesAndNewlines),
+                trigger: snippet.expandTriggerType,
+                caseSensitive: snippet.caseSensitive,
+                allowedApps: snippet.restrictToApps && !allowed.isEmpty ? allowed : nil,
+                deniedApps: denied
+            )
         }
-    }
-
-    private func deleteCharacters(count: Int) {
-        // Simulate backspace key presses (synchronous)
-        for _ in 0..<count {
-            let deleteDown = CGEvent(keyboardEventSource: nil, virtualKey: 0x33, keyDown: true)
-            let deleteUp = CGEvent(keyboardEventSource: nil, virtualKey: 0x33, keyDown: false)
-
-            deleteDown?.post(tap: .cghidEventTap)
-            deleteUp?.post(tap: .cghidEventTap)
-
-            // Small delay between keystrokes (busy wait for precision)
-            usleep(1000) // 1ms
-        }
-    }
-
-    private func playExpansionSound() {
-        NSSound.beep()
-    }
-
-    private func updateStatistics(for snippet: Snippet) {
-        snippet.useCount += 1
-        snippet.lastUsed = Date()
-
-        do {
-            try context.save()
-        } catch {
-            print("❌ Failed to update snippet statistics: \(error)")
-        }
+        .sorted { $0.abbreviation.count > $1.abbreviation.count }
+        Log.expansion.debug("Loaded \(self.candidates.count) snippets")
     }
 }

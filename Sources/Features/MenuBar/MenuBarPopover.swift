@@ -4,12 +4,13 @@ import CoreData
 /// Modern SwiftUI MenuBar Popover - replaces NSMenu
 @MainActor
 struct MenuBarPopover: View {
-    let clipboardMonitor: ClipboardMonitor
+    @ObservedObject var clipboardMonitor: ClipboardMonitor
     @Binding var isPresented: Bool
+    @ObservedObject private var navigation = PopoverNavigation.shared
 
     @AppStorage("viewMode") private var viewMode = "organized"
-    @State private var searchText = ""
     @State private var snippetCount: Int = 0
+    @State private var contentHeight: CGFloat = 0
 
     @Environment(\.cfTheme) var theme
 
@@ -21,7 +22,9 @@ struct MenuBarPopover: View {
             Divider()
 
             // Content based on mode
+            ScrollViewReader { scroller in
             ScrollView {
+                Group {
                 switch viewMode {
                 case "simple":
                     SimpleHistoryView(
@@ -40,8 +43,19 @@ struct MenuBarPopover: View {
                         onSelect: selectClip
                     )
                 }
+                }
+                .background(GeometryReader { proxy in
+                    Color.clear.preference(key: PopoverContentHeightKey.self, value: proxy.size.height)
+                })
             }
-            .frame(minHeight: 400, maxHeight: 700)
+            .onPreferenceChange(PopoverContentHeightKey.self) { contentHeight = $0 }
+            .frame(height: min(max(contentHeight, 60), maxListHeight))
+            .onChange(of: navigation.selectedID) { _, id in
+                guard let id else { return }
+                scroller.scrollTo(id)
+            }
+            }
+            .environment(\.selectedClipID, navigation.selectedID)
 
             Divider()
 
@@ -55,12 +69,18 @@ struct MenuBarPopover: View {
         }
     }
 
+    /// The list scrolls inside the popover, so the popover always fits under the menu bar.
+    private var maxListHeight: CGFloat {
+        let screenHeight = (NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main)?.visibleFrame.height ?? 800
+        return max(160, min(440, screenHeight - 320))
+    }
+
     // MARK: - Header
     private var headerView: some View {
         VStack(spacing: 0) {
             // Search - padding 8px 8px 6px
             CFInput(
-                text: $searchText,
+                text: $navigation.searchText,
                 placeholder: "Search clips & snippets",
                 prefix: AnyView(
                     CFIcon(type: .search, size: 13, stroke: 1.8)
@@ -114,11 +134,9 @@ struct MenuBarPopover: View {
         HStack(spacing: 2) {
             ForEach(["Simple", "Organized"], id: \.self) { mode in
                 Button(action: {
-                    print("🔄 Mode button clicked: \(mode) (current: \(viewMode))")
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         viewMode = mode.lowercased()
                     }
-                    print("🔄 Mode changed to: \(viewMode)")
                 }) {
                     Group {
                         if viewMode == mode.lowercased() {
@@ -161,23 +179,11 @@ struct MenuBarPopover: View {
 
     // MARK: - Helpers
     private var filteredClips: [SimpleClipItem] {
-        let clips = clipboardMonitor.clipHistory
-
-        if searchText.isEmpty {
-            return Array(clips.prefix(30))
-        }
-
-        return clips.filter { clip in
-            clip.content.localizedCaseInsensitiveContains(searchText)
-        }
+        navigation.filteredClips
     }
 
     private func selectClip(_ clip: SimpleClipItem) {
-        Task {
-            let pasteEngine = PasteEngine()
-            await pasteEngine.paste(clip.content)
-            isPresented = false
-        }
+        PasteCoordinator.shared.paste(clip)
     }
 
     private func openSnippetEditor() {
@@ -216,6 +222,7 @@ struct SimpleHistoryView: View {
     let onSelect: (SimpleClipItem) -> Void
 
     @Environment(\.cfTheme) var theme
+    @Environment(\.selectedClipID) private var selectedClipID
 
     var body: some View {
         VStack(spacing: 0) {
@@ -245,10 +252,10 @@ struct SimpleHistoryView: View {
                     ForEach(Array(clips.prefix(10).enumerated()), id: \.element.id) { index, clip in
                         CFIconRow(
                             icon: iconForClip(clip),
-                            title: titleForClip(clip),
-                            subtitle: metadataForClip(clip),
+                            title: clip.title,
+                            subtitle: clip.subtitle(),
                             kbd: keyboardShortcut(for: index),
-                            active: false
+                            active: clip.id == selectedClipID
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -283,37 +290,6 @@ struct SimpleHistoryView: View {
             return AnyView(CFIcon(type: .bracket, size: 14, stroke: 1.6))
         } else {
             return AnyView(CFIcon(type: .text, size: 14, stroke: 1.6))
-        }
-    }
-
-    private func titleForClip(_ clip: SimpleClipItem) -> String {
-        String(clip.content.prefix(60)).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func metadataForClip(_ clip: SimpleClipItem) -> String {
-        let timeAgo = timeAgoString(from: clip.createdAt)
-
-        if clip.type == "image" {
-            return "PNG · 1840×1040 · 312 KB"
-        } else if clip.content.hasPrefix("http") {
-            return "\(timeAgo) • Safari"
-        } else if clip.content.contains("=") && clip.content.contains("{") {
-            return "3 lines • Xcode"
-        } else {
-            return timeAgo
-        }
-    }
-
-    private func timeAgoString(from date: Date) -> String {
-        let interval = Date().timeIntervalSince(date)
-        if interval < 60 {
-            return "copied \(Int(interval))s ago"
-        } else if interval < 3600 {
-            return "copied \(Int(interval / 60))m ago"
-        } else if interval < 86400 {
-            return "copied \(Int(interval / 3600))h ago"
-        } else {
-            return "copied \(Int(interval / 86400))d ago"
         }
     }
 
@@ -356,8 +332,7 @@ struct OrganizedHistoryView: View {
         var text: [SimpleClipItem] = []
 
         for clip in clips {
-            // Recent (first 5)
-            if recent.count < 5 {
+            if recent.count < PopoverNavigation.shortcutCount {
                 recent.append(clip)
             }
 
@@ -396,6 +371,7 @@ struct OrganizedHistoryView: View {
                             showMetadata: true,
                             onSelect: { onSelect(clip) }
                         )
+                        .id("pinned-\(clip.id.uuidString)")
                     }
                 }
                 .padding(.bottom, 4)
@@ -413,7 +389,9 @@ struct OrganizedHistoryView: View {
                     label: "Recent",
                     count: groups.recent.count,
                     clips: groups.recent,
-                    onSelect: onSelect
+                    onSelect: onSelect,
+                    initiallyExpanded: true,
+                    showNumbers: true
                 )
 
                 if !groups.images.isEmpty {
@@ -508,9 +486,29 @@ struct CategoryGroup: View {
     let count: Int
     let clips: [SimpleClipItem]
     let onSelect: (SimpleClipItem) -> Void
-
-    @State private var isExpanded = true
+    var showNumbers = false
+    @State private var isExpanded: Bool
     @Environment(\.cfTheme) var theme
+
+    init(
+        icon: CFIcon.IconType,
+        iconColor: Color,
+        label: String,
+        count: Int,
+        clips: [SimpleClipItem],
+        onSelect: @escaping (SimpleClipItem) -> Void,
+        initiallyExpanded: Bool = false,
+        showNumbers: Bool = false
+    ) {
+        self.icon = icon
+        self.iconColor = iconColor
+        self.label = label
+        self.count = count
+        self.clips = clips
+        self.onSelect = onSelect
+        self.showNumbers = showNumbers
+        _isExpanded = State(initialValue: initiallyExpanded)
+    }
 
     var body: some View {
         VStack(spacing: 4) {
@@ -550,11 +548,11 @@ struct CategoryGroup: View {
             // Items
             if isExpanded {
                 VStack(spacing: 2) {
-                    ForEach(Array(clips.prefix(5).enumerated()), id: \.element.id) { index, clip in
+                    ForEach(Array(clips.prefix(PopoverNavigation.shortcutCount).enumerated()), id: \.element.id) { index, clip in
                         ClipRow(
                             clip: clip,
                             index: index,
-                            showNumber: false,
+                            showNumber: showNumbers,
                             onSelect: { onSelect(clip) }
                         )
                     }
@@ -575,38 +573,13 @@ struct ClipRow: View {
 
     @Environment(\.cfTheme) var theme
 
-    private var displayText: String {
-        String(clip.content.prefix(60)).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    private var displayText: String { clip.title }
+
+    @Environment(\.selectedClipID) private var selectedClipID
 
     private var keyboardShortcut: String? {
-        showNumber && index < 9 ? "\(index + 1)" : (index == 9 ? "0" : nil)
-    }
-
-    private var timeAgo: String {
-        let interval = Date().timeIntervalSince(clip.createdAt)
-        if interval < 60 {
-            return "copied \(Int(interval))s ago"
-        } else if interval < 3600 {
-            return "copied \(Int(interval / 60))m ago"
-        } else if interval < 86400 {
-            return "copied \(Int(interval / 3600))h ago"
-        } else {
-            return "copied \(Int(interval / 86400))d ago"
-        }
-    }
-
-    private var metadata: String {
-        // For now, just show time. Could detect app later.
-        if clip.type == "image" {
-            return "PNG · 1840×1040 · 312 KB"
-        } else if clip.content.hasPrefix("http") {
-            return "\(timeAgo) • Safari"
-        } else if clip.content.contains("=") && clip.content.contains("{") {
-            return "3 lines • Xcode"
-        } else {
-            return timeAgo
-        }
+        guard showNumber, index < PopoverNavigation.shortcutCount else { return nil }
+        return index == 9 ? "0" : "\(index + 1)"
     }
 
     var body: some View {
@@ -624,7 +597,7 @@ struct ClipRow: View {
                         .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
 
                     if showMetadata {
-                        Text(metadata)
+                        Text(clip.subtitle())
                             .font(.system(size: 11))
                             .foregroundColor(theme.textLabel)
                             .lineLimit(1)
@@ -637,7 +610,7 @@ struct ClipRow: View {
                 }
             }
             .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
-            .background(Color.clear)
+            .background(showNumber && clip.id == selectedClipID ? theme.accentMix(percent: 22) : Color.clear)
             .cornerRadius(6)
         }
         .buttonStyle(PlainHoverButtonStyle())
@@ -746,13 +719,13 @@ struct MenuSnippetRow: View {
                         .lineLimit(1)
 
                     if let apps = snippet.appRules, !apps.isEmpty {
-                        let appNames = apps.compactMap { ($0 as? AppRule)?.appName }.prefix(2).joined(separator: ", ")
-                        Text(".\(snippet.abbreviation) — \(appNames)")
+                        let appNames = apps.map(\.appName).prefix(2).joined(separator: ", ")
+                        Text("\(snippet.abbreviation) — \(appNames)")
                             .font(.system(size: 11))
                             .foregroundColor(theme.textLabel)
                             .lineLimit(1)
                     } else {
-                        Text(".\(snippet.abbreviation) — anywhere")
+                        Text("\(snippet.abbreviation) — anywhere")
                             .font(.system(size: 11))
                             .foregroundColor(theme.textLabel)
                             .lineLimit(1)
@@ -762,7 +735,7 @@ struct MenuSnippetRow: View {
                 Spacer()
 
                 // Abbreviation on right
-                Text(".\(snippet.abbreviation)")
+                Text(snippet.abbreviation)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(theme.textSubtle)
             }
@@ -775,20 +748,7 @@ struct MenuSnippetRow: View {
     }
 
     private func expandSnippet() {
-        // Get the snippet content and expand it
-        Task {
-            let variableProcessor = VariableProcessor()
-            let expandedContent = await variableProcessor.process(snippet.content)
-
-            // Paste the expanded content
-            let pasteEngine = PasteEngine()
-            await pasteEngine.paste(expandedContent)
-
-            // Update statistics
-            snippet.useCount += 1
-            snippet.lastUsed = Date()
-            try? viewContext.save()
-        }
+        PasteCoordinator.shared.insert(snippet)
     }
 }
 
@@ -821,9 +781,16 @@ extension Color {
 
 #Preview {
     MenuBarPopover(
-        clipboardMonitor: ClipboardMonitor(),
+        clipboardMonitor: ClipboardMonitor(context: CoreDataStack(storeURL: nil).viewContext),
         isPresented: .constant(true)
     )
     .cfAutoTheme()
     .frame(height: 600)
+}
+
+private struct PopoverContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
 }

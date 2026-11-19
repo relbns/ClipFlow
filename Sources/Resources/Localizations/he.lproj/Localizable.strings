@@ -159,3 +159,14 @@
 "reset_settings" = "אפס את כל ההגדרות";
 "open_logs" = "פתח קבצי לוג...";
 "troubleshooting" = "לפתרון בעיות";
+
+/* Snippet prompts */
+"fill_in_snippet" = "מילוי שדות לקטע הטקסט";
+"insert" = "הוספה";
+
+/* Data store problems */
+"store_newer_title" = "הנתונים של ClipFlow נשמרו בגרסה חדשה יותר";
+"store_newer_message" = "קטעי הטקסט וההיסטוריה נשמרו בגרסה חדשה יותר של ClipFlow. הם לא נפגעו, אבל שינויים שתעשה עכשיו לא יישמרו. כדי להמשיך לעבוד איתם, צריך להתקין את הגרסה העדכנית של ClipFlow.";
+"store_moved_title" = "‏ClipFlow לא הצליחה לקרוא את הנתונים שלה";
+"store_moved_message" = "הקובץ נשמר במיקום הזה, ונפתחה ספרייה חדשה וריקה:\n%@";
+"show_in_finder" = "הצגה ב-Finder";

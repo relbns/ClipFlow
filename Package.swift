@@ -11,19 +11,20 @@ let package = Package(
         .executable(name: "ClipFlow", targets: ["ClipFlow"])
     ],
     dependencies: [
-        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.0.0"),
-        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.5.0")
+        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts", from: "2.0.0")
     ],
     targets: [
         .executableTarget(
             name: "ClipFlow",
             dependencies: [
-                "KeyboardShortcuts",
-                "Sparkle"
+                "KeyboardShortcuts"
             ],
             path: "Sources",
             exclude: [
-                "Resources/Info.plist"
+                "Resources/Info.plist",
+                "Resources/ClipFlow.entitlements",
+                "Resources/ClipFlow-Sandbox.entitlements",
+                "Resources/AppIcon.icns"
             ],
             resources: [
                 .process("Resources/Assets.xcassets"),
