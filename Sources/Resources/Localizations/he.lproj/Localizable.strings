@@ -73,7 +73,6 @@
 "about_clipflow" = "אודות ClipFlow";
 
 /* Snippet Editor */
-"snippets" = "קטעי טקסט";
 "new_group" = "קבוצה חדשה";
 "new_snippet" = "קטע טקסט חדש";
 "select_snippet" = "בחר קטע טקסט לעריכה";
@@ -108,8 +107,6 @@
 "global_hotkeys" = "קיצורי מקשים גלובליים";
 "main_menu" = "תפריט ראשי";
 "snippets_menu" = "תפריט קטעי טקסט";
-"snippet_editor" = "עורך קטעי הטקסט";
-"clear_history" = "נקה היסטוריה";
 "open_clipboard_menu" = "פתח תפריט היסטוריית לוח";
 "open_snippets_menu" = "פתח תפריט קטעי טקסט";
 "open_snippet_editor" = "פתח חלון עורך קטעי טקסט";
@@ -285,7 +282,7 @@
 "credit_clipy_role" = "ארכיטקטורת הלוח הבסיסית";
 "credit_flycut_role" = "השראה לתצוגה הפשוטה";
 "license" = "רישיון";
-"about_footer" = "© 2026 ClipFlow · נעשה באהבה בתל אביב";
+"about_footer" = "© 2026 ClipFlow";
 "welcome_title" = "ברוכים הבאים ל-ClipFlow";
 "welcome_hero" = "כל מה שמעתיקים.\nכל מה שמקלידים שוב ושוב.";
 "welcome_body" = "אפליקציה שקטה בשורת התפריטים להיסטוריית הלוח ולקטעי טקסט מקוצרים, עם תמיכה מלאה בעברית ובכתיבה מימין לשמאל.";
@@ -296,7 +293,7 @@
 "welcome_step2_body" = "נדרשות כדי שקטעי טקסט יורחבו בזמן ההקלדה ופריטים מההיסטוריה יודבקו באפליקציה. סיסמאות אף פעם לא נשמרות.";
 "welcome_step3_title" = "ניסיון ראשון";
 "welcome_step3_body" = "מקלידים ‎.dd‎ בכל מקום ולוחצים רווח, ומקבלים את התאריך של היום.";
-"welcome_skip" = "דילוג";
+"welcome_skip" = "אחר כך";
 "welcome_done" = "סיום";
 "new" = "חדש";
 "editor_new_group" = "קבוצה חדשה";
@@ -354,3 +351,7 @@
 "pref_about_button" = "הצגה";
 "pref_close_outside" = "סגירת ההיסטוריה בלחיצה בחוץ";
 "pref_close_outside_hint" = "כשהאפשרות כבויה, ההיסטוריה נשארת פתוחה עד שלוחצים Esc, על הקיצור או על הסמל בשורת התפריטים.";
+"welcome_open_settings" = "מתן הרשאות ←";
+"just_now" = "עכשיו";
+"two_minutes" = "לפני 2 דק׳";
+"welcome_sample_clip" = "תודה על התגובה המהירה…";

@@ -1,377 +1,180 @@
 import SwiftUI
 
-/// Welcome/Onboarding screen
-/// Matches onboarding-d.png from design handoff
-///
-/// Specs:
-/// - Size: 780×520
-/// - Split: 50% visual left, 50% steps right
-/// - Left: radial gradient background, hero text, mini-preview
-/// - Right: 3 steps, footer with toggle and button
+/// The first-run window, built from the Welcome component in `design_handoff_clipflow/design/components/settings.jsx`.
 struct WelcomeView: View {
-    @Environment(\.cfTheme) var theme
     @Binding var isPresented: Bool
+    var onGetStarted: () -> Void
     @ObservedObject private var permissions = PermissionService.shared
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
-
-    var onGetStarted: () -> Void
+    @Environment(\.cfTheme) private var theme
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left half - Visual
-            leftVisualPanel
-
-            // Right half - Steps
-            rightStepsPanel
+            heroPanel
+            stepsPanel
         }
         .frame(width: 780, height: 520)
     }
 
-    // MARK: - Left Visual Panel
-    private var leftVisualPanel: some View {
-        ZStack {
-            CSSRadialGradient(
-                gradient: BrandPalette.welcomePanel,
-                radii: CGSize(width: 1.2, height: 0.8),
-                center: UnitPoint(x: 0.3, y: 0.2)
-            )
+    // MARK: - Left
 
-            VStack(spacing: 0) {
-                // Top: Logo + Wordmark
-                HStack(spacing: 8) {
+    private var heroPanel: some View {
+        ZStack(alignment: .topLeading) {
+            CSSRadialGradient(gradient: BrandPalette.welcomePanel, radii: CGSize(width: 1.2, height: 0.8), center: UnitPoint(x: 0.3, y: 0.2))
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
                     ClipFlowMark(size: 32)
-
-                    Text("ClipFlow")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
+                    Text("ClipFlow").font(.system(size: 18, weight: .semibold)).foregroundColor(.white)
                 }
-                .padding(.top, 32)
-                .padding(.leading, 32)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                Spacer()
-
-                // Center: Hero text
-                VStack(spacing: 12) {
-                    Text(L("welcome_hero"))
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.leading)
-                        .lineSpacing(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Text(L("welcome_body"))
-                        .font(.system(size: 13))
-                        .foregroundColor(Color.white.opacity(0.75))
-                        .lineSpacing(3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.horizontal, 32)
-
-                Spacer()
-
-                // Bottom-right: Mini preview (rotated -6°, scaled 0.78)
-                HStack {
-                    Spacer()
-                    miniPreview
-                        .rotationEffect(.degrees(-6))
-                        .scaleEffect(0.78)
-                        .padding(.trailing, -20)
-                        .padding(.bottom, -10)
-                }
+                Text(L("welcome_hero"))
+                    .font(.system(size: 28, weight: .semibold))
+                    .tracking(-0.28)
+                    .lineSpacing(2)
+                    .foregroundColor(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 26)
+                Text(L("welcome_body"))
+                    .font(.system(size: 13))
+                    .lineSpacing(4)
+                    .foregroundColor(CFTheme.dark.textMid)
+                    .frame(maxWidth: 280, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
             }
+            .padding(32)
+
+            MiniPopoverPreview()
+                .scaleEffect(0.78, anchor: .bottomTrailing)
+                .rotationEffect(.degrees(-6), anchor: .bottomTrailing)
+                .shadow(color: CFTheme.dark.shadowDeep, radius: 25, y: 30)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .offset(x: 40, y: 40)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+                .environment(\.cfTheme, .dark)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        .environment(\.colorScheme, .dark)
     }
 
-    // MARK: - Right Steps Panel
-    private var rightStepsPanel: some View {
-        VStack(spacing: 0) {
-            // Header
-            VStack(alignment: .leading, spacing: 8) {
-                Text(L("welcome_steps"))
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundColor(theme.textLabel)
-                    .textCase(.uppercase)
-                    .kerning(0.6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(EdgeInsets(top: 32, leading: 32, bottom: 20, trailing: 32))
+    // MARK: - Right
 
-            // Steps
-            VStack(spacing: 8) {
-                stepCard(
-                    number: 1,
-                    state: .done,
-                    title: L("welcome_step1_title"),
-                    body: L("welcome_step1_body")
-                )
+    private var stepsPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(L("welcome_steps"))
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(0.08 * 11)
+                .textCase(.uppercase)
+                .foregroundColor(theme.textSubtle)
+                .padding(.bottom, 14)
 
-                stepCard(
-                    number: 2,
-                    state: permissions.isGranted ? .done : .active,
-                    title: L("welcome_step2_title"),
-                    body: L("welcome_step2_body")
-                )
-
-                stepCard(
-                    number: 3,
-                    state: permissions.isGranted ? .active : .idle,
-                    title: L("welcome_step3_title"),
-                    body: L("welcome_step3_body")
-                )
-            }
-            .padding(.horizontal, 32)
+            CFStepIndicator(number: 1, state: .done, title: L("welcome_step1_title"), bodyText: L("welcome_step1_body"))
+            CFStepIndicator(
+                number: 2,
+                state: permissions.isGranted ? .done : .active,
+                title: L("welcome_step2_title"),
+                bodyText: L("welcome_step2_body")
+            )
+            CFStepIndicator(
+                number: 3,
+                state: permissions.isGranted ? .active : .default,
+                title: L("welcome_step3_title"),
+                bodyText: L("welcome_step3_body")
+            )
 
             Spacer()
-
-            // Footer
-            footerView
-        }
-        .frame(width: 390)
-        .background(theme.surfaceDeep)
-    }
-
-    // MARK: - Step Card
-    enum StepState {
-        case done
-        case active
-        case idle
-    }
-
-    @ViewBuilder
-    private func stepCard(number: Int, state: StepState, title: String, body: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Badge
-            stepBadge(number: number, state: state)
-
-            // Content
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(theme.textStrong)
-
-                Text(body)
-                    .font(.system(size: 12))
-                    .foregroundColor(theme.textMuted)
-                    .lineSpacing(2)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(12)
-        .background(state == .active ? theme.fillSoft : Color.clear)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(
-                    state == .active ? theme.accent.opacity(0.3) : Color.clear,
-                    lineWidth: 1
-                )
-        )
-        .cornerRadius(10)
-    }
-
-    @ViewBuilder
-    private func stepBadge(number: Int, state: StepState) -> some View {
-        ZStack {
-            if state == .done {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white)
-            } else {
-                Text("\(number)")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(state == .active ? .white : theme.textMuted)
-            }
-        }
-        .frame(width: 28, height: 28)
-        .background(
-            Circle()
-                .fill(badgeBackgroundGradient(state: state))
-        )
-    }
-
-    private func badgeBackgroundGradient(state: StepState) -> LinearGradient {
-        switch state {
-        case .done:
-            return LinearGradient(colors: [BrandPalette.success, BrandPalette.success], startPoint: .top, endPoint: .bottom)
-        case .active:
-            return LinearGradient(gradient: BrandPalette.stepActive, startPoint: .top, endPoint: .bottom)
-        case .idle:
-            return LinearGradient(
-                colors: [theme.fill1, theme.fill1],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-    }
-
-    private func setLaunchAtLogin(_ enabled: Bool) {
-        launchAtLogin = LaunchAtLogin.set(enabled)
-    }
-
-    // MARK: - Footer
-    private var footerView: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(theme.stroke)
-                .frame(height: 1)
 
             HStack {
-                // Left: Launch at login toggle
                 HStack(spacing: 8) {
-                    CFToggle(isOn: Binding(get: { launchAtLogin }, set: setLaunchAtLogin))
+                    CFToggle(isOn: Binding(get: { launchAtLogin }, set: { launchAtLogin = LaunchAtLogin.set($0) }))
                         .accessibilityLabel(L("pref_launch_at_login"))
-
-                    Text(L("pref_launch_at_login"))
-                        .font(.system(size: 13))
-                        .foregroundColor(theme.text)
+                    Text(L("pref_launch_at_login")).font(.system(size: 12)).foregroundColor(theme.textMuted)
                 }
-
                 Spacer()
-
-                // Right: Buttons
                 HStack(spacing: 8) {
-                    Button(action: {
-                        // Skip tour - mark as completed
-                        UserDefaults.standard.set(true, forKey: "hasCompletedWelcome")
-                        isPresented = false
-                    }) {
-                        Text(L("welcome_skip"))
-                            .font(.system(size: 12))
-                            .foregroundColor(theme.textMuted)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: {
-                        UserDefaults.standard.set(true, forKey: "hasCompletedWelcome")
+                    CFToolbarBtn(label: L("welcome_skip")) { finish() }
+                    CFToolbarBtn(label: permissions.isGranted ? L("welcome_done") : L("welcome_open_settings"), primary: true) {
                         if permissions.isGranted {
-                            onGetStarted()
+                            finish()
                             return
                         }
+                        UserDefaults.standard.set(true, forKey: "hasCompletedWelcome")
                         permissions.request()
-                        if !permissions.isGranted {
-                            permissions.openSystemSettings()
-                        }
-                    }) {
-                        HStack(spacing: 6) {
-                            Text(permissions.isGranted ? L("welcome_done") : L("perm_button"))
-                                .font(.system(size: 12, weight: .medium))
-
-                            Image(systemName: "arrow.forward")
-                                .font(.system(size: 10, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            LinearGradient(gradient: BrandPalette.primaryButton, startPoint: .top, endPoint: .bottom)
-                        )
-                        .cornerRadius(6)
-                        .shadow(color: theme.accent.opacity(0.3), radius: 3, x: 0, y: 2)
+                        if !permissions.isGranted { permissions.openSystemSettings() }
                     }
-                    .buttonStyle(.plain)
                 }
             }
-            .padding(EdgeInsets(top: 16, leading: 24, bottom: 16, trailing: 24))
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(theme.surface)
+        .onAppear {
+            permissions.refresh()
+            launchAtLogin = LaunchAtLogin.isEnabled
         }
     }
 
-    // MARK: - Mini Preview
-    private var miniPreview: some View {
-        VStack(spacing: 0) {
-            // Search field
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10))
-                    .foregroundColor(theme.textSubtle)
+    private func finish() {
+        UserDefaults.standard.set(true, forKey: "hasCompletedWelcome")
+        isPresented = false
+        onGetStarted()
+    }
+}
 
-                Text(L("search_clipboard"))
-                    .font(.system(size: 10))
-                    .foregroundColor(theme.textSubtle)
+/// The small popover on the Welcome panel: a 260pt dark popover with three sample rows.
+private struct MiniPopoverPreview: View {
+    @Environment(\.cfTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").font(.system(size: 11, weight: .semibold)).foregroundColor(theme.textSubtle)
+                Text(L("search_clipboard")).font(.system(size: 13)).foregroundColor(theme.textSubtle)
+                Spacer()
+                CFKBDChip("⌘F", dim: true)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(theme.inputBg.opacity(0.5))
-            .cornerRadius(5)
-            .padding(6)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(RoundedRectangle(cornerRadius: 7).fill(theme.inputBg))
+            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(theme.stroke, lineWidth: 1))
+            .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
 
-            // Section
-            Text(L("recent_clips"))
-                .font(.system(size: 8, weight: .semibold))
+            Text(L("cat_recent"))
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(0.06 * 10.5)
+                .textCase(.uppercase)
                 .foregroundColor(theme.textLabel)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
+                .padding(EdgeInsets(top: 6, leading: 14, bottom: 4, trailing: 14))
 
-            // Sample clip rows
-            VStack(spacing: 2) {
-                miniClipRow(icon: "link", text: "github.com/relbns/Clip...")
-                miniClipRow(icon: "doc.text", text: "Thanks for the quick...")
-            }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 6)
+            row(icon: AnyView(Image(systemName: "link")), title: "github.com/relbns/ClipFlow", subtitle: L("just_now"), kbd: "1", active: true)
+            row(icon: AnyView(Image(systemName: "text.alignleft")), title: L("welcome_sample_clip"), subtitle: L("two_minutes"), kbd: "2")
+            row(icon: AnyView(RoundedRectangle(cornerRadius: 3).fill(Color.hex(0xFF5733)).frame(width: 14, height: 14)), title: "#FF5733", subtitle: L("clip_hex_color"), kbd: "3")
+                .padding(.bottom, 6)
         }
-        .frame(width: 180, height: 140)
-        .background(
-            theme.popoverBg
-                .opacity(0.95)
-        )
-        .cornerRadius(10)
-        .shadow(color: .black.opacity(0.4), radius: 15, x: 0, y: 8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.5)
-        )
+        .frame(width: 260)
+        .background(RoundedRectangle(cornerRadius: 12).fill(theme.popoverBg))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
     }
 
-    @ViewBuilder
-    private func miniClipRow(icon: String, text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 9))
-                .foregroundColor(theme.textMid)
-                .frame(width: 16, height: 16)
-                .background(theme.fill1)
-                .cornerRadius(3)
-
-            Text(text)
-                .font(.system(size: 9))
-                .foregroundColor(theme.text)
-                .lineLimit(1)
-
-            Spacer()
-
-            Text("1")
-                .font(.system(size: 8, design: .monospaced))
-                .foregroundColor(theme.textSubtle)
-                .padding(.horizontal, 3)
-                .padding(.vertical, 1)
-                .background(theme.fill2)
-                .cornerRadius(2)
+    private func row(icon: AnyView, title: String, subtitle: String, kbd: String, active: Bool = false) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 5).fill(theme.fill1)
+                icon.font(.system(size: 11, weight: .medium)).foregroundColor(theme.textMid)
+            }
+            .frame(width: 26, height: 26)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.system(size: 13, weight: active ? .medium : .regular)).foregroundColor(theme.textStrong).lineLimit(1)
+                Text(subtitle).font(.system(size: 11)).foregroundColor(theme.textLabel).lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            CFKBDChip(kbd, dim: !active)
         }
+        .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
+        .background(RoundedRectangle(cornerRadius: 6).fill(active ? Color.hex(0x7874FF, alpha: 0.22) : .clear))
         .padding(.horizontal, 6)
-        .padding(.vertical, 3)
     }
 }
-
-// MARK: - Preview
-#if DEBUG
-struct WelcomeView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            WelcomeView(isPresented: .constant(true)) {
-            }
-            .cfAutoTheme()
-            .previewDisplayName("Welcome - Light")
-
-            WelcomeView(isPresented: .constant(true)) {
-            }
-            .cfAutoTheme()
-            .preferredColorScheme(.dark)
-            .previewDisplayName("Welcome - Dark")
-        }
-    }
-}
-#endif

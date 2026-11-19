@@ -1,234 +1,128 @@
 import SwiftUI
-import AppKit
 
+/// The About window, built from `design_handoff_clipflow/design/components/about.jsx`.
 struct AboutView: View {
-    @Environment(\.openURL) private var openURL
-    @Environment(\.cfTheme) var theme
+    @Environment(\.cfTheme) private var theme
+
+    private var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                Spacer().frame(height: 20)
+            ClipFlowHero(size: 128)
 
-                    ClipFlowHero(size: 128)
+            Text("ClipFlow")
+                .font(.system(size: 28, weight: .bold))
+                .tracking(-0.28)
+                .foregroundColor(theme.textStrong)
+                .padding(.top, 22)
+            Text(L("app_tagline"))
+                .font(.system(size: 13.5))
+                .foregroundColor(theme.textMuted)
+                .padding(.top, 4)
 
-                    Spacer().frame(height: 12)
-
-                    // Title
-                    Text("ClipFlow")
-                        .font(.system(size: 28, weight: .bold))
-                        .kerning(-0.28)
-                        .foregroundColor(theme.textStrong)
-
-                    Spacer().frame(height: 4)
-
-                    // Tagline
-                    Text(L("app_tagline"))
-                        .font(.system(size: 13.5))
-                        .foregroundColor(theme.textMuted)
-
-                    Spacer().frame(height: 10)
-
-                    // Version Row
-                    HStack(spacing: 8) {
-                        Text(L("version_format", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"))
-                            .font(.system(size: 13))
-                            .foregroundColor(theme.text)
-
-                        // ALPHA badge - amber/gold color
-                        Text(L("alpha_badge"))
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundColor(BrandPalette.warningText)
-                            .textCase(.uppercase)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(
-                                BrandPalette.warning.mixed(25)
-                            )
-                            .cornerRadius(4)
-                    }
-
-                    Spacer().frame(height: 16)
-
-                    // Divider
-                    Rectangle()
-                        .fill(theme.stroke)
-                        .frame(height: 1)
-                        .frame(width: 460)
-
-                    Spacer().frame(height: 12)
-
-                    // Credits Section
-                    VStack(alignment: .leading, spacing: 0) {
-                        // Header
-                        Text(L("credits"))
-                            .textCase(.uppercase)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(theme.textLabel)
-                            .kerning(0.66)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Spacer().frame(height: 8)
-
-                        // Ariel Benesh
-                        CreditRow(
-                            icon: AnyView(
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 14, weight: .medium))
-                            ),
-                            iconColor: BrandPalette.Credit.creator,
-                            title: "Ariel Benesh",
-                            subtitle: L("credit_creator_role")
-                        )
-
-                        Spacer().frame(height: 10)
-
-                        // Separator
-                        Text(L("credits_giants"))
-                            .font(.system(size: 12))
-                            .foregroundColor(theme.textSubtle)
-                            .padding(.leading, 40)
-
-                        Spacer().frame(height: 8)
-
-                        // Clipy
-                        CreditRow(
-                            icon: AnyView(
-                                Image(systemName: "curlybraces")
-                                    .font(.system(size: 14, weight: .medium))
-                            ),
-                            iconColor: BrandPalette.Credit.clipy,
-                            title: "Clipy",
-                            subtitle: L("credit_clipy_role")
-                        )
-
-                        Spacer().frame(height: 6)
-
-                        // Flycut
-                        CreditRow(
-                            icon: AnyView(
-                                Image(systemName: "paintbrush.fill")
-                                    .font(.system(size: 14, weight: .medium))
-                            ),
-                            iconColor: BrandPalette.Credit.flycut,
-                            title: "Flycut",
-                            subtitle: L("credit_flycut_role")
-                        )
-                    }
-                    .padding(.horizontal, 50)
-
-                    Spacer().frame(height: 16)
-
-                    // Divider
-                    Rectangle()
-                        .fill(theme.stroke)
-                        .frame(height: 1)
-                        .frame(width: 460)
-
-                    Spacer().frame(height: 12)
-
-                    // Footer Links
-                    HStack(spacing: 20) {
-                        Button(action: {
-                            if let url = URL(string: "https://github.com/relbns/ClipFlow") {
-                                openURL(url)
-                            }
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "link")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("GitHub")
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(BrandPalette.accentLink)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: {
-                            if let url = URL(string: "https://github.com/relbns/ClipFlow/blob/main/CREDITS.md") {
-                                openURL(url)
-                            }
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "doc.text")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text(L("full_credits"))
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(BrandPalette.accentLink)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: {
-                            if let url = URL(string: "https://github.com/relbns/ClipFlow/blob/main/LICENSE") {
-                                openURL(url)
-                            }
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "gearshape")
-                                    .font(.system(size: 11, weight: .medium))
-                                Text(L("license"))
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(BrandPalette.accentLink)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Spacer().frame(height: 8)
-
-                    // Copyright
-                    Text(L("about_footer"))
-                        .font(.system(size: 11))
-                        .foregroundColor(theme.textFaint)
-
-                    Spacer().frame(height: 20)
+            HStack(spacing: 8) {
+                Text(L("version_format", version))
+                    .font(.system(size: 12))
+                    .foregroundColor(theme.textSubtle)
+                Text(L("alpha_badge"))
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .tracking(0.06 * 10.5)
+                    .textCase(.uppercase)
+                    .foregroundColor(BrandPalette.warningText)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(BrandPalette.warning.mixed(25)))
             }
+            .padding(.top, 10)
+
+            Rectangle().fill(theme.strokeSoft).frame(height: 1).padding(.top, 24).padding(.bottom, 16)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(L("credits"))
+                    .font(.system(size: 10.5, weight: .bold))
+                    .tracking(0.08 * 10.5)
+                    .textCase(.uppercase)
+                    .foregroundColor(theme.textLabel)
+                    .padding(.bottom, 4)
+                CreditRow(symbol: "person", accent: BrandPalette.Credit.creator, name: "Ariel Benesh", role: L("credit_creator_role"))
+                Text(L("credits_giants"))
+                    .font(.system(size: 11.5))
+                    .foregroundColor(theme.textMuted)
+                    .padding(.top, 14)
+                    .padding(.bottom, 4)
+                CreditRow(symbol: "scissors", accent: BrandPalette.Credit.clipy, name: "Clipy", role: L("credit_clipy_role"))
+                CreditRow(symbol: "list.clipboard", accent: BrandPalette.Credit.flycut, name: "Flycut", role: L("credit_flycut_role"))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 10)
+
+            VStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    AboutLink(symbol: "link", label: "GitHub", url: "https://github.com/relbns/ClipFlow")
+                    AboutLink(symbol: "text.alignleft", label: L("full_credits"), url: "https://github.com/relbns/ClipFlow/blob/main/CREDITS.md")
+                    AboutLink(symbol: "gearshape", label: L("license"), url: "https://github.com/relbns/ClipFlow/blob/main/LICENSE")
+                }
+                Text(L("about_footer"))
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textFaint)
+            }
+            .padding(.top, 18)
             .frame(maxWidth: .infinity)
+            .overlay(Rectangle().fill(theme.strokeSoft).frame(height: 1), alignment: .top)
         }
+        .padding(EdgeInsets(top: 36, leading: 32, bottom: 22, trailing: 32))
         .frame(width: 560, height: 680)
         .background(theme.surface)
     }
 }
 
-// MARK: - Credit Row
 private struct CreditRow: View {
-    let icon: AnyView
-    let iconColor: Color
-    let title: String
-    let subtitle: String
-
-    @Environment(\.cfTheme) var theme
+    let symbol: String
+    let accent: Color
+    let name: String
+    let role: String
+    @Environment(\.cfTheme) private var theme
 
     var body: some View {
         HStack(spacing: 12) {
-            // Icon tile
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(iconColor.mixed(22))
-                    .frame(width: 28, height: 28)
-
-                icon
-                    .foregroundColor(iconColor)
+                RoundedRectangle(cornerRadius: 8).fill(accent.mixed(22))
+                Image(systemName: symbol).font(.system(size: 12, weight: .semibold)).foregroundColor(accent)
             }
-
-            // Text
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(theme.textStrong)
-
-                Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundColor(theme.textSubtle)
+            .frame(width: 28, height: 28)
+            .frame(width: 32, alignment: .leading)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name).font(.system(size: 13, weight: .medium)).foregroundColor(theme.textStrong)
+                Text(role).font(.system(size: 12)).foregroundColor(theme.textMuted)
             }
-
-            Spacer()
         }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
     }
 }
 
-#Preview {
-    AboutView()
-        .cfAutoTheme()
+private struct AboutLink: View {
+    let symbol: String
+    let label: String
+    let url: String
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        Button {
+            if let destination = URL(string: url) { openURL(destination) }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 12, weight: .medium))
+                Text(label).font(.system(size: 13, weight: .medium))
+            }
+            .foregroundColor(BrandPalette.accentLink)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 }
