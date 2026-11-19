@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AdvancedSettingsView: View {
+    @Environment(\.cfTheme) private var theme
     @AppStorage("clipboardCheckInterval") private var checkInterval = 750.0
     @AppStorage("storeHistoryLocally") private var storeLocally = true
     @AppStorage("neverSyncPasswords") private var neverSyncPasswords = true
@@ -21,13 +22,13 @@ struct AdvancedSettingsView: View {
                         Slider(value: $checkInterval, in: 100...2000, step: 50)
                         Text("\(Int(checkInterval)) μs")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(theme.textMuted)
                             .frame(width: 70)
                     }
 
                     Text("Lower values = more responsive, higher CPU usage")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(theme.textMuted)
                 }
             }
 
@@ -43,7 +44,7 @@ struct AdvancedSettingsView: View {
 
                 Text("Remove clipboard items older than 30 days")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
 
             Section("Privacy") {
@@ -55,7 +56,7 @@ struct AdvancedSettingsView: View {
 
                 Text("When enabled, all clipboard history is deleted when ClipFlow quits")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
 
             Section("Updates") {
@@ -70,7 +71,7 @@ struct AdvancedSettingsView: View {
 
                     Text("Version 1.0.0 (1)")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(theme.textMuted)
                 }
             }
 
@@ -78,7 +79,7 @@ struct AdvancedSettingsView: View {
                 Button("Reset All Settings") {
                     resetSettings()
                 }
-                .foregroundColor(.red)
+                .foregroundColor(theme.danger)
 
                 Button("Open Log Files...") {
                     openLogs()
@@ -86,7 +87,7 @@ struct AdvancedSettingsView: View {
 
                 Text("For troubleshooting issues")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
         }
         .formStyle(.grouped)

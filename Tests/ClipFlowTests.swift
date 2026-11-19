@@ -342,3 +342,28 @@ final class PopoverNavigationTests: XCTestCase {
         navigation.clipboardMonitor = nil
     }
 }
+
+final class OKLCHTests: XCTestCase {
+    func testDesignTokensConvertLikeABrowser() {
+        XCTAssertEqual(OKLCH(0.60, 0.17, 272).hex, "#5F74E4")
+        XCTAssertEqual(OKLCH(0.78, 0.14, 70).hex, "#F0A646")
+        XCTAssertEqual(OKLCH(0.70, 0.17, 145).hex, "#4DB956")
+        XCTAssertEqual(OKLCH(0.70, 0.17, 60).hex, "#E88000")
+        XCTAssertEqual(OKLCH(0.55, 0.03, 250).hex, "#657383")
+    }
+
+    func testExtremesAndGamutClipping() {
+        XCTAssertEqual(OKLCH(1, 0, 0).hex, "#FFFFFF")
+        XCTAssertEqual(OKLCH(0, 0, 0).hex, "#000000")
+        XCTAssertEqual(OKLCH(0.9, 0.4, 145).hex.count, 7)
+    }
+}
+
+final class OKLCHDisplayP3Tests: XCTestCase {
+    func testColorsOutsideSRGBStayInsideDisplayP3() {
+        for color in [OKLCH(0.86, 0.12, 272), OKLCH(0.74, 0.17, 280), OKLCH(0.85, 0.15, 60)] {
+            let (red, green, blue) = color.displayP3
+            XCTAssertTrue([red, green, blue].allSatisfy { $0 > 0 && $0 < 1 }, "\(color) clips in Display P3")
+        }
+    }
+}

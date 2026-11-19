@@ -30,13 +30,13 @@ struct CFFooterRowBtn: View {
             HStack(spacing: 10) {
                 // Icon
                 CFIcon(type: icon, size: 14, stroke: 1.8)
-                    .foregroundColor(danger ? Color(red: 1.0, green: 0.48, blue: 0.45) : theme.textMuted)
+                    .foregroundColor(danger ? theme.danger : theme.textMuted)
                     .frame(width: 16, alignment: .center)
 
                 // Label
                 Text(label)
                     .font(.system(size: 13))
-                    .foregroundColor(danger ? Color(red: 1.0, green: 0.48, blue: 0.45) : theme.text)
+                    .foregroundColor(danger ? theme.danger : theme.text)
 
                 Spacer()
 
@@ -78,15 +78,15 @@ struct CFFooterRowBtn: View {
             CFFooterRowBtn(icon: .power, label: "Quit ClipFlow", kbd: "⌘Q", danger: true) {
             }
         }
-        .background(Color.black.opacity(0.07))
+        .background(CFTheme.light.fill2)
 
         Text("↑ Danger variant (Quit)")
             .font(.caption)
-            .foregroundColor(.secondary)
+            .foregroundColor(CFTheme.dark.textMuted)
             .padding(.top, 8)
     }
     .frame(width: 340)
-    .background(Color(red: 0.11, green: 0.11, blue: 0.13))
+    .background(CFTheme.dark.surface)
     .cfAutoTheme()
 }
 
@@ -103,6 +103,6 @@ struct CFFooterRowBtn: View {
         }
     }
     .frame(width: 340)
-    .background(Color(red: 0.96, green: 0.96, blue: 0.97))
+    .background(CFTheme.light.surface)
     .cfAutoTheme()
 }

@@ -10,14 +10,7 @@ struct AboutView: View {
             VStack(spacing: 0) {
                 Spacer().frame(height: 20)
 
-                    // App Icon
-                    if let appIcon = NSImage(named: "AppIcon") {
-                        Image(nsImage: appIcon)
-                            .resizable()
-                            .frame(width: 96, height: 96)
-                            .cornerRadius(21)
-                            .shadow(color: Color.black.opacity(0.25), radius: 16, x: 0, y: 8)
-                    }
+                    ClipFlowHero(size: 128)
 
                     Spacer().frame(height: 12)
 
@@ -45,12 +38,12 @@ struct AboutView: View {
                         // ALPHA badge - amber/gold color
                         Text("ALPHA")
                             .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundColor(Color(red: 1.0, green: 0.75, blue: 0.0))  // Pure amber #FFC000
+                            .foregroundColor(BrandPalette.warningText)
                             .textCase(.uppercase)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .background(
-                                Color(red: 1.0, green: 0.75, blue: 0.0).opacity(0.25)
+                                BrandPalette.warning.mixed(25)
                             )
                             .cornerRadius(4)
                     }
@@ -82,7 +75,7 @@ struct AboutView: View {
                                 Image(systemName: "person.fill")
                                     .font(.system(size: 14, weight: .medium))
                             ),
-                            iconColor: theme.accent,
+                            iconColor: BrandPalette.Credit.creator,
                             title: "Ariel Benesh",
                             subtitle: "Creator & Developer"
                         )
@@ -103,7 +96,7 @@ struct AboutView: View {
                                 Image(systemName: "curlybraces")
                                     .font(.system(size: 14, weight: .medium))
                             ),
-                            iconColor: theme.success,
+                            iconColor: BrandPalette.Credit.clipy,
                             title: "Clipy",
                             subtitle: "Core clipboard architecture"
                         )
@@ -116,7 +109,7 @@ struct AboutView: View {
                                 Image(systemName: "paintbrush.fill")
                                     .font(.system(size: 14, weight: .medium))
                             ),
-                            iconColor: theme.warning,
+                            iconColor: BrandPalette.Credit.flycut,
                             title: "Flycut",
                             subtitle: "UI/UX inspiration for Simple mode"
                         )
@@ -146,7 +139,7 @@ struct AboutView: View {
                                 Text("GitHub")
                                     .font(.system(size: 12))
                             }
-                            .foregroundColor(theme.accent)
+                            .foregroundColor(BrandPalette.accentLink)
                         }
                         .buttonStyle(.plain)
 
@@ -161,7 +154,7 @@ struct AboutView: View {
                                 Text("Full Credits")
                                     .font(.system(size: 12))
                             }
-                            .foregroundColor(theme.accent)
+                            .foregroundColor(BrandPalette.accentLink)
                         }
                         .buttonStyle(.plain)
 
@@ -176,7 +169,7 @@ struct AboutView: View {
                                 Text("License")
                                     .font(.system(size: 12))
                             }
-                            .foregroundColor(theme.accent)
+                            .foregroundColor(BrandPalette.accentLink)
                         }
                         .buttonStyle(.plain)
                     }
@@ -192,8 +185,8 @@ struct AboutView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(width: 560, height: 520)
-        .background(theme.surfaceDeep)
+        .frame(width: 560, height: 680)
+        .background(theme.surface)
     }
 }
 
@@ -211,7 +204,7 @@ private struct CreditRow: View {
             // Icon tile
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(iconColor.opacity(0.18))
+                    .fill(iconColor.mixed(22))
                     .frame(width: 28, height: 28)
 
                 icon

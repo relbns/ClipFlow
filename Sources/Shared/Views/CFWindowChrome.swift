@@ -56,7 +56,7 @@ struct CFWindowChrome<Toolbar: View>: View {
         HStack(spacing: 8) {
             // Red
             Circle()
-                .fill(Color(red: 1, green: 0.37, blue: 0.34))
+                .fill(BrandPalette.TrafficLight.close)
                 .frame(width: 12, height: 12)
                 .shadow(color: .black.opacity(0.15), radius: 0, x: 0, y: 0)
                 .overlay(
@@ -66,7 +66,7 @@ struct CFWindowChrome<Toolbar: View>: View {
 
             // Yellow
             Circle()
-                .fill(Color(red: 0.99, green: 0.74, blue: 0.18))
+                .fill(BrandPalette.TrafficLight.minimize)
                 .frame(width: 12, height: 12)
                 .shadow(color: .black.opacity(0.15), radius: 0, x: 0, y: 0)
                 .overlay(
@@ -76,7 +76,7 @@ struct CFWindowChrome<Toolbar: View>: View {
 
             // Green
             Circle()
-                .fill(Color(red: 0.16, green: 0.78, blue: 0.25))
+                .fill(BrandPalette.TrafficLight.zoom)
                 .frame(width: 12, height: 12)
                 .shadow(color: .black.opacity(0.15), radius: 0, x: 0, y: 0)
                 .overlay(

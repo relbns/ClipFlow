@@ -8,6 +8,7 @@ struct ClipFlowApp: App {
     var body: some Scene {
         Settings {
             SettingsView()
+                .cfAutoTheme()
                 .environment(\.layoutDirection, languageManager.layoutDirection)
                 .environmentObject(languageManager)
         }

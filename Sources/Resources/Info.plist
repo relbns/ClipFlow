@@ -31,7 +31,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 Ariel Benesh. All rights reserved.</string>
+	<string>Copyright © 2026 Ariel Benesh. MIT License.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSAccessibilityUsageDescription</key>

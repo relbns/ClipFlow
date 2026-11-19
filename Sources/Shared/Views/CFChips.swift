@@ -109,11 +109,11 @@ struct CFStatusChip: View {
     private var color: Color {
         switch status {
         case .saved:
-            return Color(red: 0.7, green: 0.17, blue: 0.45, opacity: 1.0) // green
+            return BrandPalette.success
         case .saving:
-            return Color(red: 0.7, green: 0.17, blue: 0.70, opacity: 1.0) // amber
+            return BrandPalette.warning
         case .error:
-            return Color(red: 0.7, green: 0.17, blue: 0.30, opacity: 1.0) // red
+            return BrandPalette.danger
         }
     }
 
@@ -155,9 +155,9 @@ struct CFVersionTag: View {
 
         var color: Color {
             switch self {
-            case .alpha: return Color(red: 0.7, green: 0.17, blue: 0.60, opacity: 1.0) // amber
-            case .beta: return Color(red: 0.6, green: 0.17, blue: 0.72, opacity: 1.0) // purple
-            case .dev: return Color(red: 0.7, green: 0.14, blue: 0.50, opacity: 1.0) // green
+            case .alpha: return BrandPalette.warningText
+            case .beta: return BrandPalette.accentLink
+            case .dev: return BrandPalette.successText
             }
         }
     }

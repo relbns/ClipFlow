@@ -39,15 +39,11 @@ struct AppearanceSettingsView: View {
                                 },
                                 set: { index in
                                     appearanceMode = ["auto", "light", "dark"][index]
-                                    // TODO: Update app theme
                                 }
                             ),
                             options: ["Auto", "Light", "Dark"],
                             columns: 3
                         )
-                        .onChange(of: appearanceMode) { _, newValue in
-                            // Theme will be applied automatically by ThemeManager observing UserDefaults
-                        }
                     }
 
                     CFSettingsRow(

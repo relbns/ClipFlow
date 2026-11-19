@@ -1,16 +1,12 @@
 import SwiftUI
 import CoreData
 
-/// Public wrapper that checks Core Data availability
 struct SnippetEditorView: View {
     var body: some View {
-        CoreDataAvailabilityWrapper {
-            SnippetEditorContentView()
-        }
+        SnippetEditorContentView()
     }
 }
 
-/// Internal view with Core Data dependencies
 private struct SnippetEditorContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -210,12 +206,13 @@ private struct SnippetEditorContentView: View {
 }
 
 private struct SnippetRow: View {
+    @Environment(\.cfTheme) private var theme
     @ObservedObject var snippet: Snippet
 
     var body: some View {
         HStack {
             Image(systemName: snippet.isEnabled ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(snippet.isEnabled ? .green : .secondary)
+                .foregroundColor(snippet.isEnabled ? theme.success : theme.textMuted)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(snippet.title)
@@ -223,7 +220,7 @@ private struct SnippetRow: View {
 
                 Text(snippet.abbreviation)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
 
             Spacer()
@@ -231,13 +228,14 @@ private struct SnippetRow: View {
             if snippet.useCount > 0 {
                 Text("\(snippet.useCount)")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(theme.textMuted)
             }
         }
     }
 }
 
 private struct SnippetDetailView: View {
+    @Environment(\.cfTheme) private var theme
     @ObservedObject var snippet: Snippet
     @Environment(\.managedObjectContext) private var viewContext
 
@@ -294,20 +292,20 @@ private struct SnippetDetailView: View {
                     if let message = abbreviationValidation.message {
                         HStack(spacing: 4) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
+                                .foregroundColor(theme.warning)
                                 .font(.caption)
                             Text(message)
                                 .font(.caption)
-                                .foregroundColor(.orange)
+                                .foregroundColor(theme.warning)
                         }
                     } else if !snippet.abbreviation.isEmpty {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
+                                .foregroundColor(theme.success)
                                 .font(.caption)
                             Text("Valid abbreviation")
                                 .font(.caption)
-                                .foregroundColor(.green)
+                                .foregroundColor(theme.success)
                         }
                     }
                 }
@@ -346,7 +344,7 @@ private struct SnippetDetailView: View {
 
                     Text("Click to insert variables · Type {prompt:Name} for user input")
                         .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(theme.textMuted)
                 }
             }
 
@@ -402,12 +400,12 @@ private struct SnippetDetailView: View {
                             ForEach(Array(rules), id: \.id) { rule in
                                 HStack {
                                     Image(systemName: "app.fill")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(theme.accent)
                                     Text(rule.appName)
                                     Spacer()
                                     Button(action: { removeAppRule(rule) }) {
                                         Image(systemName: "minus.circle.fill")
-                                            .foregroundColor(.red)
+                                            .foregroundColor(theme.danger)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -415,7 +413,7 @@ private struct SnippetDetailView: View {
                         } else {
                             Text("No apps selected. This snippet will not expand anywhere.")
                                 .font(.caption)
-                                .foregroundColor(.orange)
+                                .foregroundColor(theme.warning)
                         }
 
                         Button(action: addAppRule) {
@@ -427,7 +425,7 @@ private struct SnippetDetailView: View {
 
                     Text("Snippet will only expand in selected applications")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(theme.textMuted)
                 }
             }
         }
@@ -634,7 +632,7 @@ private struct GroupsPanel: View {
                                 ForEach(recentSnippetsLimited, id: \.id) { snippet in
                                     LibraryRow(
                                         icon: .clock,
-                                        iconColor: Color(red: 0.78, green: 0.14, blue: 0.70),
+                                        iconColor: BrandPalette.Category.recent,
                                         title: snippet.title,
                                         subtitle: snippet.abbreviation
                                     ) {
@@ -982,9 +980,9 @@ private struct EditorToolbar: View {
                         .font(.system(size: 12))
                     Text("⌘⌫")
                         .font(.system(size: 10))
-                        .foregroundColor(Color.red.opacity(0.7))
+                        .foregroundColor(theme.danger.opacity(0.7))
                 }
-                .foregroundColor(selectedSnippet == nil ? theme.textFaint : Color.red)
+                .foregroundColor(selectedSnippet == nil ? theme.textFaint : theme.danger)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(theme.fill2)

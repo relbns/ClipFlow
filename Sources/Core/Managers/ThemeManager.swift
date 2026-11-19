@@ -45,11 +45,7 @@ class ThemeManager: ObservableObject {
             appearance = nil // Follow system
         }
 
+        // App level only: a per-window appearance would also restyle the status item's window.
         NSApp.appearance = appearance
-
-        // Notify all windows to update
-        for window in NSApp.windows {
-            window.appearance = appearance
-        }
     }
 }

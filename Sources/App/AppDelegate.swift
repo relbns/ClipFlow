@@ -49,9 +49,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if SnapshotRenderer.runIfRequested() {
+            NSApp.terminate(nil)
+            return
+        }
         NSApp.setActivationPolicy(.accessory)
         ProcessInfo.processInfo.disableAutomaticTermination("ClipFlow runs in the menu bar without windows")
         AppDefaults.register()
+        _ = ThemeManager.shared
 
         let stack = CoreDataStack.shared
         stack.prepareDefaultData()
@@ -191,6 +196,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             )
             .cfAutoTheme()
+            .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
 
             popover.contentViewController = NSHostingController(rootView: popoverView)
             NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
@@ -208,6 +214,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             PasteCoordinator.shared.rememberFrontmostApp()
             PopoverNavigation.shared.popoverWillShow()
+            popover.appearance = NSApp.appearance
             let anchor = popoverAnchor()
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
@@ -292,7 +299,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             aboutWindow = makeWindow(
                 rootView: aboutView,
                 title: L("about_clipflow"),
-                size: NSSize(width: 560, height: 520),
+                size: NSSize(width: 560, height: 680),
                 style: [.titled, .closable]
             )
         }

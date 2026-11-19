@@ -11,13 +11,15 @@ final class ClipboardMonitor: ObservableObject {
     private var lastChangeCount = 0
     private let thumbnailSize: CGFloat = 64
 
-    private var maxHistoryItems: Int { max(10, UserDefaults.standard.integer(forKey: "maxHistoryItems")) }
-    private var removeDuplicates: Bool { UserDefaults.standard.bool(forKey: "removeDuplicates") }
-    private var moveUsedToTop: Bool { UserDefaults.standard.bool(forKey: "moveUsedToTop") }
+    private let defaults: UserDefaults
+    private var maxHistoryItems: Int { max(10, defaults.integer(forKey: "maxHistoryItems")) }
+    private var removeDuplicates: Bool { defaults.bool(forKey: "removeDuplicates") }
+    private var moveUsedToTop: Bool { defaults.bool(forKey: "moveUsedToTop") }
 
-    init(context: NSManagedObjectContext, pasteboard: NSPasteboard = .general) {
+    init(context: NSManagedObjectContext, pasteboard: NSPasteboard = .general, defaults: UserDefaults = .standard) {
         self.context = context
         self.pasteboard = pasteboard
+        self.defaults = defaults
         reload()
     }
 
@@ -53,17 +55,21 @@ final class ClipboardMonitor: ObservableObject {
     }
 
     func record(_ capture: ClipCapture, snapshot: PasteboardSnapshot, source: NSRunningApplication?) {
+        record(capture, snapshot: snapshot, sourceName: source?.localizedName, sourceBundleID: source?.bundleIdentifier)
+    }
+
+    func record(_ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?, at date: Date = Date()) {
         if removeDuplicates, let existing = fetchItem(hash: capture.hash) {
-            existing.createdAt = Date()
-            existing.sourceAppName = source?.localizedName
-            existing.sourceBundleID = source?.bundleIdentifier
+            existing.createdAt = date
+            existing.sourceAppName = sourceName
+            existing.sourceBundleID = sourceBundleID
             saveAndReload()
             return
         }
 
         let item = ClipItem(context: context)
         item.id = UUID()
-        item.createdAt = Date()
+        item.createdAt = date
         item.type = capture.kind.rawValue
         item.content = capture.text
         item.dataHash = capture.hash
@@ -71,8 +77,8 @@ final class ClipboardMonitor: ObservableObject {
         item.byteCount = Int64(capture.byteCount)
         item.pixelWidth = Int32(capture.pixelWidth)
         item.pixelHeight = Int32(capture.pixelHeight)
-        item.sourceAppName = source?.localizedName
-        item.sourceBundleID = source?.bundleIdentifier
+        item.sourceAppName = sourceName
+        item.sourceBundleID = sourceBundleID
         item.pasteboardData = try? snapshot.encoded()
         if capture.kind == .image {
             item.imageData = thumbnail(from: snapshot)

@@ -33,7 +33,7 @@ targets:
         CFBundleVersion: 1
         LSMinimumSystemVersion: 14.0
         LSUIElement: true
-        NSHumanReadableCopyright: "Copyright © 2026 Ariel Benesh. All rights reserved."
+        NSHumanReadableCopyright: "Copyright © 2026 Ariel Benesh. MIT License."
         NSPrincipalClass: NSApplication
     entitlements:
       path: Sources/Resources/ClipFlow.entitlements

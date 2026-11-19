@@ -24,14 +24,7 @@ struct CFToolbarBtn: View {
             .frame(height: 24)
             .background(
                 primary
-                    ? LinearGradient(
-                        colors: [
-                            Color(red: 0.65, green: 0.17, blue: 0.72, opacity: 1.0),
-                            Color(red: 0.55, green: 0.19, blue: 0.72, opacity: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+                    ? LinearGradient(gradient: BrandPalette.primaryButton, startPoint: .top, endPoint: .bottom)
                     : theme.btnBg
             )
             .cornerRadius(6)
@@ -39,7 +32,7 @@ struct CFToolbarBtn: View {
                 RoundedRectangle(cornerRadius: 6)
                     .strokeBorder(
                         primary
-                            ? Color(red: 0.5, green: 0.19, blue: 0.72, opacity: 1.0)
+                            ? BrandPalette.primaryButtonBorder
                             : theme.fill2,
                         lineWidth: 1
                     )
@@ -92,7 +85,7 @@ struct CFLinkBtn: View {
                 Text(label)
                     .font(.system(size: 13, weight: .medium))
             }
-            .foregroundColor(Color(red: 0.68, green: 0.17, blue: 0.72, opacity: 1.0))
+            .foregroundColor(BrandPalette.accentLink)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(Color.clear)
@@ -113,7 +106,7 @@ struct CFDangerBtn: View {
         Button(action: { action?() }) {
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(Color(red: 1.0, green: 0.48, blue: 0.45, opacity: 1.0))
+                .foregroundColor(theme.danger)
                 .padding(.horizontal, 9)
                 .frame(height: 24)
                 .background(theme.btnBg)
@@ -283,21 +276,21 @@ struct CFButtons_Previews: PreviewProvider {
                         icon: AnyView(CFIcon(type: .clock, size: 13)),
                         label: "Recent",
                         count: 14,
-                        accent: Color(red: 0.78, green: 0.14, blue: 0.70)
+                        accent: BrandPalette.Category.recent
                     )
 
                     CFGroupRow(
                         icon: AnyView(CFIcon(type: .image, size: 13)),
                         label: "Images",
                         count: 3,
-                        accent: Color(red: 0.74, green: 0.14, blue: 0.60)
+                        accent: BrandPalette.Category.images
                     )
 
                     CFGroupRow(
                         icon: AnyView(CFIcon(type: .link, size: 13)),
                         label: "Links",
                         count: 6,
-                        accent: Color(red: 0.78, green: 0.14, blue: 0.50)
+                        accent: BrandPalette.Category.links
                     )
                 }
             }

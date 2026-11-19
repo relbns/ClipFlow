@@ -149,7 +149,7 @@ struct CFIconRow_Previews: PreviewProvider {
                     CFIconRow(
                         icon: AnyView(
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(Color(red: 1, green: 0.34, blue: 0.2))
+                                .fill(Color.hex(0xFF5733))
                                 .frame(width: 16, height: 16)
                                 .shadow(color: .black.opacity(0.15), radius: 0, x: 0, y: 0)
                                 .overlay(
