@@ -38,7 +38,25 @@ struct CFIcon: View {
     var size: CGFloat = 16
     var stroke: CGFloat = 1.6
 
+    /// Icons where an SF Symbol reads better than the design's drawing (the README prefers Symbols).
+    private var symbolName: String? {
+        switch type {
+        case .text: return "text.alignleft"
+        default: return nil
+        }
+    }
+
     var body: some View {
+        if let symbolName {
+            Image(systemName: symbolName)
+                .font(.system(size: size * 0.82, weight: stroke >= 1.8 ? .semibold : .medium))
+                .frame(width: size, height: size)
+        } else {
+            drawnIcon
+        }
+    }
+
+    private var drawnIcon: some View {
         Canvas { context, size in
             let scale = size.width / 24.0
             context.scaleBy(x: scale, y: scale)

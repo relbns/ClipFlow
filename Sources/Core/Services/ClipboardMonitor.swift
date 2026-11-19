@@ -37,6 +37,7 @@ final class ClipboardMonitor: ObservableObject {
     }
 
     func checkPasteboard() {
+        guard timer != nil else { return }
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else { return }
         lastChangeCount = changeCount

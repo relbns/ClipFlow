@@ -99,10 +99,11 @@ struct ClipCapture: Equatable {
 
 extension SimpleClipItem {
     /// The first line of a history row.
+    @MainActor
     var title: String {
         switch kind {
         case .image:
-            return pixelWidth > 0 ? "Image \(pixelWidth)×\(pixelHeight)" : "Image"
+            return pixelWidth > 0 ? L("clip_image_size", pixelWidth, pixelHeight) : L("clip_image")
         case .file:
             return URL(fileURLWithPath: content).lastPathComponent
         default:
@@ -113,6 +114,7 @@ extension SimpleClipItem {
     }
 
     /// The second line of a history row, from the clip's real data.
+    @MainActor
     func subtitle(now: Date = Date()) -> String {
         let detail: String
         switch kind {
@@ -120,23 +122,24 @@ extension SimpleClipItem {
             let size = ByteCountFormatter.string(fromByteCount: Int64(byteCount), countStyle: .file)
             detail = pixelWidth > 0 ? "\(pixelWidth)×\(pixelHeight) · \(size)" : size
         case .color:
-            detail = "hex color"
+            detail = L("clip_hex_color")
         case .file:
-            detail = "file"
+            detail = L("clip_file")
         default:
-            detail = lineCount > 1 ? "\(lineCount) lines" : Self.copiedAgo(createdAt, now: now)
+            detail = lineCount > 1 ? L("clip_lines", lineCount) : Self.copiedAgo(createdAt, now: now)
         }
         guard let app = sourceAppName, !app.isEmpty else { return detail }
         return "\(detail) • \(app)"
     }
 
+    @MainActor
     static func copiedAgo(_ date: Date, now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
         switch seconds {
-        case ..<60: return "copied \(seconds)s ago"
-        case ..<3600: return "copied \(seconds / 60)m ago"
-        case ..<86400: return "copied \(seconds / 3600)h ago"
-        default: return "copied \(seconds / 86400)d ago"
+        case ..<60: return L("copied_seconds_ago", seconds)
+        case ..<3600: return L("copied_minutes_ago", seconds / 60)
+        case ..<86400: return L("copied_hours_ago", seconds / 3600)
+        default: return L("copied_days_ago", count: seconds / 86400)
         }
     }
 }

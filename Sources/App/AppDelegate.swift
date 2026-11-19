@@ -2,7 +2,7 @@ import Cocoa
 import Combine
 import SwiftUI
 
-/// Wrapper that dynamically updates layout direction based on language changes
+/// Rebuilds its content when the interface language changes, so every `L()` string and the direction update at once.
 struct DynamicLanguageWrapper<Content: View>: View {
     @EnvironmentObject var languageManager: LanguageManager
     let content: Content
@@ -14,6 +14,8 @@ struct DynamicLanguageWrapper<Content: View>: View {
     var body: some View {
         content
             .environment(\.layoutDirection, languageManager.layoutDirection)
+            .environment(\.locale, Locale(identifier: languageManager.currentLanguage))
+            .id(languageManager.currentLanguage)
     }
 }
 
@@ -88,9 +90,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateTextExpansionState() }
             .store(in: &cancellables)
+        LanguageManager.shared.$currentLanguage
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateWindowTitles() }
+            .store(in: &cancellables)
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.updateTextExpansionState() }
+            .sink { [weak self] _ in
+                self?.updateTextExpansionState()
+                self?.updateHistoryRecordingState()
+            }
             .store(in: &cancellables)
 
         let hasCompletedWelcome = UserDefaults.standard.bool(forKey: "hasCompletedWelcome")
@@ -123,7 +134,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.messageText = L("store_moved_title")
             alert.informativeText = L("store_moved_message", url.path)
             alert.addButton(withTitle: L("show_in_finder"))
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: L("ok"))
         }
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn, case .movedAside(let url) = issue {
@@ -156,12 +167,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         center.addObserver(self, selector: #selector(openPreferences), name: NSNotification.Name("OpenPreferences"), object: nil)
         center.addObserver(self, selector: #selector(openSnippetEditor), name: NSNotification.Name("OpenSnippetEditor"), object: nil)
         center.addObserver(self, selector: #selector(openAbout), name: NSNotification.Name("OpenAbout"), object: nil)
+        center.addObserver(forName: .clearClipboardHistory, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.clipboardMonitor.clearHistory() }
+        }
     }
 
     // MARK: - Text expansion
 
     private var isTextExpansionEnabled: Bool {
         UserDefaults.standard.bool(forKey: "textExpansionEnabled")
+    }
+
+    private func updateHistoryRecordingState() {
+        if UserDefaults.standard.bool(forKey: "startMonitoring") {
+            clipboardMonitor.startMonitoring()
+        } else {
+            clipboardMonitor.stopMonitoring()
+        }
     }
 
     /// Idempotent: starts the tap once expansion is on and Input Monitoring is granted, stops it otherwise.
@@ -188,15 +210,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             popover.behavior = .transient
             popover.animates = true
 
-            let popoverView = MenuBarPopover(
-                clipboardMonitor: clipboardMonitor,
-                isPresented: Binding(
-                    get: { popover.isShown },
-                    set: { if !$0 { popover.performClose(nil) } }
+            let popoverView = DynamicLanguageWrapper {
+                MenuBarPopover(
+                    clipboardMonitor: clipboardMonitor,
+                    isPresented: Binding(
+                        get: { popover.isShown },
+                        set: { if !$0 { popover.performClose(nil) } }
+                    )
                 )
-            )
-            .cfAutoTheme()
-            .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
+                .cfAutoTheme()
+                .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
+            }
+            .environmentObject(LanguageManager.shared)
 
             popover.contentViewController = NSHostingController(rootView: popoverView)
             NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self] _ in
@@ -218,7 +243,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let anchor = popoverAnchor()
             popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
-            popover.contentViewController?.view.window?.makeKey()
+            // The popover's window exists only after show returns; make it key then, so the first click acts.
+            DispatchQueue.main.async {
+                popover.contentViewController?.view.window?.makeKey()
+            }
         }
     }
 
@@ -256,6 +284,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let settingsView = DynamicLanguageWrapper {
                 SettingsView()
                     .cfAutoTheme()
+                    .environment(\.managedObjectContext, CoreDataStack.shared.viewContext)
             }
             .environmentObject(LanguageManager.shared)
 
@@ -322,7 +351,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             let window = makeWindow(
                 rootView: welcomeView,
-                title: "Welcome to ClipFlow",
+                title: L("welcome_title"),
                 size: NSSize(width: 780, height: 560),
                 style: [.titled, .closable]
             )
@@ -336,6 +365,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             welcomeWindow = window
         }
         present(welcomeWindow)
+    }
+
+    private func updateWindowTitles() {
+        settingsWindow?.title = L("preferences")
+        snippetEditorWindow?.title = L("snippet_editor")
+        aboutWindow?.title = L("about_clipflow")
+        welcomeWindow?.title = L("welcome_title")
     }
 
     private func makeWindow<Content: View>(rootView: Content, title: String, size: NSSize, style: NSWindow.StyleMask) -> NSWindow {

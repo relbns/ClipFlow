@@ -1,41 +1,21 @@
 import SwiftUI
 
 struct PrivacySettingsView: View {
-    @Environment(\.cfTheme) var theme
+    @Environment(\.cfTheme) private var theme
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // Header
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(L("privacy"))
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(theme.textStrong)
-
-                    Text("Control what ClipFlow can access and monitor")
-                        .font(.system(size: 13))
-                        .foregroundColor(theme.textSubtle)
+        SettingsPage {
+            CFSettingsRow(label: L("pref_passwords"), hint: L("pref_passwords_hint")) {
+                HStack(spacing: 6) {
+                    CFIcon(type: .lock, size: 13, stroke: 1.8)
+                    Text(L("always_on")).font(.system(size: 12))
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-
-                // Placeholder
-                Text("Privacy settings coming soon")
-                    .font(.system(size: 13))
-                    .foregroundColor(theme.textMuted)
-                    .padding(24)
-                    .frame(maxWidth: .infinity)
-                    .background(theme.surface)
-                    .cornerRadius(12)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
+                .foregroundColor(theme.textMuted)
+                .padding(.top, 2)
+            }
+            CFSettingsRow(label: L("pref_history_excluded"), hint: L("pref_history_excluded_hint"), isLast: true) {
+                ExcludedAppsField(scope: .history)
             }
         }
-        .background(theme.surfaceDeep)
     }
-}
-
-#Preview {
-    PrivacySettingsView()
-        .cfAutoTheme()
 }

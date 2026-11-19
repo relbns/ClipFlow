@@ -23,7 +23,7 @@ struct AboutView: View {
                     Spacer().frame(height: 4)
 
                     // Tagline
-                    Text("Modern clipboard manager + text expander")
+                    Text(L("app_tagline"))
                         .font(.system(size: 13.5))
                         .foregroundColor(theme.textMuted)
 
@@ -31,12 +31,12 @@ struct AboutView: View {
 
                     // Version Row
                     HStack(spacing: 8) {
-                        Text("Version 1.0.0")
+                        Text(L("version_format", Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"))
                             .font(.system(size: 13))
                             .foregroundColor(theme.text)
 
                         // ALPHA badge - amber/gold color
-                        Text("ALPHA")
+                        Text(L("alpha_badge"))
                             .font(.system(size: 10.5, weight: .semibold))
                             .foregroundColor(BrandPalette.warningText)
                             .textCase(.uppercase)
@@ -61,7 +61,8 @@ struct AboutView: View {
                     // Credits Section
                     VStack(alignment: .leading, spacing: 0) {
                         // Header
-                        Text("CREDITS")
+                        Text(L("credits"))
+                            .textCase(.uppercase)
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(theme.textLabel)
                             .kerning(0.66)
@@ -77,13 +78,13 @@ struct AboutView: View {
                             ),
                             iconColor: BrandPalette.Credit.creator,
                             title: "Ariel Benesh",
-                            subtitle: "Creator & Developer"
+                            subtitle: L("credit_creator_role")
                         )
 
                         Spacer().frame(height: 10)
 
                         // Separator
-                        Text("Built on the shoulders of giants")
+                        Text(L("credits_giants"))
                             .font(.system(size: 12))
                             .foregroundColor(theme.textSubtle)
                             .padding(.leading, 40)
@@ -98,7 +99,7 @@ struct AboutView: View {
                             ),
                             iconColor: BrandPalette.Credit.clipy,
                             title: "Clipy",
-                            subtitle: "Core clipboard architecture"
+                            subtitle: L("credit_clipy_role")
                         )
 
                         Spacer().frame(height: 6)
@@ -111,7 +112,7 @@ struct AboutView: View {
                             ),
                             iconColor: BrandPalette.Credit.flycut,
                             title: "Flycut",
-                            subtitle: "UI/UX inspiration for Simple mode"
+                            subtitle: L("credit_flycut_role")
                         )
                     }
                     .padding(.horizontal, 50)
@@ -151,7 +152,7 @@ struct AboutView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "doc.text")
                                     .font(.system(size: 11, weight: .medium))
-                                Text("Full Credits")
+                                Text(L("full_credits"))
                                     .font(.system(size: 12))
                             }
                             .foregroundColor(BrandPalette.accentLink)
@@ -166,7 +167,7 @@ struct AboutView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "gearshape")
                                     .font(.system(size: 11, weight: .medium))
-                                Text("License")
+                                Text(L("license"))
                                     .font(.system(size: 12))
                             }
                             .foregroundColor(BrandPalette.accentLink)
@@ -177,7 +178,7 @@ struct AboutView: View {
                     Spacer().frame(height: 8)
 
                     // Copyright
-                    Text("© 2026 ClipFlow")
+                    Text(L("about_footer"))
                         .font(.system(size: 11))
                         .foregroundColor(theme.textFaint)
 

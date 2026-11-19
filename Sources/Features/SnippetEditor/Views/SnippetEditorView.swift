@@ -86,7 +86,7 @@ private struct SnippetEditorContentView: View {
         withAnimation {
             let newGroup = SnippetGroup(context: viewContext)
             newGroup.id = UUID()
-            newGroup.name = "New Group"
+            newGroup.name = L("editor_new_group")
             newGroup.isEnabled = true
             newGroup.sortOrder = Int32(groups.count)
             newGroup.createdAt = Date()
@@ -106,7 +106,7 @@ private struct SnippetEditorContentView: View {
             // Create default group if none exists
             let defaultGroup = SnippetGroup(context: viewContext)
             defaultGroup.id = UUID()
-            defaultGroup.name = "Default"
+            defaultGroup.name = L("editor_default_group")
             defaultGroup.isEnabled = true
             defaultGroup.sortOrder = 0
             defaultGroup.createdAt = Date()
@@ -127,13 +127,13 @@ private struct SnippetEditorContentView: View {
         withAnimation {
             let newSnippet = Snippet(context: viewContext)
             newSnippet.id = UUID()
-            newSnippet.title = "New Snippet"
+            newSnippet.title = L("editor_new_snippet")
             newSnippet.abbreviation = ".new"
             newSnippet.content = ""
             newSnippet.isEnabled = true
             newSnippet.createdAt = Date()
             newSnippet.updatedAt = Date()
-            newSnippet.expandTrigger = "delimiter"
+            newSnippet.expandTrigger = UserDefaults.standard.string(forKey: "expandAfter") ?? ExpandTrigger.delimiter.rawValue
             newSnippet.caseSensitive = false
             newSnippet.playSound = false
             newSnippet.useCount = 0
@@ -248,17 +248,17 @@ private struct SnippetDetailView: View {
         let abbr = snippet.abbreviation.trimmingCharacters(in: .whitespaces)
 
         if abbr.isEmpty {
-            return (false, "Abbreviation cannot be empty")
+            return (false, L("abbr_error_empty"))
         }
 
         let validPrefixes = [".", ";", "/"]
         let hasValidPrefix = validPrefixes.contains(where: { abbr.hasPrefix($0) })
         if !hasValidPrefix {
-            return (false, "Must start with . or ; or /")
+            return (false, L("abbr_error_prefix"))
         }
 
         if abbr.contains(" ") {
-            return (false, "Cannot contain spaces")
+            return (false, L("abbr_error_spaces"))
         }
 
         // Allow alphanumerics (includes Hebrew), special chars, and Hebrew letters explicitly
@@ -267,14 +267,14 @@ private struct SnippetDetailView: View {
         allowedCharacters.formUnion(CharacterSet(charactersIn: "א...ת"))  // Hebrew letters range
 
         if abbr.rangeOfCharacter(from: allowedCharacters.inverted) != nil {
-            return (false, "Only letters, numbers, Hebrew, and ._-/; allowed")
+            return (false, L("abbr_error_characters"))
         }
 
         let duplicate = allSnippets.first { otherSnippet in
             otherSnippet.id != snippet.id && otherSnippet.abbreviation == abbr
         }
         if duplicate != nil {
-            return (false, "This abbreviation already exists")
+            return (false, L("abbr_error_duplicate"))
         }
 
         return (true, nil)
@@ -282,12 +282,12 @@ private struct SnippetDetailView: View {
 
     var body: some View {
         Form {
-            Section("Basic") {
-                TextField("Title:", text: $snippet.title)
+            Section(L("editor_section_basic")) {
+                TextField(L("editor_title"), text: $snippet.title)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("Abbreviation:", text: $snippet.abbreviation)
-                        .help("Type this to expand the snippet (e.g., .cdsh)")
+                    TextField(L("editor_abbreviation"), text: $snippet.abbreviation)
+                        .help(L("editor_abbreviation_help"))
 
                     if let message = abbreviationValidation.message {
                         HStack(spacing: 4) {
@@ -303,17 +303,17 @@ private struct SnippetDetailView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(theme.success)
                                 .font(.caption)
-                            Text("Valid abbreviation")
+                            Text(L("abbr_valid"))
                                 .font(.caption)
                                 .foregroundColor(theme.success)
                         }
                     }
                 }
 
-                Toggle("Enabled", isOn: $snippet.isEnabled)
+                Toggle(L("editor_enabled"), isOn: $snippet.isEnabled)
             }
 
-            Section("Content") {
+            Section(L("editor_section_content")) {
                 TextEditor(text: $snippet.content)
                     .font(.system(.body, design: .monospaced))
                     .frame(minHeight: 200)
@@ -342,57 +342,57 @@ private struct SnippetDetailView: View {
                         .buttonStyle(.plain)
                     }
 
-                    Text("Click to insert variables · Type {prompt:Name} for user input")
+                    Text(L("editor_variables_hint"))
                         .font(.system(size: 11))
                         .foregroundColor(theme.textMuted)
                 }
             }
 
-            Section("Expansion") {
-                Picker("Expand after:", selection: $snippet.expandTrigger) {
-                    Text("Delimiter (space, tab, punct)").tag("delimiter")
-                    Text("Space only").tag("space")
-                    Text("Any character").tag("any")
-                    Text("Tab only").tag("tab")
-                    Text("Enter only").tag("enter")
+            Section(L("editor_section_expansion")) {
+                Picker(L("editor_expand_after"), selection: $snippet.expandTrigger) {
+                    Text(L("trigger_delimiter_long")).tag("delimiter")
+                    Text(L("trigger_space_long")).tag("space")
+                    Text(L("trigger_any_long")).tag("any")
+                    Text(L("trigger_tab_long")).tag("tab")
+                    Text(L("trigger_enter_long")).tag("enter")
                 }
 
-                Toggle("Case sensitive", isOn: $snippet.caseSensitive)
-                Toggle("Play sound on expansion", isOn: $snippet.playSound)
+                Toggle(L("editor_case_sensitive"), isOn: $snippet.caseSensitive)
+                Toggle(L("editor_play_sound"), isOn: $snippet.playSound)
             }
 
-            Section("Statistics") {
+            Section(L("editor_section_statistics")) {
                 // 2×2 Grid
                 HStack(spacing: 12) {
                     VStack(spacing: 12) {
                         CFStatCard(
                             value: "\(snippet.useCount)",
-                            label: "TOTAL USES"
+                            label: L("stat_uses")
                         )
 
                         CFStatCard(
                             value: "\(charsSaved)",
-                            label: "CHARS/USE"
+                            label: L("stat_chars_per_use")
                         )
                     }
 
                     VStack(spacing: 12) {
                         CFStatCard(
                             value: formatTimeSaved(estimatedTimeSaved),
-                            label: "TIME SAVED"
+                            label: L("stat_time_saved")
                         )
 
                         CFStatCard(
                             value: "\(charsSaved * Int(snippet.useCount))",
-                            label: "TOTAL SAVED"
+                            label: L("stat_chars_saved")
                         )
                     }
                 }
                 .padding(.vertical, 8)
             }
 
-            Section("App-Specific Rules") {
-                Toggle("Restrict to specific apps", isOn: $snippet.restrictToApps)
+            Section(L("editor_section_apps")) {
+                Toggle(L("editor_restrict_apps"), isOn: $snippet.restrictToApps)
 
                 if snippet.restrictToApps {
                     VStack(alignment: .leading, spacing: 8) {
@@ -411,19 +411,19 @@ private struct SnippetDetailView: View {
                                 }
                             }
                         } else {
-                            Text("No apps selected. This snippet will not expand anywhere.")
+                            Text(L("editor_no_apps"))
                                 .font(.caption)
                                 .foregroundColor(theme.warning)
                         }
 
                         Button(action: addAppRule) {
-                            Label("Add App", systemImage: "plus.circle")
+                            Label(L("add_app"), systemImage: "plus.circle")
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                     }
 
-                    Text("Snippet will only expand in selected applications")
+                    Text(L("editor_restrict_hint"))
                         .font(.caption)
                         .foregroundColor(theme.textMuted)
                 }
@@ -433,7 +433,7 @@ private struct SnippetDetailView: View {
         .padding()
         .toolbar {
             ToolbarItem {
-                Button("Save") {
+                Button(L("save")) {
                     saveSnippet()
                 }
                 .buttonStyle(.borderedProminent)
@@ -442,15 +442,15 @@ private struct SnippetDetailView: View {
 
             ToolbarItem {
                 Menu {
-                    Button("Duplicate") {
+                    Button(L("duplicate")) {
                         duplicateSnippet()
                     }
                     Divider()
-                    Button("Delete", role: .destructive) {
+                    Button(L("delete"), role: .destructive) {
                         deleteSnippet()
                     }
                 } label: {
-                    Label("More", systemImage: "ellipsis.circle")
+                    Label(L("more"), systemImage: "ellipsis.circle")
                 }
             }
         }
@@ -601,7 +601,7 @@ private struct GroupsPanel: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Groups")
+                Text(L("editor_groups"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(theme.textStrong)
 
@@ -625,7 +625,7 @@ private struct GroupsPanel: View {
                     // Library Section
                     if !recentSnippetsLimited.isEmpty {
                         VStack(spacing: 8) {
-                            CFSectionLabel("LIBRARY")
+                            CFSectionLabel(L("editor_library"))
                                 .padding(.horizontal, 8)
 
                             VStack(spacing: 2) {
@@ -646,7 +646,7 @@ private struct GroupsPanel: View {
 
                     // Groups Section
                     VStack(spacing: 8) {
-                        CFSectionLabel("GROUPS")
+                        CFSectionLabel(L("editor_groups"))
                             .padding(.horizontal, 8)
 
                         VStack(spacing: 2) {
@@ -761,7 +761,7 @@ private struct GroupRow: View {
         .contextMenu {
             if let onDelete = onDelete {
                 Button(role: .destructive, action: onDelete) {
-                    Label("Delete Group", systemImage: "trash")
+                    Label(L("editor_delete_group"), systemImage: "trash")
                 }
             }
         }
@@ -784,7 +784,7 @@ private struct SnippetsPanel: View {
             // Header with search
             VStack(spacing: 12) {
                 HStack {
-                    Text("Snippets")
+                    Text(L("section_snippets"))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(theme.textStrong)
 
@@ -799,7 +799,7 @@ private struct SnippetsPanel: View {
 
                 CFInput(
                     text: $searchText,
-                    placeholder: "Search snippets...",
+                    placeholder: L("editor_search"),
                     prefix: nil,
                     suffix: AnyView(
                         CFIcon(type: .search, size: 14, stroke: 1.6)
@@ -904,7 +904,7 @@ private struct EditorPanel: View {
                 CFIcon(type: .text, size: 48, stroke: 1.4)
                     .foregroundColor(theme.textFaint)
 
-                Text("Select a snippet to edit")
+                Text(L("editor_select_snippet"))
                     .font(.system(size: 14))
                     .foregroundColor(theme.textMuted)
             }
@@ -928,7 +928,7 @@ private struct EditorToolbar: View {
             Button(action: onNew) {
                 HStack(spacing: 6) {
                     CFIcon(type: .plus, size: 12, stroke: 1.8)
-                    Text("New")
+                    Text(L("new"))
                         .font(.system(size: 12))
                     Text("⌘N")
                         .font(.system(size: 10))
@@ -941,12 +941,13 @@ private struct EditorToolbar: View {
                 .cornerRadius(5)
             }
             .buttonStyle(.plain)
+            .keyboardShortcut("n", modifiers: .command)
 
             // Duplicate Button
             Button(action: onDuplicate) {
                 HStack(spacing: 6) {
                     CFIcon(type: .bracket, size: 12, stroke: 1.8)
-                    Text("Duplicate")
+                    Text(L("duplicate"))
                         .font(.system(size: 12))
                 }
                 .foregroundColor(selectedSnippet == nil ? theme.textFaint : theme.textStrong)
@@ -960,27 +961,12 @@ private struct EditorToolbar: View {
 
             Spacer()
 
-            // Synced Indicator
-            HStack(spacing: 6) {
-                CFIcon(type: .cloud, size: 12, stroke: 1.6)
-                    .foregroundColor(theme.textSubtle)
-
-                Text("Synced")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.textMuted)
-            }
-
-            Spacer()
-
             // Delete Button
             Button(action: onDelete) {
                 HStack(spacing: 6) {
                     CFIcon(type: .trash, size: 12, stroke: 1.8)
-                    Text("Delete")
+                    Text(L("delete"))
                         .font(.system(size: 12))
-                    Text("⌘⌫")
-                        .font(.system(size: 10))
-                        .foregroundColor(theme.danger.opacity(0.7))
                 }
                 .foregroundColor(selectedSnippet == nil ? theme.textFaint : theme.danger)
                 .padding(.horizontal, 10)
@@ -989,6 +975,7 @@ private struct EditorToolbar: View {
                 .cornerRadius(5)
             }
             .buttonStyle(.plain)
+
             .disabled(selectedSnippet == nil)
         }
         .padding(.horizontal, 16)
@@ -1005,24 +992,13 @@ private struct EditorStatusBar: View {
 
     private var contentStats: String {
         guard let snippet = selectedSnippet else {
-            return "No snippet selected"
+            return L("editor_no_selection")
         }
 
         let chars = snippet.content.count
         let words = snippet.content.split(separator: " ").count
 
-        return "\(chars) chars · \(words) words"
-    }
-
-    private var lastSynced: String {
-        if let snippet = selectedSnippet,
-           let group = snippet.group,
-           let lastSynced = group.lastSynced {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .short
-            return "Last synced \(formatter.localizedString(for: lastSynced, relativeTo: Date()))"
-        }
-        return "Not synced"
+        return "\(L("editor_chars", count: chars)) · \(L("editor_words", count: words))"
     }
 
     var body: some View {
@@ -1033,11 +1009,6 @@ private struct EditorStatusBar: View {
                 .foregroundColor(theme.textMuted)
 
             Spacer()
-
-            // Right: Last Synced
-            Text(lastSynced)
-                .font(.system(size: 11))
-                .foregroundColor(theme.textMuted)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
