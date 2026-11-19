@@ -74,6 +74,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         PasteCoordinator.shared.clipboardMonitor = clipboardMonitor
         PasteCoordinator.shared.closePopover = { [weak self] in self?.menuBarPopover?.performClose(nil) }
         PopoverNavigation.shared.clipboardMonitor = clipboardMonitor
+        PopoverNavigation.shared.context = stack.viewContext
         PopoverNavigation.shared.onClose = { [weak self] in self?.menuBarPopover?.performClose(nil) }
 
         setupStatusItem()
@@ -147,7 +148,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "ClipFlow")
+            button.image = StatusItemIcon.make()
             button.target = self
             button.action = #selector(statusBarButtonClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])

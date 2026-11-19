@@ -37,6 +37,9 @@ enum SnapshotRenderer {
         let monitor = ClipboardMonitor(context: stack.viewContext, defaults: defaults)
         SampleData.fill(stack.viewContext, monitor: monitor)
         PopoverNavigation.shared.clipboardMonitor = monitor
+        PopoverNavigation.shared.context = stack.viewContext
+        PopoverNavigation.shared.defaults = defaults
+        PopoverNavigation.shared.reloadSnippets()
 
         let languages = arguments(after: "--languages")?.split(separator: ",").map(String.init) ?? ["en"]
         for language in languages {
@@ -60,6 +63,9 @@ enum SnapshotRenderer {
             save("mb-simple", MenuBarPopover(clipboardMonitor: monitor, isPresented: .constant(true)), size: nil)
             defaults.set("organized", forKey: "viewMode")
             save("mb-org", MenuBarPopover(clipboardMonitor: monitor, isPresented: .constant(true)), size: nil)
+            PopoverNavigation.shared.drilledCategory = .links
+            save("mb-org-links", MenuBarPopover(clipboardMonitor: monitor, isPresented: .constant(true)), size: nil)
+            PopoverNavigation.shared.drilledCategory = nil
             save("prefs-exp", SettingsView(initialTab: 2), size: CGSize(width: 760, height: 620))
             save("onboarding", WelcomeView(isPresented: .constant(true), onGetStarted: {}), size: CGSize(width: 780, height: 520))
             save("about", AboutView(), size: CGSize(width: 560, height: 680))
@@ -132,6 +138,16 @@ private struct ThemeTokenSheet: View {
             HStack(spacing: 16) {
                 ForEach([16, 28, 48, 96], id: \.self) { size in ClipFlowMark(size: CGFloat(size)) }
                 ClipFlowMark(size: 48, rounded: false)
+            }
+            .padding(.bottom, 8)
+            let icons: [CFIcon.IconType] = [.search, .clock, .image, .text, .link, .swatch, .bolt, .star, .pin, .folder, .chevron, .chevronDown, .plus, .cmd, .gear, .trash, .power, .cloud, .check, .circle, .key, .sparkles, .bracket, .arrowDown, .lock, .dot, .hebrew, .info]
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(64)), count: 7), spacing: 10) {
+                ForEach(icons, id: \.self) { icon in
+                    VStack(spacing: 4) {
+                        CFIcon(type: icon, size: 22, stroke: 1.6).foregroundColor(theme.text)
+                        Text(String(describing: icon)).font(.system(size: 9)).foregroundColor(theme.textMuted)
+                    }
+                }
             }
             .padding(.bottom, 8)
             ForEach(rows, id: \.0) { name, color in

@@ -1,49 +1,74 @@
 import SwiftUI
-import CoreData
 
-/// Modern SwiftUI MenuBar Popover - replaces NSMenu
-@MainActor
+/// The history popover, built from `design_handoff_clipflow/design/components/menubar.jsx`.
 struct MenuBarPopover: View {
     @ObservedObject var clipboardMonitor: ClipboardMonitor
     @Binding var isPresented: Bool
     @ObservedObject private var navigation = PopoverNavigation.shared
-    @Environment(\.managedObjectContext) private var managedObjectContext
-
     @AppStorage("viewMode") private var viewMode = "organized"
-    @State private var snippetCount: Int = 0
     @State private var contentHeight: CGFloat = 0
-
-    @Environment(\.cfTheme) var theme
+    @Environment(\.cfTheme) private var theme
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with Search
-            headerView
+            searchField
+            if navigation.drilledCategory != nil, navigation.searchText.isEmpty {
+                drillHeader
+            }
+            list
+            PopoverDivider()
+            footer
+        }
+        .frame(width: 340)
+        .background(theme.popoverBg)
+        .environment(\.selectedPopoverItemID, navigation.selectedID)
+    }
 
-            Divider()
+    // MARK: - Search
 
-            // Content based on mode
-            ScrollViewReader { scroller in
+    private var searchField: some View {
+        CFInput(
+            text: $navigation.searchText,
+            placeholder: L("search_clipboard"),
+            prefix: AnyView(CFIcon(type: .search, size: 13, stroke: 1.8).foregroundColor(theme.textSubtle)),
+            suffix: AnyView(CFKBDChip("⌘F", dim: true))
+        )
+        .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
+    }
+
+    private var drillHeader: some View {
+        Button(action: navigation.goBack) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.backward").font(.system(size: 11, weight: .semibold))
+                Text(L("section_categories")).font(.system(size: 12))
+                Spacer()
+            }
+            .foregroundColor(theme.textMuted)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L("back"))
+    }
+
+    // MARK: - List
+
+    private var list: some View {
+        ScrollViewReader { scroller in
             ScrollView {
-                Group {
-                switch viewMode {
-                case "simple":
-                    SimpleHistoryView(
-                        clips: filteredClips,
-                        onSelect: selectClip
-                    )
-                case "hebrew":
-                    HebrewHistoryView(
-                        clips: filteredClips,
-                        onSelect: selectClip
-                    )
-                default: // organized
-                    OrganizedHistoryView(
-                        clips: filteredClips,
-                        snippetCount: snippetCount,
-                        onSelect: selectClip
-                    )
-                }
+                VStack(alignment: .leading, spacing: 0) {
+                    let sections = navigation.sections
+                    if sections.allSatisfy({ $0.items.isEmpty }) {
+                        emptyState
+                    }
+                    ForEach(sections) { section in
+                        PopoverSectionHeader(title: section.title, trailing: section.trailing)
+                        ForEach(section.items) { item in
+                            row(for: item).id(item.id)
+                        }
+                        Spacer().frame(height: 4)
+                    }
                 }
                 .background(GeometryReader { proxy in
                     Color.clear.preference(key: PopoverContentHeightKey.self, value: proxy.size.height)
@@ -52,744 +77,299 @@ struct MenuBarPopover: View {
             .onPreferenceChange(PopoverContentHeightKey.self) { contentHeight = $0 }
             .frame(height: min(max(contentHeight, 60), maxListHeight))
             .onChange(of: navigation.selectedID) { _, id in
-                guard let id else { return }
-                scroller.scrollTo(id)
+                if let id { scroller.scrollTo(id) }
             }
-            }
-            .environment(\.selectedClipID, navigation.selectedID)
-
-            Divider()
-
-            // Footer
-            footerView
-        }
-        .frame(width: 340)
-        .background(theme.popoverBg)
-        .onAppear {
-            fetchSnippetCount()
         }
     }
 
-    /// The list scrolls inside the popover, so the popover always fits under the menu bar.
-    private var maxListHeight: CGFloat {
-        let screenHeight = (NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main)?.visibleFrame.height ?? 800
-        return max(160, min(440, screenHeight - 320))
-    }
-
-    // MARK: - Header
-    private var headerView: some View {
-        VStack(spacing: 0) {
-            // Search - padding 8px 8px 6px
-            CFInput(
-                text: $navigation.searchText,
-                placeholder: L("search_clipboard"),
-                prefix: AnyView(
-                    CFIcon(type: .search, size: 13, stroke: 1.8)
-                        .foregroundColor(theme.textSubtle)
-                ),
-                suffix: AnyView(
-                    CFKBDChip("⌘F", dim: true)
-                )
-            )
-            .padding(EdgeInsets(top: 8, leading: 8, bottom: 6, trailing: 8))
+    @ViewBuilder
+    private func row(for item: PopoverItem) -> some View {
+        switch item {
+        case .clip(let clip, let number):
+            PopoverClipRow(clip: clip, trailing: number.map { $0 == 10 ? "0" : "\($0)" }, itemID: item.id)
+                .onTapGesture { navigation.activate(item) }
+                .contextMenu { clipMenu(clip) }
+        case .pinned(let clip, let slot):
+            PopoverClipRow(clip: clip, trailing: "⌘\(slot)", pinned: true, itemID: item.id)
+                .onTapGesture { navigation.activate(item) }
+                .contextMenu { clipMenu(clip) }
+        case .category(let category, let count):
+            PopoverCategoryRow(category: category, count: count, itemID: item.id)
+                .onTapGesture { navigation.activate(item) }
+        case .snippet(let snippet):
+            PopoverSnippetRow(snippet: snippet, itemID: item.id)
+                .onTapGesture { navigation.activate(item) }
         }
     }
 
-
-    // MARK: - Footer
-    private var footerView: some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            CFFooterRowBtn(icon: .sparkles, label: L("menu_snippet_editor"), kbd: "⌘E") {
-                openSnippetEditor()
-            }
-
-            CFFooterRowBtn(icon: .gear, label: L("menu_preferences"), kbd: "⌘,") {
-                openPreferences()
-            }
-
-            CFFooterRowBtn(icon: .info, label: L("menu_about")) {
-                openAbout()
-            }
-
-            Divider()
-
-            CFFooterRowBtn(icon: .trash, label: L("menu_clear_history")) {
-                Task { @MainActor in
-                    clearClipboardHistory()
-                }
-            }
-
-            CFFooterRowBtn(icon: .power, label: L("menu_quit"), kbd: "⌘Q", danger: true) {
-                NSApp.terminate(nil)
-            }
-
-            // Mode toggle
-            modeSwitcher
-                .padding(EdgeInsets(top: 6, leading: 10, bottom: 10, trailing: 10))
-        }
-    }
-
-    private var modeSwitcher: some View {
-        HStack(spacing: 2) {
-            ForEach(["simple", "organized"], id: \.self) { mode in
-                Button(action: { viewMode = mode }) {
-                    Group {
-                        if viewMode == mode {
-                            Text(L("mode_\(mode)"))
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(theme.textStrong)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 5)
-                                .background(theme.segSelected)
-                                .cornerRadius(5)
-                                .shadow(
-                                    color: theme.segShadow.color,
-                                    radius: theme.segShadow.radius,
-                                    x: theme.segShadow.x,
-                                    y: theme.segShadow.y
-                                )
-                        } else {
-                            Text(L("mode_\(mode)"))
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundColor(theme.textMuted)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 5)
-                                .background(Color.clear)
-                                .cornerRadius(5)
-                                .contentShape(Rectangle())
-                        }
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(2)
-        .background(theme.inputBg)
-        .cornerRadius(7)
-        .overlay(
-            RoundedRectangle(cornerRadius: 7)
-                .strokeBorder(theme.strokeSoft, lineWidth: 1)
-        )
-    }
-
-    // MARK: - Helpers
-    private var filteredClips: [SimpleClipItem] {
-        navigation.filteredClips
-    }
-
-    private func selectClip(_ clip: SimpleClipItem) {
-        PasteCoordinator.shared.paste(clip)
-    }
-
-    private func openSnippetEditor() {
-        isPresented = false
-        NotificationCenter.default.post(name: NSNotification.Name("OpenSnippetEditor"), object: nil)
-    }
-
-    private func openPreferences() {
-        isPresented = false
-        NotificationCenter.default.post(name: NSNotification.Name("OpenPreferences"), object: nil)
-    }
-
-    private func openAbout() {
-        isPresented = false
-        NotificationCenter.default.post(name: NSNotification.Name("OpenAbout"), object: nil)
-    }
-
-    @MainActor
-    private func clearClipboardHistory() {
-        clipboardMonitor.clearHistory()
-        isPresented = false
-    }
-
-    private func fetchSnippetCount() {
-        let context = managedObjectContext
-        let request: NSFetchRequest<Snippet> = Snippet.fetchRequest()
-        request.predicate = NSPredicate(format: "isEnabled == YES")
-
-        snippetCount = (try? context.count(for: request)) ?? 0
-    }
-}
-
-// MARK: - Simple History View
-struct SimpleHistoryView: View {
-    let clips: [SimpleClipItem]
-    let onSelect: (SimpleClipItem) -> Void
-
-    @Environment(\.cfTheme) var theme
-    @Environment(\.selectedClipID) private var selectedClipID
-
-    var body: some View {
-        VStack(spacing: 0) {
-            if clips.isEmpty {
-                emptyState
-            } else {
-                // Section Header
-                HStack {
-                    Text(L("recent_clips"))
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundColor(theme.textLabel)
-                        .textCase(.uppercase)
-                        .tracking(0.06 * 10.5)
-
-                    Spacer()
-
-                    Text(L("items_count", count: clips.count))
-                        .font(.system(size: 10.5))
-                        .foregroundColor(theme.textSubtle)
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 6)
-                .padding(.bottom, 4)
-
-                // Clip List - using new CFIconRow primitive
-                VStack(spacing: 0) {
-                    ForEach(Array(clips.prefix(10).enumerated()), id: \.element.id) { index, clip in
-                        CFIconRow(
-                            icon: iconForClip(clip),
-                            title: clip.title,
-                            subtitle: clip.subtitle(),
-                            kbd: keyboardShortcut(for: index),
-                            active: clip.id == selectedClipID
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            onSelect(clip)
-                        }
-                    }
-                }
-                .padding(.bottom, 4)
-            }
-        }
-        .padding(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
-    }
-
-    // MARK: - Helper Functions
-    private func iconForClip(_ clip: SimpleClipItem) -> AnyView {
-        if clip.content.hasPrefix("#") && clip.content.count >= 4 && clip.content.count <= 9 {
-            // Color swatch
-            return AnyView(
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(hex: clip.content) ?? theme.fill2)
-                    .frame(width: 16, height: 16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 3)
-                            .strokeBorder(theme.shadowStrong, lineWidth: 0.5)
-                    )
-            )
-        } else if clip.type == "image" {
-            return AnyView(CFIcon(type: .image, size: 14, stroke: 1.6))
-        } else if clip.content.hasPrefix("http://") || clip.content.hasPrefix("https://") {
-            return AnyView(CFIcon(type: .link, size: 14, stroke: 1.6))
-        } else if clip.content.contains("{") || clip.content.contains("function") || clip.content.contains("const") {
-            return AnyView(CFIcon(type: .bracket, size: 14, stroke: 1.6))
-        } else {
-            return AnyView(CFIcon(type: .text, size: 14, stroke: 1.6))
-        }
-    }
-
-    private func keyboardShortcut(for index: Int) -> String? {
-        if index < 9 {
-            return "\(index + 1)"
-        } else if index == 9 {
-            return "0"
-        }
-        return nil
+    @ViewBuilder
+    private func clipMenu(_ clip: SimpleClipItem) -> some View {
+        Button(clip.isPinned ? L("unpin") : L("pin")) { navigation.togglePin(clip) }
+        Button(L("delete_clip"), role: .destructive) { navigation.delete(clip) }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            CFIcon(type: .clock, size: 32, stroke: 1.4)
-                .foregroundColor(theme.textFaint)
-
-            Text(L("no_history"))
+        VStack(spacing: 10) {
+            CFIcon(type: .clock, size: 28, stroke: 1.4).foregroundColor(theme.textFaint)
+            Text(navigation.searchText.isEmpty ? L("no_history") : L("no_results"))
                 .font(.system(size: 13))
                 .foregroundColor(theme.textMuted)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-    }
-}
-
-// MARK: - Organized History View
-struct OrganizedHistoryView: View {
-    let clips: [SimpleClipItem]
-    let snippetCount: Int
-    let onSelect: (SimpleClipItem) -> Void
-
-    @Environment(\.cfTheme) var theme
-
-    private var groupedClips: (recent: [SimpleClipItem], images: [SimpleClipItem], links: [SimpleClipItem], colors: [SimpleClipItem], text: [SimpleClipItem]) {
-        var recent: [SimpleClipItem] = []
-        var images: [SimpleClipItem] = []
-        var links: [SimpleClipItem] = []
-        var colors: [SimpleClipItem] = []
-        var text: [SimpleClipItem] = []
-
-        for clip in clips {
-            if recent.count < PopoverNavigation.shortcutCount {
-                recent.append(clip)
-            }
-
-            // Categorize
-            if clip.type == "image" {
-                images.append(clip)
-            } else if clip.content.hasPrefix("http://") || clip.content.hasPrefix("https://") {
-                links.append(clip)
-            } else if clip.content.hasPrefix("#") && clip.content.count <= 9 {
-                colors.append(clip)
-            } else {
-                text.append(clip)
-            }
-        }
-
-        return (recent, images, links, colors, text)
+        .padding(.vertical, 32)
     }
 
-    var body: some View {
+    /// The list scrolls inside the popover, so the popover always fits under the menu bar.
+    private var maxListHeight: CGFloat {
+        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
+        return max(160, min(440, (screen?.visibleFrame.height ?? 800) - 300))
+    }
+
+    // MARK: - Footer
+
+    private var footer: some View {
         VStack(spacing: 0) {
-            let groups = groupedClips
-            let pinnedClips = clips.filter { $0.isPinned }
-
-            // PINNED Section
-            if !pinnedClips.isEmpty {
-                CFSectionLabel(L("section_pinned"))
-                    .padding(.horizontal, 8)
-                    .padding(.top, 8)
-
-                VStack(spacing: 2) {
-                    ForEach(Array(pinnedClips.prefix(2).enumerated()), id: \.element.id) { index, clip in
-                        ClipRow(
-                            clip: clip,
-                            index: index,
-                            showNumber: false,
-                            showMetadata: true,
-                            onSelect: { onSelect(clip) }
-                        )
-                        .id("pinned-\(clip.id.uuidString)")
-                    }
-                }
-                .padding(.bottom, 4)
+            CFFooterRowBtn(icon: .sparkles, label: L("menu_snippet_editor"), kbd: "⌘E") {
+                post("OpenSnippetEditor")
             }
-
-            // CATEGORIES Section Label
-            CFSectionLabel(L("section_categories"))
-                .padding(.horizontal, 8)
-                .padding(.top, pinnedClips.isEmpty ? 8 : 8)
-
-            VStack(spacing: 2) {
-                CategoryGroup(
-                    icon: .clock,
-                    iconColor: BrandPalette.Category.recent,
-                    label: L("cat_recent"),
-                    count: groups.recent.count,
-                    clips: groups.recent,
-                    onSelect: onSelect,
-                    initiallyExpanded: true,
-                    showNumbers: true
-                )
-
-                if !groups.images.isEmpty {
-                    CategoryGroup(
-                        icon: .image,
-                        iconColor: BrandPalette.Category.images,
-                        label: L("cat_images"),
-                        count: groups.images.count,
-                        clips: groups.images,
-                        onSelect: onSelect
-                    )
-                }
-
-                if !groups.links.isEmpty {
-                    CategoryGroup(
-                        icon: .link,
-                        iconColor: BrandPalette.Category.links,
-                        label: L("cat_links"),
-                        count: groups.links.count,
-                        clips: groups.links,
-                        onSelect: onSelect
-                    )
-                }
-
-                if !groups.colors.isEmpty {
-                    CategoryGroup(
-                        icon: .swatch,
-                        iconColor: BrandPalette.Category.colors,
-                        label: L("cat_colors"),
-                        count: groups.colors.count,
-                        clips: groups.colors,
-                        onSelect: onSelect
-                    )
-                }
-
-                if !groups.text.isEmpty {
-                    CategoryGroup(
-                        icon: .text,
-                        iconColor: BrandPalette.Category.text,
-                        label: L("cat_text"),
-                        count: groups.text.count,
-                        clips: groups.text,
-                        onSelect: onSelect
-                    )
-                }
+            CFFooterRowBtn(icon: .gear, label: L("menu_preferences"), kbd: "⌘,") {
+                post("OpenPreferences")
             }
-            .padding(.bottom, 2)
-
-            // SNIPPETS Section
-            CFSectionLabel(L("section_snippets"))
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
-
-            SnippetsListView()
-                .padding(.bottom, 4)
+            PopoverDivider()
+            CFFooterRowBtn(icon: .trash, label: L("menu_clear_history")) {
+                clipboardMonitor.clearHistory()
+                isPresented = false
+            }
+            CFFooterRowBtn(icon: .power, label: L("menu_quit"), kbd: "⌘Q") {
+                NSApp.terminate(nil)
+            }
+            CFSegmentedControl(
+                selection: Binding(
+                    get: { viewMode == "simple" ? 0 : 1 },
+                    set: { viewMode = $0 == 0 ? "simple" : "organized"; navigation.drilledCategory = nil }
+                ),
+                options: [L("mode_simple"), L("mode_organized")]
+            )
+            .padding(EdgeInsets(top: 6, leading: 10, bottom: 10, trailing: 10))
         }
-        .padding(8)
+    }
+
+    private func post(_ name: String) {
+        isPresented = false
+        NotificationCenter.default.post(name: NSNotification.Name(name), object: nil)
     }
 }
 
-// MARK: - Hebrew/RTL History View
-struct HebrewHistoryView: View {
-    let clips: [SimpleClipItem]
-    let onSelect: (SimpleClipItem) -> Void
+// MARK: - Rows
 
-    @Environment(\.cfTheme) var theme
+private struct PopoverSectionHeader: View {
+    let title: String
+    let trailing: String?
+    @Environment(\.cfTheme) private var theme
 
     var body: some View {
-        VStack(spacing: 2) {
-            ForEach(Array(clips.prefix(10).enumerated()), id: \.element.id) { index, clip in
-                ClipRow(
-                    clip: clip,
-                    index: index,
-                    showNumber: true,
-                    showMetadata: true,
-                    rtl: true,
-                    onSelect: { onSelect(clip) }
-                )
+        HStack {
+            Text(title)
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(0.06 * 10.5)
+                .textCase(.uppercase)
+                .foregroundColor(theme.textLabel)
+            Spacer()
+            if let trailing {
+                Text(trailing).font(.system(size: 10.5)).foregroundColor(theme.textSubtle)
             }
         }
-        .padding(8)
-        .environment(\.layoutDirection, .rightToLeft)
+        .padding(EdgeInsets(top: 6, leading: 14, bottom: 4, trailing: 14))
     }
 }
 
-// MARK: - Category Group
-struct CategoryGroup: View {
-    let icon: CFIcon.IconType
-    let iconColor: Color
-    let label: String
-    let count: Int
-    let clips: [SimpleClipItem]
-    let onSelect: (SimpleClipItem) -> Void
-    var showNumbers = false
-    @State private var isExpanded: Bool
-    @Environment(\.cfTheme) var theme
-
-    init(
-        icon: CFIcon.IconType,
-        iconColor: Color,
-        label: String,
-        count: Int,
-        clips: [SimpleClipItem],
-        onSelect: @escaping (SimpleClipItem) -> Void,
-        initiallyExpanded: Bool = false,
-        showNumbers: Bool = false
-    ) {
-        self.icon = icon
-        self.iconColor = iconColor
-        self.label = label
-        self.count = count
-        self.clips = clips
-        self.onSelect = onSelect
-        self.showNumbers = showNumbers
-        _isExpanded = State(initialValue: initiallyExpanded)
-    }
-
-    var body: some View {
-        VStack(spacing: 4) {
-            // Header
-            Button(action: { isExpanded.toggle() }) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(iconColor.opacity(0.22))
-                            .frame(width: 22, height: 22)
-
-                        CFIcon(type: icon, size: 13, stroke: 1.8)
-                            .foregroundColor(iconColor)
-                    }
-
-                    Text(label)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(theme.textStrong)
-
-                    Spacer()
-
-                    CFCountBadge(count: count)
-
-                    CFIcon(
-                        type: .chevronDown,
-                        size: 12,
-                        stroke: 1.8
-                    )
-                    .foregroundColor(theme.textMuted)
-                    .rotationEffect(.degrees(isExpanded ? 0 : -90))
-                }
-                .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-
-            // Items
-            if isExpanded {
-                VStack(spacing: 2) {
-                    ForEach(Array(clips.prefix(PopoverNavigation.shortcutCount).enumerated()), id: \.element.id) { index, clip in
-                        ClipRow(
-                            clip: clip,
-                            index: index,
-                            showNumber: showNumbers,
-                            onSelect: { onSelect(clip) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Clip Row
-struct ClipRow: View {
+/// The design's ClipRow: 26pt tile, title and subtitle, trailing kbd chip; tinted when selected.
+private struct PopoverClipRow: View {
     let clip: SimpleClipItem
-    let index: Int
-    let showNumber: Bool
-    var showMetadata: Bool = false
-    var rtl: Bool = false
-    let onSelect: () -> Void
+    let trailing: String?
+    var pinned = false
+    let itemID: String
+    @Environment(\.selectedPopoverItemID) private var selectedID
+    @Environment(\.cfTheme) private var theme
 
-    @Environment(\.cfTheme) var theme
-
-    private var displayText: String { clip.title }
-
-    @Environment(\.selectedClipID) private var selectedClipID
-
-    private var keyboardShortcut: String? {
-        guard showNumber, index < PopoverNavigation.shortcutCount else { return nil }
-        return index == 9 ? "0" : "\(index + 1)"
-    }
+    private var isSelected: Bool { selectedID == itemID }
 
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 10) {
-                // Icon container - 26x26 with border-radius 5
-                iconView
-
-                // Text content
-                VStack(alignment: rtl ? .trailing : .leading, spacing: showMetadata ? 2 : 0) {
-                    Text(displayText)
-                        .font(.system(size: 13))
-                        .foregroundColor(theme.textStrong)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: rtl ? .trailing : .leading)
-
-                    if showMetadata {
-                        Text(clip.subtitle())
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textLabel)
-                            .lineLimit(1)
-                    }
-                }
-
-                // Keyboard shortcut
-                if let shortcut = keyboardShortcut {
-                    CFKBDChip(shortcut, dim: true)
-                }
+        HStack(spacing: 10) {
+            ClipTile(clip: clip, pinned: pinned)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(clip.title)
+                    .font(clip.looksLikeCode ? .system(size: 12, design: .monospaced) : .system(size: 13, weight: isSelected ? .medium : .regular))
+                    .foregroundColor(theme.textStrong)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(clip.subtitle())
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textLabel)
+                    .lineLimit(1)
             }
-            .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
-            .background(showNumber && clip.id == selectedClipID ? theme.accentMix(percent: 22) : Color.clear)
-            .cornerRadius(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let trailing {
+                CFKBDChip(trailing, dim: !isSelected)
+                    .environment(\.layoutDirection, .leftToRight)
+            }
         }
-        .buttonStyle(PlainHoverButtonStyle())
+        .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
+        .background(RoundedRectangle(cornerRadius: 6).fill(isSelected ? BrandPalette.selectedRow : .clear))
         .padding(.horizontal, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+private struct ClipTile: View {
+    let clip: SimpleClipItem
+    var pinned = false
+    @Environment(\.cfTheme) private var theme
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 5).fill(theme.fill1)
+            content.foregroundColor(theme.textMid)
+        }
+        .frame(width: 26, height: 26)
+        .clipShape(RoundedRectangle(cornerRadius: 5))
     }
 
     @ViewBuilder
-    private var iconView: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 5)
-                .fill(theme.fill1)
-                .frame(width: 26, height: 26)
-
-            // Render different icons based on content type
-            if clip.content.hasPrefix("#") && clip.content.count >= 4 && clip.content.count <= 9 {
-                // Hex color - show color swatch
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(hex: clip.content) ?? theme.fill2)
-                    .frame(width: 16, height: 16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 3)
-                            .strokeBorder(theme.shadowStrong, lineWidth: 1)
-                    )
-            } else if clip.type == "image" {
-                // Image - show thumbnail or image icon
-                if let imageData = clip.imageData, let nsImage = NSImage(data: imageData) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 26, height: 26)
-                        .clipped()
-                        .cornerRadius(5)
-                } else {
-                    CFIcon(type: .image, size: 14, stroke: 1.6)
-                        .foregroundColor(theme.textMid)
-                }
-            } else if clip.content.hasPrefix("http://") || clip.content.hasPrefix("https://") {
-                // URL - show link icon
-                CFIcon(type: .link, size: 14, stroke: 1.6)
-                    .foregroundColor(theme.textMid)
-            } else if clip.content.contains("{") || clip.content.contains("const ") || clip.content.contains("func ") {
-                // Code - show bracket icon
-                CFIcon(type: .bracket, size: 14, stroke: 1.6)
-                    .foregroundColor(theme.textMid)
-            } else {
-                // Default - text icon
-                CFIcon(type: .text, size: 14, stroke: 1.6)
-                    .foregroundColor(theme.textMid)
-            }
+    private var content: some View {
+        if pinned {
+            CFIcon(type: .pin, size: 13, stroke: 1.6)
+        } else if clip.kind == .image, let data = clip.imageData, let image = NSImage(data: data) {
+            Image(nsImage: image).resizable().aspectRatio(contentMode: .fill).frame(width: 26, height: 26)
+        } else if clip.kind == .color {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color(hex: clip.content.trimmingCharacters(in: .whitespacesAndNewlines)) ?? theme.fill2)
+                .frame(width: 16, height: 16)
+                .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(theme.shadowStrong, lineWidth: 1))
+        } else if clip.kind == .url {
+            CFIcon(type: .link, size: 14, stroke: 1.6)
+        } else if clip.kind == .file {
+            CFIcon(type: .folder, size: 14, stroke: 1.6)
+        } else if clip.looksLikeCode {
+            CFIcon(type: .bracket, size: 14, stroke: 1.6)
+        } else {
+            CFIcon(type: .text, size: 14, stroke: 1.6)
         }
     }
 }
 
-// MARK: - Snippets List View
-struct SnippetsListView: View {
-    @Environment(\.cfTheme) var theme
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Snippet.title, ascending: true)],
-        predicate: NSPredicate(format: "isEnabled == YES"),
-        animation: .default
-    )
-    private var snippets: FetchedResults<Snippet>
+private struct PopoverCategoryRow: View {
+    let category: PopoverCategory
+    let count: Int
+    let itemID: String
+    @Environment(\.selectedPopoverItemID) private var selectedID
+    @Environment(\.cfTheme) private var theme
 
     var body: some View {
-        VStack(spacing: 2) {
-            ForEach(Array(snippets.prefix(2)), id: \.id) { snippet in
-                MenuSnippetRow(snippet: snippet)
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6).fill(category.accent.mixed(22))
+                CFIcon(type: category.icon, size: 13, stroke: 1.8).foregroundColor(category.accent)
             }
-
-            if snippets.isEmpty {
-                Text(L("no_snippets"))
-                    .font(.system(size: 13))
-                    .foregroundColor(theme.textMuted)
-                    .padding(.vertical, 12)
-            }
+            .frame(width: 22, height: 22)
+            Text(L(category.titleKey))
+                .font(.system(size: 13))
+                .foregroundColor(theme.text)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("\(count)")
+                .font(.system(size: 11))
+                .foregroundColor(theme.textSubtle)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(Capsule().fill(theme.fill1))
+            Image(systemName: "chevron.forward")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(theme.textFaint)
         }
-    }
-}
-
-// MARK: - Menu Snippet Row
-struct MenuSnippetRow: View {
-    let snippet: Snippet
-    @Environment(\.cfTheme) var theme
-    @Environment(\.managedObjectContext) var viewContext
-
-    var body: some View {
-        Button(action: {
-            expandSnippet()
-        }) {
-            HStack(spacing: 10) {
-                // Icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(theme.fill1)
-                        .frame(width: 26, height: 26)
-
-                    CFIcon(type: .bolt, size: 13, stroke: 1.8)
-                        .foregroundColor(theme.textMid)
-                }
-
-                // Text content
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(snippet.title)
-                        .font(.system(size: 13))
-                        .foregroundColor(theme.textStrong)
-                        .lineLimit(1)
-
-                    if let apps = snippet.appRules, !apps.isEmpty {
-                        let appNames = apps.map(\.appName).prefix(2).joined(separator: ", ")
-                        Text("\(snippet.abbreviation) · \(appNames)")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textLabel)
-                            .lineLimit(1)
-                    } else {
-                        Text("\(snippet.abbreviation) · \(L("everywhere"))")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.textLabel)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer()
-
-                // Abbreviation on right
-                Text(snippet.abbreviation)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(theme.textSubtle)
-            }
-            .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
-            .background(Color.clear)
-            .cornerRadius(6)
-        }
-        .buttonStyle(PlainHoverButtonStyle())
+        .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
+        .background(RoundedRectangle(cornerRadius: 6).fill(selectedID == itemID ? BrandPalette.selectedRow : .clear))
         .padding(.horizontal, 6)
-    }
-
-    private func expandSnippet() {
-        PasteCoordinator.shared.insert(snippet)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
-// MARK: - Color Hex Extension
-extension Color {
-    init?(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            return nil
+private struct PopoverSnippetRow: View {
+    let snippet: SnippetSummary
+    let itemID: String
+    @Environment(\.selectedPopoverItemID) private var selectedID
+    @Environment(\.cfTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 5).fill(theme.fill1)
+                CFIcon(type: .bolt, size: 13, stroke: 1.8).foregroundColor(theme.textMid)
+            }
+            .frame(width: 26, height: 26)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(snippet.title).font(.system(size: 13)).foregroundColor(theme.textStrong).lineLimit(1)
+                Text("\(snippet.abbreviation) · \(snippet.apps.isEmpty ? L("everywhere") : snippet.apps.prefix(2).joined(separator: ", "))")
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textLabel)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(snippet.abbreviation)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(theme.textSubtle)
+                .environment(\.layoutDirection, .leftToRight)
         }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
+        .padding(EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10))
+        .background(RoundedRectangle(cornerRadius: 6).fill(selectedID == itemID ? BrandPalette.selectedRow : .clear))
+        .padding(.horizontal, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
-#Preview {
-    let stack = CoreDataStack(storeURL: nil)
-    return MenuBarPopover(
-        clipboardMonitor: ClipboardMonitor(context: stack.viewContext),
-        isPresented: .constant(true)
-    )
-    .cfAutoTheme()
-    .environment(\.managedObjectContext, stack.viewContext)
-    .frame(height: 600)
+private struct PopoverDivider: View {
+    @Environment(\.cfTheme) private var theme
+
+    var body: some View {
+        Rectangle().fill(theme.stroke).frame(height: 1).padding(.vertical, 4)
+    }
 }
 
 private struct PopoverContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+extension SimpleClipItem {
+    /// Shown in monospace with a bracket glyph, like the design's code row.
+    var looksLikeCode: Bool {
+        guard kind == .text || kind == .rtf else { return false }
+        let text = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let starts = ["const ", "let ", "var ", "func ", "function ", "import ", "def ", "class ", "return ", "#include", "SELECT "]
+        return starts.contains(where: text.hasPrefix) || text.contains("=>") || (text.contains("{") && text.contains("}")) || text.hasSuffix(";")
+    }
+}
+
+extension Color {
+    /// `#RGB`, `#RRGGBB` or `#AARRGGBB` text from a copied color.
+    init?(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var value: UInt64 = 0
+        guard Scanner(string: hex).scanHexInt64(&value) else { return nil }
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: (a, r, g, b) = (255, (value >> 8) * 17, (value >> 4 & 0xF) * 17, (value & 0xF) * 17)
+        case 6: (a, r, g, b) = (255, value >> 16, value >> 8 & 0xFF, value & 0xFF)
+        case 8: (a, r, g, b) = (value >> 24, value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF)
+        default: return nil
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
 }

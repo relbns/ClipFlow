@@ -313,33 +313,73 @@ final class StorageTests: XCTestCase {
 
 @MainActor
 final class PopoverNavigationTests: XCTestCase {
-    func testArrowsMoveWithinTheNumberedClipsAndDigitsOnlyWorkWithAnEmptySearch() {
+    private var monitor: ClipboardMonitor!
+    private var defaults: UserDefaults!
+    private let navigation = PopoverNavigation.shared
+
+    override func setUp() async throws {
         let stack = CoreDataStack(storeURL: nil)
-        let monitor = ClipboardMonitor(context: stack.viewContext)
-        for index in 1...12 {
-            let snapshot = PasteboardSnapshot.text("clip \(index)", transient: false)
-            monitor.record(ClipCapture.classify(snapshot)!, snapshot: snapshot, source: nil)
+        defaults = UserDefaults(suiteName: "clipflow-nav-\(UUID().uuidString)")!
+        AppDefaults.register(in: defaults)
+        monitor = ClipboardMonitor(context: stack.viewContext, defaults: defaults)
+        let base = Date()
+        let texts = (1...11).map { "clip \($0)" } + ["https://example.com", "#FF5733"]
+        for (offset, text) in texts.enumerated() {
+            let snapshot = PasteboardSnapshot.text(text, transient: false)
+            monitor.record(ClipCapture.classify(snapshot)!, snapshot: snapshot, sourceName: nil, sourceBundleID: nil, at: base.addingTimeInterval(Double(offset)))
         }
-
-        let navigation = PopoverNavigation.shared
         navigation.clipboardMonitor = monitor
+        navigation.defaults = defaults
         navigation.searchText = ""
-        XCTAssertEqual(navigation.navigableClips.count, 10)
-        XCTAssertEqual(navigation.selectedID, navigation.navigableClips[0].id)
+        navigation.drilledCategory = nil
+    }
 
-        XCTAssertTrue(navigation.handle(.init(keyCode: 126)))
-        XCTAssertEqual(navigation.selectedID, navigation.navigableClips[0].id)
-        for _ in 0..<15 { _ = navigation.handle(.init(keyCode: 125)) }
-        XCTAssertEqual(navigation.selectedID, navigation.navigableClips[9].id)
-
-        XCTAssertFalse(navigation.handle(.init(keyCode: 125, hasModifiers: true)))
-        XCTAssertTrue(navigation.handle(.init(keyCode: 18, characters: "1")))
-
-        navigation.searchText = "clip 1"
-        XCTAssertEqual(navigation.selectedID, navigation.navigableClips[0].id)
-        XCTAssertFalse(navigation.handle(.init(keyCode: 18, characters: "1")))
-        XCTAssertFalse(navigation.handle(.init(keyCode: 0, characters: "a")))
+    override func tearDown() async throws {
         navigation.clipboardMonitor = nil
+        navigation.defaults = .standard
+    }
+
+    private func numbers(_ items: [PopoverItem]) -> [Int?] {
+        items.compactMap { if case .clip(_, let number) = $0 { return number }; return nil }
+    }
+
+    func testSimpleModeNumbersTheFirstTenClips() {
+        defaults.set("simple", forKey: "viewMode")
+        let items = navigation.items
+        XCTAssertEqual(items.count, 13)
+        XCTAssertEqual(numbers(items).prefix(11).map { $0 }, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, nil])
+    }
+
+    func testOrganizedModeShowsCategoriesAndDrillsIn() {
+        defaults.set("organized", forKey: "viewMode")
+        XCTAssertEqual(navigation.sections.map(\.id), ["categories"])
+        XCTAssertTrue(navigation.handle(.init(keyCode: 125)))
+        XCTAssertTrue(navigation.handle(.init(keyCode: 125)))
+        XCTAssertEqual(navigation.selectedID, "category-links")
+        XCTAssertTrue(navigation.handle(.init(keyCode: 36)))
+        XCTAssertEqual(navigation.drilledCategory, .links)
+        XCTAssertEqual(navigation.items.count, 1)
+        XCTAssertTrue(navigation.handle(.init(keyCode: 53)))
+        XCTAssertNil(navigation.drilledCategory)
+    }
+
+    func testDigitsPasteOnlyWithAnEmptySearchAndModifiersPassThrough() {
+        defaults.set("simple", forKey: "viewMode")
+        XCTAssertTrue(navigation.handle(.init(keyCode: 18, characters: "1")))
+        XCTAssertFalse(navigation.handle(.init(keyCode: 125, modifiers: .other)))
+        navigation.searchText = "clip 1"
+        XCTAssertFalse(navigation.handle(.init(keyCode: 18, characters: "1")))
+        XCTAssertEqual(navigation.sections.first?.id, "results")
+        XCTAssertEqual(navigation.items.count, 3)
+    }
+
+    func testPinnedClipsGetCommandSlots() {
+        defaults.set("organized", forKey: "viewMode")
+        monitor.setPinned(monitor.clipHistory[2], true)
+        guard case .pinned(_, let slot)? = navigation.sections.first?.items.first else {
+            return XCTFail("expected a pinned row first")
+        }
+        XCTAssertEqual(slot, 1)
     }
 }
 

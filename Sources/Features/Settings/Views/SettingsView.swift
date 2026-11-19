@@ -115,9 +115,14 @@ struct GeneralSettingsView: View {
             CFSettingsRow(label: L("pref_clear_history"), hint: L("pref_clear_history_hint")) {
                 CFToolbarBtn(label: L("pref_clear_history_button")) { confirmingClear = true }
             }
-            CFSettingsRow(label: L("pref_welcome"), hint: L("pref_welcome_hint"), isLast: true) {
+            CFSettingsRow(label: L("pref_welcome"), hint: L("pref_welcome_hint")) {
                 CFToolbarBtn(label: L("pref_welcome_button")) {
                     NSApp.sendAction(#selector(AppDelegate.openWelcome), to: nil, from: nil)
+                }
+            }
+            CFSettingsRow(label: L("pref_about"), hint: L("pref_about_hint"), isLast: true) {
+                CFToolbarBtn(label: L("pref_about_button")) {
+                    NSApp.sendAction(#selector(AppDelegate.openAbout), to: nil, from: nil)
                 }
             }
         }

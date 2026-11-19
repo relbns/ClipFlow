@@ -343,3 +343,12 @@
 "editor_words_one" = "1 word";
 "editor_words_other" = "%d words";
 "launch_at_login_failed" = "Couldn't change Launch at login";
+"search_results" = "Results";
+"no_results" = "No matching clips";
+"pin" = "Pin";
+"unpin" = "Unpin";
+"delete_clip" = "Delete";
+"back" = "Back";
+"pref_about" = "About ClipFlow";
+"pref_about_hint" = "Version, credits and license.";
+"pref_about_button" = "Show";
