@@ -6,11 +6,13 @@ set -e
 #                    Accessibility / Input Monitoring trust across rebuilds
 #   --adhoc          ad-hoc signature (trust is lost on every rebuild)
 #   --notarize       Developer ID + notarization (paid Apple Developer account)
+# --universal builds for Apple Silicon and Intel, as the downloadable release does.
 # The dev identity comes from --cert, $CLIPFLOW_SIGN_IDENTITY, or the untracked
 # file .signing-identity (one line, the identity name as shown by
 # `security find-identity -v -p codesigning`).
 SIGNING_MODE="dev"
 ENTITLEMENTS_PATH="Sources/Resources/ClipFlow.entitlements"
+UNIVERSAL=0
 DEV_CERT="${CLIPFLOW_SIGN_IDENTITY:-}"
 if [ -z "$DEV_CERT" ] && [ -f .signing-identity ]; then
     DEV_CERT="$(head -1 .signing-identity)"
@@ -38,8 +40,12 @@ while [[ $# -gt 0 ]]; do
             ENTITLEMENTS_PATH="Sources/Resources/ClipFlow-Sandbox.entitlements"
             shift
             ;;
+        --universal)
+            UNIVERSAL=1
+            shift
+            ;;
         *)
-            echo "Usage: $0 [--dev|--adhoc|--notarize] [--sandbox] [--cert \"Certificate Name\"]"
+            echo "Usage: $0 [--dev|--adhoc|--notarize] [--sandbox] [--universal] [--cert \"Certificate Name\"]"
             exit 1
             ;;
     esac
@@ -63,8 +69,13 @@ echo "🔨 Building ClipFlow.app..."
 echo "📝 Signing mode: $SIGNING_MODE"
 echo ""
 
-# Build release binary
-swift build -c release
+if [ "$UNIVERSAL" = "1" ]; then
+    swift build -c release --arch arm64 --arch x86_64
+    PRODUCTS=".build/apple/Products/Release"
+else
+    swift build -c release
+    PRODUCTS=".build/release"
+fi
 
 # Create app bundle structure from scratch so removed files never linger
 APP_DIR="Build.noindex/ClipFlow.app"
@@ -74,24 +85,24 @@ mkdir -p "$APP_DIR/Contents/Resources"
 mkdir -p "$APP_DIR/Contents/Frameworks"
 
 # Copy binary
-cp .build/release/ClipFlow "$APP_DIR/Contents/MacOS/"
+cp "$PRODUCTS/ClipFlow" "$APP_DIR/Contents/MacOS/"
 
 # Copy any .framework or .bundle files produced by dependencies
-find .build/release -name "*.framework" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \; 2>/dev/null || true
-find .build/release -name "*.bundle" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+# -H follows $PRODUCTS itself, since .build/release is a symlink
+find -H "$PRODUCTS" -maxdepth 1 -name "*.framework" -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \;
+find -H "$PRODUCTS" -maxdepth 1 -name "*.bundle" -exec cp -R {} "$APP_DIR/Contents/Resources/" \;
 
-# Copy and fix Info.plist (replace Xcode variables + increment build)
-cp Sources/Resources/Info.plist "$APP_DIR/Contents/Info.plist.tmp"
+# KeyboardShortcuts loads its strings from this bundle and crashes without it
+if [ ! -d "$APP_DIR/Contents/Resources/KeyboardShortcuts_KeyboardShortcuts.bundle" ]; then
+    echo "❌ KeyboardShortcuts_KeyboardShortcuts.bundle was not copied from $PRODUCTS"
+    exit 1
+fi
 
-# Get current build number and increment it
-CURRENT_BUILD=$(grep -A1 "CFBundleVersion" Sources/Resources/Info.plist | grep "<string>" | sed 's/.*<string>\(.*\)<\/string>/\1/')
-NEW_BUILD=$((CURRENT_BUILD + 1))
+# Copy Info.plist with the Xcode variables filled in and a dated build number
 BUILD_DATE=$(date "+%Y%m%d.%H%M")
-
-sed 's/\$(EXECUTABLE_NAME)/ClipFlow/g' "$APP_DIR/Contents/Info.plist.tmp" | \
-sed 's/\$(DEVELOPMENT_LANGUAGE)/en/g' | \
-sed "s/<string>\${CURRENT_BUILD}<\/string>/<string>${BUILD_DATE}<\/string>/g" > "$APP_DIR/Contents/Info.plist"
-rm "$APP_DIR/Contents/Info.plist.tmp"
+sed 's/\$(EXECUTABLE_NAME)/ClipFlow/g' Sources/Resources/Info.plist | \
+sed 's/\$(DEVELOPMENT_LANGUAGE)/en/g' > "$APP_DIR/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_DATE" "$APP_DIR/Contents/Info.plist"
 
 echo "📝 Build number: $BUILD_DATE"
 
@@ -149,7 +160,7 @@ case $SIGNING_MODE in
     adhoc)
         echo "   Mode: Ad-hoc"
         # Ad-hoc signing - no certificate needed
-        codesign --force --deep --sign - "$APP_DIR" 2>/dev/null
+        codesign --force --deep --sign - --entitlements "$ENTITLEMENTS_PATH" "$APP_DIR"
         echo "✅ Ad-hoc signed (users will need to allow in System Settings)"
         ;;
 

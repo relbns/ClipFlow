@@ -1,134 +1,53 @@
 #!/bin/bash
 set -e
 
+# Packages the downloadable release. Build it first with:
+#   ./build-app.sh --adhoc --universal
 APP_DIR="Build.noindex/ClipFlow.app"
 RELEASE_DIR="Build.noindex/Release"
-VERSION=$(defaults read "$(pwd)/$APP_DIR/Contents/Info.plist" CFBundleShortVersionString)
-BUILD=$(defaults read "$(pwd)/$APP_DIR/Contents/Info.plist" CFBundleVersion)
 
-echo "📦 Packaging ClipFlow v$VERSION (Build $BUILD) for release..."
-echo ""
-
-# Check if app exists
 if [ ! -d "$APP_DIR" ]; then
-    echo "❌ ClipFlow.app not found. Run ./build-app.sh first"
+    echo "❌ $APP_DIR not found. Run ./build-app.sh --adhoc --universal first"
+    exit 1
+fi
+if ! codesign -dv "$APP_DIR" 2>&1 | grep -q "^Signature=adhoc"; then
+    echo "❌ The app is not ad-hoc signed. A development signature carries your name and Team ID."
+    echo "   Rebuild with ./build-app.sh --adhoc --universal"
+    exit 1
+fi
+codesign --verify --deep --strict "$APP_DIR"
+# The single-arch build finds its resource bundles only on the Mac that built it
+if ! lipo -archs "$APP_DIR/Contents/MacOS/ClipFlow" | grep -q x86_64; then
+    echo "❌ The app is Apple Silicon only. Rebuild with ./build-app.sh --adhoc --universal"
     exit 1
 fi
 
-# Create release directory
+VERSION=$(defaults read "$(pwd)/$APP_DIR/Contents/Info.plist" CFBundleShortVersionString)
+if gh release view "v$VERSION" >/dev/null 2>&1; then
+    echo "❌ Release v$VERSION already exists. Raise CFBundleShortVersionString in Sources/Resources/Info.plist and rebuild."
+    exit 1
+fi
+echo "📦 Packaging ClipFlow $VERSION..."
+
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
+# Without extended attributes, so the signature survives any unzip tool
+ditto -c -k --keepParent --norsrc --noextattr --noacl "$APP_DIR" "$RELEASE_DIR/ClipFlow.zip"
 
-# Copy app
-cp -R "$APP_DIR" "$RELEASE_DIR/"
-
-# Create installation instructions
-cat > "$RELEASE_DIR/INSTALL.txt" << 'EOF'
-ClipFlow Installation Instructions
-===================================
-
-ClipFlow is open source and distributed without Apple notarization.
-This means macOS will show a security warning on first launch.
-
-Installation Steps:
--------------------
-
-1. Move ClipFlow.app to /Applications:
-   - Drag ClipFlow.app to your Applications folder
-   - Or via Terminal:
-     cp -R ClipFlow.app /Applications/
-
-2. First Launch - IMPORTANT:
-   - Do NOT double-click ClipFlow.app
-   - Instead: Right-click → Open
-   - Click "Open" in the security dialog
-   - OR remove quarantine attribute:
-     xattr -cr /Applications/ClipFlow.app
-     open /Applications/ClipFlow.app
-
-3. Grant Accessibility Permission:
-   - ClipFlow needs this for clipboard monitoring and text expansion
-   - System Settings → Privacy & Security → Accessibility
-   - Click the lock to unlock
-   - Add ClipFlow and enable it
-
-4. Done!
-   - ClipFlow will appear in your menu bar
-   - Set up your hotkeys in Settings
-
-Troubleshooting:
-----------------
-
-If the app won't open:
-  xattr -cr /Applications/ClipFlow.app
-
-If text expansion doesn't work:
-  - Check Accessibility permission is granted
-  - Enable text expansion in ClipFlow Settings
-
-For more help, visit:
-https://github.com/relbns/ClipFlow/issues
-
----
-ClipFlow is free and open source (MIT License)
-Built with ❤️ for macOS
-EOF
-
-# Create README for GitHub release
 cat > "$RELEASE_DIR/RELEASE_NOTES.md" << EOF
-# ClipFlow v$VERSION
+## Install
 
-## Installation
+1. Download \`ClipFlow.zip\`, unzip it and move \`ClipFlow.app\` to your Applications folder.
+2. Open it. ClipFlow is not notarized by Apple yet, so macOS blocks the first launch. Then open **System Settings → Privacy & Security**, scroll to the message about ClipFlow, click **Open Anyway** and confirm with your password.
+3. Grant **Accessibility** and **Input Monitoring** when the welcome screen asks. Clipboard history works without them. Text expansion needs both, and paste-on-pick needs Accessibility.
 
-### Option 1: Download & Install (Recommended)
-1. Download \`ClipFlow.zip\`
-2. Unzip and read \`INSTALL.txt\`
-3. Move \`ClipFlow.app\` to \`/Applications\`
-4. **Right-click → Open** (first time only)
-5. Grant Accessibility permission
+Runs on Apple Silicon and Intel Macs with macOS 14 or later. After an update, allow the new version the same way, then remove ClipFlow from both permission lists with **−** and grant them again.
 
-### Option 2: Build from Source
-\`\`\`bash
-git clone https://github.com/relbns/ClipFlow.git
-cd ClipFlow
-./build-app.sh --release
-./install-app.sh
-\`\`\`
+## What's new
 
-## What's New in v$VERSION
-
-[Add your release notes here]
-
-## Requirements
-- macOS 14.0 Sonoma or later
-- Accessibility permission (for clipboard & text expansion)
-
-## Support
-- Issues: https://github.com/relbns/ClipFlow/issues
-- Discussions: https://github.com/relbns/ClipFlow/discussions
-
----
-**Note**: ClipFlow is not notarized by Apple. This is intentional - we're open source and free.
-You'll need to allow the app in System Settings on first launch.
 EOF
 
-# Create ZIP
-echo "🗜️  Creating ZIP archive..."
-cd "$RELEASE_DIR"
-zip -r "../ClipFlow-v$VERSION.zip" . -x "*.DS_Store"
-cd - > /dev/null
-
 echo ""
-echo "✅ Release package created:"
-echo "   📦 Build.noindex/ClipFlow-v$VERSION.zip"
-echo "   📝 Build.noindex/Release/INSTALL.txt"
-echo "   📄 Build.noindex/Release/RELEASE_NOTES.md"
-echo ""
-echo "Next steps:"
-echo "1. Test the ZIP on a clean Mac"
-echo "2. Edit Build.noindex/Release/RELEASE_NOTES.md with changelog"
-echo "3. Create GitHub release:"
-echo "   gh release create v$VERSION Build.noindex/ClipFlow-v$VERSION.zip"
-echo "   --title \"ClipFlow v$VERSION\""
-echo "   --notes-file Build.noindex/Release/RELEASE_NOTES.md"
-echo ""
+echo "✅ $RELEASE_DIR/ClipFlow.zip"
+echo "   Add the changes under \"What's new\" in $RELEASE_DIR/RELEASE_NOTES.md, then:"
+echo "   gh release create v$VERSION $RELEASE_DIR/ClipFlow.zip --title \"ClipFlow $VERSION\" --notes-file $RELEASE_DIR/RELEASE_NOTES.md"

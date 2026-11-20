@@ -78,7 +78,7 @@ ClipFlow needs Accessibility permission for:
 2. Make sure ClipFlow is **enabled**
 3. If it's already there, try:
    ```bash
-   tccutil reset Accessibility com.singalong.clipflow
+   tccutil reset Accessibility io.benesh.clipflow
    # Then re-grant permission
    ```
 
@@ -102,7 +102,7 @@ log stream --predicate 'process == "ClipFlow"' --level debug
 ```bash
 # Remove preferences
 rm -rf ~/Library/Application\ Support/ClipFlow
-rm ~/Library/Preferences/com.singalong.clipflow.plist
+rm ~/Library/Preferences/io.benesh.clipflow.plist
 
 # Restart
 open /Applications/ClipFlow.app
@@ -183,10 +183,10 @@ rm -rf /Applications/ClipFlow.app
 
 # Remove user data (optional)
 rm -rf ~/Library/Application\ Support/ClipFlow
-rm ~/Library/Preferences/com.singalong.clipflow.plist
+rm ~/Library/Preferences/io.benesh.clipflow.plist
 
 # Reset Accessibility permission (optional)
-tccutil reset Accessibility com.singalong.clipflow
+tccutil reset Accessibility io.benesh.clipflow
 ```
 
 ---

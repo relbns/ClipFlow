@@ -30,7 +30,7 @@
 log stream --predicate 'process == "ClipFlow"' --level debug
 
 # איפוס הרשאת Accessibility
-tccutil reset Accessibility com.singalong.clipflow
+tccutil reset Accessibility io.benesh.clipflow
 
 # בדיקת חתימה
 codesign -dv /Applications/ClipFlow.app

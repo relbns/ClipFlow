@@ -486,3 +486,39 @@ final class SnippetEditorModelTests: XCTestCase {
         XCTAssertEqual(first.content, "Best regards")
     }
 }
+
+final class PreviousBundleIDTests: XCTestCase {
+    private let previous = "clipflow-test-previous-id"
+    private let current = "clipflow-test-current-id"
+    private let defaults = UserDefaults.standard
+
+    override func tearDown() {
+        let preferences = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Preferences")
+        for name in [previous, current] {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: preferences.appendingPathComponent("\(name).plist"))
+        }
+    }
+
+    func testSettingsMoveOnceAndDoNotComeBackAfterAReset() {
+        defaults.setPersistentDomain(["viewMode": "simple", "AppleLanguages": ["he"]], forName: previous)
+
+        PreviousBundleID.migrateDefaultsIfNeeded(defaults: defaults, from: previous, to: current)
+        XCTAssertEqual(defaults.persistentDomain(forName: current)?["viewMode"] as? String, "simple")
+        XCTAssertNil(defaults.persistentDomain(forName: previous))
+
+        defaults.removePersistentDomain(forName: current)
+        PreviousBundleID.migrateDefaultsIfNeeded(defaults: defaults, from: previous, to: current)
+        XCTAssertTrue(defaults.persistentDomain(forName: current)?.isEmpty ?? true)
+    }
+
+    func testExistingSettingsAreKeptAndTheOldOnesRemoved() {
+        defaults.setPersistentDomain(["viewMode": "simple"], forName: previous)
+        defaults.setPersistentDomain(["viewMode": "organized"], forName: current)
+
+        PreviousBundleID.migrateDefaultsIfNeeded(defaults: defaults, from: previous, to: current)
+        XCTAssertEqual(defaults.persistentDomain(forName: current)?["viewMode"] as? String, "organized")
+        XCTAssertNil(defaults.persistentDomain(forName: previous))
+    }
+}

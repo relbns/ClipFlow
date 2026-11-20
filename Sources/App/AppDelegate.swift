@@ -56,6 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
+        PreviousBundleID.quitRunningCopies()
         NSApp.setActivationPolicy(.accessory)
         ProcessInfo.processInfo.disableAutomaticTermination("ClipFlow runs in the menu bar without windows")
         AppDefaults.register()

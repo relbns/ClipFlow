@@ -1,7 +1,7 @@
 import os
 
 enum Log {
-    private static let subsystem = "com.singalong.clipflow"
+    private static let subsystem = "io.benesh.clipflow"
 
     static let app = Logger(subsystem: subsystem, category: "app")
     static let expansion = Logger(subsystem: subsystem, category: "expansion")
