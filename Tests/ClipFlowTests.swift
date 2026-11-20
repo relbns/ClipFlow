@@ -4,8 +4,10 @@ import XCTest
 @testable import ClipFlow
 
 extension XCTestCase {
-    /// An empty defaults suite with a fixed name: every run reuses one preferences file instead of leaving a new one.
-    func makeTestDefaults(_ name: String) -> UserDefaults {
+    /// An empty defaults suite named after the test: runs reuse its file, and parallel workers never share one.
+    func makeTestDefaults(_ purpose: String) -> UserDefaults {
+        let testName = self.name.filter { $0.isLetter || $0.isNumber }
+        let name = "\(purpose)-\(testName)"
         let defaults = UserDefaults(suiteName: name)!
         defaults.removePersistentDomain(forName: name)
         addTeardownBlock { defaults.removePersistentDomain(forName: name) }
@@ -613,8 +615,8 @@ final class SnippetEditorModelTests: XCTestCase {
 }
 
 final class PreviousBundleIDTests: XCTestCase {
-    private let previous = "clipflow-tests-previous-id"
-    private let current = "clipflow-tests-current-id"
+    private var previous: String { "clipflow-tests-previous-id-\(name.filter { $0.isLetter || $0.isNumber })" }
+    private var current: String { "clipflow-tests-current-id-\(name.filter { $0.isLetter || $0.isNumber })" }
     private let defaults = UserDefaults.standard
 
     override func tearDown() {
