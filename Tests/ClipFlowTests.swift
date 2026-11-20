@@ -487,22 +487,38 @@ final class SnippetEditorModelTests: XCTestCase {
     }
 }
 
-final class PreviousBundleDefaultsTests: XCTestCase {
-    func testSettingsMoveOnceAndNeverOverwriteNewOnes() {
-        let previous = "clipflow-old-\(UUID().uuidString)"
-        let current = "clipflow-new-\(UUID().uuidString)"
-        let defaults = UserDefaults.standard
-        defer {
-            defaults.removePersistentDomain(forName: previous)
-            defaults.removePersistentDomain(forName: current)
+final class PreviousBundleIDTests: XCTestCase {
+    private let previous = "clipflow-test-previous-id"
+    private let current = "clipflow-test-current-id"
+    private let defaults = UserDefaults.standard
+
+    override func tearDown() {
+        let preferences = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Preferences")
+        for name in [previous, current] {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: preferences.appendingPathComponent("\(name).plist"))
         }
+    }
+
+    func testSettingsMoveOnceAndDoNotComeBackAfterAReset() {
         defaults.setPersistentDomain(["viewMode": "simple", "AppleLanguages": ["he"]], forName: previous)
 
-        PreviousBundleDefaults.migrateIfNeeded(defaults: defaults, from: previous, to: current)
+        PreviousBundleID.migrateDefaultsIfNeeded(defaults: defaults, from: previous, to: current)
         XCTAssertEqual(defaults.persistentDomain(forName: current)?["viewMode"] as? String, "simple")
+        XCTAssertNil(defaults.persistentDomain(forName: previous))
 
+        defaults.removePersistentDomain(forName: current)
+        PreviousBundleID.migrateDefaultsIfNeeded(defaults: defaults, from: previous, to: current)
+        XCTAssertTrue(defaults.persistentDomain(forName: current)?.isEmpty ?? true)
+    }
+
+    func testExistingSettingsAreKeptAndTheOldOnesRemoved() {
+        defaults.setPersistentDomain(["viewMode": "simple"], forName: previous)
         defaults.setPersistentDomain(["viewMode": "organized"], forName: current)
-        PreviousBundleDefaults.migrateIfNeeded(defaults: defaults, from: previous, to: current)
+
+        PreviousBundleID.migrateDefaultsIfNeeded(defaults: defaults, from: previous, to: current)
         XCTAssertEqual(defaults.persistentDomain(forName: current)?["viewMode"] as? String, "organized")
+        XCTAssertNil(defaults.persistentDomain(forName: previous))
     }
 }

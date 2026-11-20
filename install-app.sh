@@ -7,6 +7,11 @@ if [ -e "$APP" ] && [ ! -w "$APP" ] || [ ! -w /Applications ]; then
     SUDO="sudo"
 fi
 
+if ! codesign --verify --deep --strict Build.noindex/ClipFlow.app 2>/dev/null; then
+    echo "❌ Build.noindex/ClipFlow.app is incomplete or its signature is invalid. Run ./build-app.sh first"
+    exit 1
+fi
+
 echo "📦 Installing ClipFlow to /Applications..."
 
 if pgrep -x "ClipFlow" > /dev/null; then

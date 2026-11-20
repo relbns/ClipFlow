@@ -88,21 +88,21 @@ mkdir -p "$APP_DIR/Contents/Frameworks"
 cp "$PRODUCTS/ClipFlow" "$APP_DIR/Contents/MacOS/"
 
 # Copy any .framework or .bundle files produced by dependencies
-find "$PRODUCTS" -name "*.framework" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \; 2>/dev/null || true
-find "$PRODUCTS" -name "*.bundle" -maxdepth 1 -exec cp -R {} "$APP_DIR/Contents/Resources/" \; 2>/dev/null || true
+# -H follows $PRODUCTS itself, since .build/release is a symlink
+find -H "$PRODUCTS" -maxdepth 1 -name "*.framework" -exec cp -R {} "$APP_DIR/Contents/Frameworks/" \;
+find -H "$PRODUCTS" -maxdepth 1 -name "*.bundle" -exec cp -R {} "$APP_DIR/Contents/Resources/" \;
 
-# Copy and fix Info.plist (replace Xcode variables + increment build)
-cp Sources/Resources/Info.plist "$APP_DIR/Contents/Info.plist.tmp"
+# KeyboardShortcuts loads its strings from this bundle and crashes without it
+if [ ! -d "$APP_DIR/Contents/Resources/KeyboardShortcuts_KeyboardShortcuts.bundle" ]; then
+    echo "❌ KeyboardShortcuts_KeyboardShortcuts.bundle was not copied from $PRODUCTS"
+    exit 1
+fi
 
-# Get current build number and increment it
-CURRENT_BUILD=$(grep -A1 "CFBundleVersion" Sources/Resources/Info.plist | grep "<string>" | sed 's/.*<string>\(.*\)<\/string>/\1/')
-NEW_BUILD=$((CURRENT_BUILD + 1))
+# Copy Info.plist with the Xcode variables filled in and a dated build number
 BUILD_DATE=$(date "+%Y%m%d.%H%M")
-
-sed 's/\$(EXECUTABLE_NAME)/ClipFlow/g' "$APP_DIR/Contents/Info.plist.tmp" | \
-sed 's/\$(DEVELOPMENT_LANGUAGE)/en/g' | \
-sed "s/<string>\${CURRENT_BUILD}<\/string>/<string>${BUILD_DATE}<\/string>/g" > "$APP_DIR/Contents/Info.plist"
-rm "$APP_DIR/Contents/Info.plist.tmp"
+sed 's/\$(EXECUTABLE_NAME)/ClipFlow/g' Sources/Resources/Info.plist | \
+sed 's/\$(DEVELOPMENT_LANGUAGE)/en/g' > "$APP_DIR/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_DATE" "$APP_DIR/Contents/Info.plist"
 
 echo "📝 Build number: $BUILD_DATE"
 
@@ -160,7 +160,7 @@ case $SIGNING_MODE in
     adhoc)
         echo "   Mode: Ad-hoc"
         # Ad-hoc signing - no certificate needed
-        codesign --force --deep --sign - "$APP_DIR" 2>/dev/null
+        codesign --force --deep --sign - --entitlements "$ENTITLEMENTS_PATH" "$APP_DIR"
         echo "✅ Ad-hoc signed (users will need to allow in System Settings)"
         ;;
 

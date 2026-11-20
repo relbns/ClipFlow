@@ -4,6 +4,7 @@ echo "Clearing all ClipFlow preferences..."
 
 # Clear app UserDefaults
 defaults delete io.benesh.clipflow 2>/dev/null
+defaults delete com.singalong.clipflow 2>/dev/null || true
 echo "✅ Cleared app defaults"
 
 # Clear NSStatusBar autosave

@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct ClipFlowApp: App {
     // Declared first so it runs before the delegate or anything else reads a setting.
-    private let previousSettings: Void = PreviousBundleDefaults.migrateIfNeeded()
+    private let previousSettings: Void = PreviousBundleID.migrateDefaultsIfNeeded()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {

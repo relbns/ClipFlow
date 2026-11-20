@@ -65,10 +65,10 @@
 
 1. Download `ClipFlow.zip` from the [latest release](https://github.com/relbns/ClipFlow/releases/latest) and unzip it.
 2. Move `ClipFlow.app` to your Applications folder.
-3. Open it. ClipFlow is not notarized by Apple yet, so the first launch is blocked: open **System Settings → Privacy & Security**, scroll to the message about ClipFlow and click **Open Anyway**.
+3. Open it. ClipFlow is not notarized by Apple yet, so macOS blocks the first launch. Then open **System Settings → Privacy & Security**, scroll to the message about ClipFlow, click **Open Anyway** and confirm with your password. The button shows up for about an hour after the blocked launch.
 4. Grant the two permissions the welcome screen asks for (see [Permissions](#permissions)).
 
-The download runs on Apple Silicon and Intel Macs with macOS 14 or later. Each new version has to be allowed again in the same place, and macOS asks for the permissions again after an update.
+The download runs on Apple Silicon and Intel Macs with macOS 14 or later. Each new version has to be allowed again the same way. After an update, remove ClipFlow from both permission lists with **−** and grant them again: the old entry stays switched on but no longer applies.
 
 ### Requirements
 
@@ -95,7 +95,7 @@ open /Applications/ClipFlow.app
 
 ### Permissions
 
-ClipFlow needs two permissions for text expansion and paste-on-pick. Clipboard history works without them.
+Clipboard history works without any permission. Text expansion needs both, and paste-on-pick needs Accessibility.
 
 - **Accessibility**: to type the expansion and paste the clip you pick.
 - **Input Monitoring**: to notice the abbreviations you type.
