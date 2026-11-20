@@ -128,7 +128,16 @@ final class ClipboardMonitor: ObservableObject {
 
     /// Puts text ClipFlow produced (read from the screen or an image) on the clipboard and into history as ClipFlow's.
     func copy(_ text: String) {
-        let snapshot = PasteboardSnapshot.text(text, transient: false)
+        copyOwn(.text(text, transient: false))
+    }
+
+    /// Puts a screen capture on the clipboard as an image and into history; its text is read later only if
+    /// "Find images by their text" is on.
+    func copyImage(_ png: Data) {
+        copyOwn(PasteboardSnapshot(items: [[NSPasteboard.PasteboardType.png.rawValue: png]]))
+    }
+
+    private func copyOwn(_ snapshot: PasteboardSnapshot) {
         let changeCount = snapshot.write(to: pasteboard)
         OwnPasteboardWrites.shared.record(changeCount)
         lastChangeCount = changeCount

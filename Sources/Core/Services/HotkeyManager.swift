@@ -7,6 +7,7 @@ extension KeyboardShortcuts.Name {
     static let fixKeyboardLayout = Self("fixKeyboardLayout", default: .init(.l, modifiers: [.command, .control]))
     static let pastePlainText = Self("pastePlainText", default: .init(.v, modifiers: [.command, .control, .shift]))
     static let captureScreenText = Self("captureScreenText", default: .init(.t, modifiers: [.command, .control, .shift]))
+    static let captureScreenImage = Self("captureScreenImage", default: .init(.i, modifiers: [.command, .control, .shift]))
     static let showSnippetEditor = Self("showSnippetEditor")
     static let clearHistory = Self("clearHistory")
 }
@@ -23,9 +24,11 @@ final class HotkeyManager {
         onClearHistory: @escaping () -> Void,
         onFixLayout: @escaping () -> Void,
         onPastePlainText: @escaping () -> Void,
-        onCaptureScreenText: @escaping () -> Void
+        onCaptureScreenText: @escaping () -> Void,
+        onCaptureScreenImage: @escaping () -> Void
     ) {
         KeyboardShortcuts.onKeyUp(for: .captureScreenText, action: onCaptureScreenText)
+        KeyboardShortcuts.onKeyUp(for: .captureScreenImage, action: onCaptureScreenImage)
         KeyboardShortcuts.onKeyUp(for: .pastePlainText, action: onPastePlainText)
         KeyboardShortcuts.onKeyUp(for: .showHistoryMenu, action: onHistoryMenu)
         KeyboardShortcuts.onKeyUp(for: .fixKeyboardLayout, action: onFixLayout)

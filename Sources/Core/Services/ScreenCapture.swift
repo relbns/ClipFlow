@@ -1,14 +1,19 @@
 import AppKit
 
-/// The copy-text-from-screen hotkey: the user drags an area with the system's own selection, its text goes to the
-/// clipboard (and so to history), and the capture itself is kept as an image clip when that setting is on.
+/// The screen hotkeys: the user drags an area with the system's own selection. `.text` puts the text read in it on
+/// the clipboard (keeping the image as a clip when that setting is on); `.image` puts the image itself there, unread.
 @MainActor
-enum ScreenTextCapture {
+enum ScreenCapture {
+    enum Result {
+        case text
+        case image
+    }
+
     static let saveScreenshotsKey = "ocrSaveScreenshots"
     private static let accessRequestedKey = "ocrScreenAccessRequested"
-    private static var isCapturing = false
+    private(set) static var isCapturing = false
 
-    static func run(monitor: ClipboardMonitor, defaults: UserDefaults = .standard) async {
+    static func run(_ result: Result, monitor: ClipboardMonitor, defaults: UserDefaults = .standard) async {
         guard !isCapturing else { return }
         guard CGPreflightScreenCaptureAccess() else {
             // The first time, the system asks; after that, explain, since macOS may need a relaunch to see the grant.
@@ -28,6 +33,10 @@ enum ScreenTextCapture {
         await captureInteractively(to: file)
         guard let png = try? Data(contentsOf: file), !png.isEmpty else { return }
 
+        if result == .image {
+            monitor.copyImage(png)
+            return
+        }
         let text = await TextRecognizer.recognize(imageData: png, languages: TextRecognizer.currentLanguages(defaults: defaults)) ?? ""
         if defaults.bool(forKey: saveScreenshotsKey) {
             monitor.recordScreenshot(png, recognizedText: text)

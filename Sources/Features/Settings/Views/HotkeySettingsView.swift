@@ -15,6 +15,9 @@ struct HotkeySettingsView: View {
             CFSettingsRow(label: L("hotkey_capture_text"), hint: L("hotkey_capture_text_hint")) {
                 KeyboardShortcuts.Recorder(for: .captureScreenText)
             }
+            CFSettingsRow(label: L("hotkey_capture_image"), hint: L("hotkey_capture_image_hint")) {
+                KeyboardShortcuts.Recorder(for: .captureScreenImage)
+            }
             CFSettingsRow(label: L("hotkey_fix_layout"), hint: L("hotkey_fix_layout_hint")) {
                 KeyboardShortcuts.Recorder(for: .fixKeyboardLayout)
             }

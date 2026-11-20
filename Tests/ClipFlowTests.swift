@@ -511,6 +511,20 @@ final class PopoverNavigationTests: XCTestCase {
         XCTAssertNil(monitor.nextImageToRecognize(), "an image with no text is marked read")
     }
 
+    func testACapturedImageIsKeptUnreadForTheBackgroundPass() throws {
+        let image = NSImage(size: NSSize(width: 4, height: 4), flipped: false) { rect in
+            NSColor.blue.setFill()
+            rect.fill()
+            return true
+        }
+        let png = try XCTUnwrap(NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation))?.representation(using: .png, properties: [:]))
+        monitor.copyImage(png)
+        let captured = try XCTUnwrap(monitor.clipHistory.first { $0.kind == .image })
+        XCTAssertEqual(captured.sourceAppName, "ClipFlow")
+        XCTAssertNil(captured.recognizedText)
+        XCTAssertEqual(monitor.nextImageToRecognize()?.id, captured.id)
+    }
+
     func testNothingIsKeptWhileHistoryRecordingIsOff() throws {
         defaults.set(false, forKey: "startMonitoring")
         let before = monitor.clipHistory.count
