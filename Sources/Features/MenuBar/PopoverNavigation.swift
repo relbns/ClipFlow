@@ -291,10 +291,11 @@ final class PopoverNavigation: ObservableObject {
         selectedItemID = item.id
     }
 
-    func activate(_ item: PopoverItem) {
+    /// `plainText`: Option was held, so a clip pastes without its formatting.
+    func activate(_ item: PopoverItem, plainText: Bool = false) {
         switch item {
         case .clip(let clip, _), .pinned(let clip, _):
-            PasteCoordinator.shared.paste(clip)
+            PasteCoordinator.shared.paste(clip, as: plainText && clip.hasPlainText ? .plainText : .original)
         case .category(let category, _):
             showsAllSnippets = false
             drilledCategory = category
@@ -315,14 +316,10 @@ final class PopoverNavigation: ObservableObject {
         selectedItemID = openedRow
     }
 
-    static func canSaveAsSnippet(_ clip: SimpleClipItem) -> Bool {
-        clip.kind != .image && clip.kind != .file
-    }
-
     /// Saves the clip's text as a snippet in the group, or in a new group when there is none, and opens it in the editor.
     @discardableResult
     func saveAsSnippet(_ clip: SimpleClipItem, in groupID: NSManagedObjectID?) -> Snippet? {
-        guard let context, Self.canSaveAsSnippet(clip) else { return nil }
+        guard let context, clip.hasPlainText else { return nil }
         let group = groupID.flatMap { try? context.existingObject(with: $0) as? SnippetGroup }
             ?? SnippetGroup.insert(named: L("editor_new_group"), in: context)
         let title = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -406,6 +403,10 @@ final class PopoverNavigation: ObservableObject {
                 return activatePinned(slot: digit)
             }
             return handleCommand(keyCode: key.keyCode)
+        }
+        if key.modifiers == .option, key.keyCode == KeyCode.returnKey || key.keyCode == KeyCode.enter {
+            if let item = selectedItem { activate(item, plainText: true) }
+            return true
         }
         if key.modifiers == .option, key.keyCode == KeyCode.delete, searchText.isEmpty {
             switch selectedItem {

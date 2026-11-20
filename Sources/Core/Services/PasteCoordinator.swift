@@ -52,10 +52,31 @@ final class PasteCoordinator {
         target.activate()
     }
 
-    func paste(_ clip: SimpleClipItem) {
-        guard let monitor = clipboardMonitor, let snapshot = monitor.snapshot(for: clip) else {
-            Log.ui.error("Picked clip has no stored content; nothing pasted")
-            return
+    enum PasteStyle: Equatable {
+        case original
+        case plainText
+        case transformed(TextTransform)
+    }
+
+    func paste(_ clip: SimpleClipItem, as style: PasteStyle = .original) {
+        guard let monitor = clipboardMonitor else { return }
+        let alwaysPlain = UserDefaults.standard.bool(forKey: "alwaysPastePlainText") && clip.hasPlainText
+        let snapshot: PasteboardSnapshot
+        switch style == .original && alwaysPlain ? .plainText : style {
+        case .original:
+            guard let stored = monitor.snapshot(for: clip) else {
+                Log.ui.error("Picked clip has no stored content; nothing pasted")
+                return
+            }
+            snapshot = stored
+        case .plainText:
+            snapshot = .text(clip.content, transient: false)
+        case .transformed(let transform):
+            guard let text = transform.apply(clip.content, layoutPairs: LayoutFixer.shared.layoutPairs) else {
+                NSSound.beep()
+                return
+            }
+            snapshot = .text(text, transient: false)
         }
         closePopover()
         let target = target
@@ -64,6 +85,16 @@ final class PasteCoordinator {
             await PasteEngine.shared.paste(snapshot, into: target)
             monitor.markUsed(clip)
         }
+    }
+
+    /// The plain-text hotkey: pastes the clipboard's text into the frontmost app and puts the clipboard back.
+    func pasteClipboardAsPlainText() async {
+        guard await SyntheticKeyboard.modifiersReleased(),
+              let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        PasteEngine.shared.insert(RenderedSnippet(text: text, cursorOffsetFromEnd: 0), replacingTyped: 0)
     }
 
     func insert(_ snippet: Snippet) {

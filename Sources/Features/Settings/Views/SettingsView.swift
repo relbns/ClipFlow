@@ -95,6 +95,7 @@ struct GeneralSettingsView: View {
     @AppStorage("removeDuplicates") private var removeDuplicates = true
     @AppStorage("moveUsedToTop") private var moveUsedToTop = true
     @AppStorage("startMonitoring") private var recordHistory = true
+    @AppStorage("alwaysPastePlainText") private var alwaysPastePlainText = false
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var confirmingClear = false
 
@@ -116,6 +117,9 @@ struct GeneralSettingsView: View {
             }
             CFSettingsRow(label: L("pref_move_used_to_top"), hint: L("pref_move_used_to_top_hint")) {
                 CFToggle(isOn: $moveUsedToTop).accessibilityLabel(L("pref_move_used_to_top"))
+            }
+            CFSettingsRow(label: L("pref_always_plain"), hint: L("pref_always_plain_hint")) {
+                CFToggle(isOn: $alwaysPastePlainText).accessibilityLabel(L("pref_always_plain"))
             }
             CFSettingsRow(label: L("pref_clear_history"), hint: L("pref_clear_history_hint")) {
                 CFToolbarBtn(label: L("pref_clear_history_button")) { confirmingClear = true }

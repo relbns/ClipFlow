@@ -17,6 +17,8 @@ struct SimpleClipItem: Identifiable, Hashable {
     let pixelHeight: Int
 
     var kind: ClipType { ClipType(rawValue: type) ?? .text }
+    /// Text, rich text, a link or a color: something that pastes, transforms and saves as plain text.
+    var hasPlainText: Bool { kind != .image && kind != .file }
 
     var lineCount: Int {
         content.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).count

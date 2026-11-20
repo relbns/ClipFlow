@@ -567,6 +567,42 @@ final class LayoutConverterTests: XCTestCase {
     }
 }
 
+final class TextTransformTests: XCTestCase {
+    func testEachTransformRewritesItsFixture() {
+        let cases: [(TextTransform, String, String?)] = [
+            (.uppercase, "Hello world", "HELLO WORLD"),
+            (.lowercase, "Hello World", "hello world"),
+            (.titleCase, "hello big world", "Hello Big World"),
+            (.sentenceCase, "HELLO. how are YOU?\nfine", "Hello. How are you?\nFine"),
+            (.trim, "  padded \n", "padded"),
+            (.collapseSpaces, "a   b\t\tc\nd  e", "a b c\nd e"),
+            (.joinLines, "first line\n  second\r\nthird", "first line second third"),
+            (.removeEmptyLines, "a\n\n  \nb", "a\nb"),
+            (.camelCase, "user ID list", "userIdList"),
+            (.snakeCase, "userIDList", "user_id_list"),
+            (.kebabCase, "Hello World_again", "hello-world-again"),
+            (.urlEncode, "a b&c=ש", "a%20b%26c%3D%D7%A9"),
+            (.urlDecode, "a%20b%26c", "a b&c"),
+            (.base64Encode, "שלום", "16nXnNeV150="),
+            (.base64Decode, "16nXnNeV150=", "שלום"),
+            (.base64Decode, "not base64 ✗", nil),
+            (.prettyJSON, "{\"b\":1,\"a\":[1,2]}", "{\n  \"a\" : [\n    1,\n    2\n  ],\n  \"b\" : 1\n}"),
+            (.prettyJSON, "{broken", nil),
+            (.removeNiqqud, "שָׁלוֹם בֵּית־סֵפֶר", "שלום בית־ספר"),
+            (.uppercase, "ALREADY", nil)
+        ]
+        for (transform, input, expected) in cases {
+            XCTAssertEqual(transform.apply(input), expected, "\(transform) on \(input)")
+        }
+    }
+
+    func testFixLayoutUsesTheGivenLayoutPairs() {
+        let pair = LayoutPair(first: "en", second: "he", keys: [("a", "ש"), ("k", "ל"), ("u", "ו"), ("o", "ם")])
+        XCTAssertEqual(TextTransform.fixLayout.apply("akuo", layoutPairs: [pair]), "שלום")
+        XCTAssertNil(TextTransform.fixLayout.apply("akuo"), "no layouts, no change")
+    }
+}
+
 final class FuzzyMatchTests: XCTestCase {
     func testTiersRankExactThenPrefixThenWordThenAnywhereThenGaps() {
         let cases: [(query: String, text: String, score: Int?)] = [

@@ -163,7 +163,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onHistoryMenu: { [weak self] in self?.showMenuPopover() },
             onSnippetEditor: { [weak self] in self?.openSnippetEditor() },
             onClearHistory: { [weak self] in self?.clipboardMonitor.clearHistory() },
-            onFixLayout: { Task { await LayoutFixer.shared.fix() } }
+            onFixLayout: { Task { await LayoutFixer.shared.fix() } },
+            onPastePlainText: { Task { await PasteCoordinator.shared.pasteClipboardAsPlainText() } }
         )
     }
 
