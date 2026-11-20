@@ -2,7 +2,7 @@ import KeyboardShortcuts
 import SwiftUI
 
 struct ImageTextSettingsView: View {
-    @AppStorage(ScreenTextCapture.saveScreenshotsKey) private var saveScreenshots = true
+    @AppStorage(ScreenCapture.saveScreenshotsKey) private var saveScreenshots = true
     @AppStorage(ImageTextIndexer.enabledKey) private var indexImages = true
     @AppStorage(TextRecognizer.languagesKey) private var savedLanguages = ""
     @State private var hasScreenAccess = CGPreflightScreenCaptureAccess()
@@ -23,6 +23,9 @@ struct ImageTextSettingsView: View {
             CFSettingsRow(label: L("hotkey_capture_text"), hint: L("hotkey_capture_text_hint")) {
                 KeyboardShortcuts.Recorder(for: .captureScreenText)
             }
+            CFSettingsRow(label: L("hotkey_capture_image"), hint: L("hotkey_capture_image_hint")) {
+                KeyboardShortcuts.Recorder(for: .captureScreenImage)
+            }
             CFSettingsRow(label: L("ocr_screen_access"), hint: L("ocr_screen_access_hint")) {
                 if hasScreenAccess {
                     Text(L("ocr_screen_access_granted")).font(.system(size: 12)).foregroundColor(theme.textMid)
@@ -30,9 +33,9 @@ struct ImageTextSettingsView: View {
                     HStack(spacing: 8) {
                         CFToolbarBtn(label: L("ocr_permission_open")) {
                             CGRequestScreenCaptureAccess()
-                            ScreenTextCapture.openScreenRecordingSettings()
+                            ScreenCapture.openScreenRecordingSettings()
                         }
-                        CFToolbarBtn(label: L("ocr_permission_relaunch")) { ScreenTextCapture.relaunch() }
+                        CFToolbarBtn(label: L("ocr_permission_relaunch")) { ScreenCapture.relaunch() }
                     }
                 }
             }

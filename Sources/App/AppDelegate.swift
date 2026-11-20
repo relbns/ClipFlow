@@ -166,12 +166,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onClearHistory: { [weak self] in self?.clipboardMonitor.clearHistory() },
             onFixLayout: { Task { await LayoutFixer.shared.fix() } },
             onPastePlainText: { Task { await PasteCoordinator.shared.pasteClipboardAsPlainText() } },
-            onCaptureScreenText: { [weak self] in
-                guard let self else { return }
-                if menuBarPopover?.isShown == true { menuBarPopover?.performClose(nil) }
-                Task { await ScreenTextCapture.run(monitor: self.clipboardMonitor) }
-            }
+            onCaptureScreenText: { [weak self] in self?.captureScreen(.text) },
+            onCaptureScreenImage: { [weak self] in self?.captureScreen(.image) }
         )
+    }
+
+    private func captureScreen(_ result: ScreenCapture.Result) {
+        if menuBarPopover?.isShown == true { menuBarPopover?.performClose(nil) }
+        guard let monitor = clipboardMonitor else { return }
+        Task { await ScreenCapture.run(result, monitor: monitor) }
     }
 
     private func setupNotifications() {

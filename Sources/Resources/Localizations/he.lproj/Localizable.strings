@@ -209,6 +209,8 @@
 "tab_image_text" = "טקסט בתמונות";
 "hotkey_capture_text" = "העתקת טקסט מהמסך";
 "hotkey_capture_text_hint" = "מסמנים אזור כלשהו במסך, והטקסט שבו עובר ללוח.";
+"hotkey_capture_image" = "צילום אזור במסך";
+"hotkey_capture_image_hint" = "מסמנים אזור כלשהו במסך, והתמונה עוברת ללוח ולהיסטוריה, בלי זיהוי טקסט.";
 "ocr_screen_access" = "הקלטת מסך";
 "ocr_screen_access_hint" = "נדרשת כדי לקרוא את האזור שמסמנים. שום דבר לא מצולם עד שלוחצים על הקיצור. אחרי האישור צריך להפעיל את ClipFlow מחדש.";
 "ocr_screen_access_granted" = "מאושרת";

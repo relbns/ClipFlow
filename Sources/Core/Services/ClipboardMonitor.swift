@@ -136,6 +136,17 @@ final class ClipboardMonitor: ObservableObject {
         record(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier)
     }
 
+    /// Puts a screen capture on the clipboard as an image and into history; its text is read later only if
+    /// "Find images by their text" is on.
+    func copyImage(_ png: Data) {
+        let snapshot = PasteboardSnapshot(items: [[NSPasteboard.PasteboardType.png.rawValue: png]])
+        let changeCount = snapshot.write(to: pasteboard)
+        OwnPasteboardWrites.shared.record(changeCount)
+        lastChangeCount = changeCount
+        guard isRecording, let capture = ClipCapture.classify(snapshot) else { return }
+        record(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier)
+    }
+
     /// "" marks an image as read with no text, so it is not read again.
     func setRecognizedText(_ text: String, forClipID id: UUID) {
         guard let item = fetchItem(id: id), item.recognizedText != text else { return }

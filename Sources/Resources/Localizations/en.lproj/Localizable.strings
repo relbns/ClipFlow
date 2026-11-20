@@ -209,6 +209,8 @@
 "tab_image_text" = "Image Text";
 "hotkey_capture_text" = "Copy text from screen";
 "hotkey_capture_text_hint" = "Drag over any part of the screen; the text in it goes to the clipboard.";
+"hotkey_capture_image" = "Capture screen area";
+"hotkey_capture_image_hint" = "Drag over any part of the screen; the image goes to the clipboard and history, with no text recognition.";
 "ocr_screen_access" = "Screen Recording";
 "ocr_screen_access_hint" = "Needed to read the area you select. Nothing is captured until you press the shortcut. After allowing it, restart ClipFlow.";
 "ocr_screen_access_granted" = "Allowed";
