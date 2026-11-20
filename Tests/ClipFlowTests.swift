@@ -723,12 +723,32 @@ final class SyncMergeTests: XCTestCase {
         XCTAssertEqual(join.groupMap, ["L": "R"])
     }
 
-    func testTombstonesExpireAfterTheRetention() {
-        let ledger = [
-            "snippet:old": SyncLedgerEntry(hash: "", modifiedAt: t0, deleted: true, device: "m1"),
-            "snippet:live": SyncLedgerEntry(hash: "h", modifiedAt: t0, deleted: false, device: "m1")
+    func testAJoiningMacKeepsItsSnippetWhenTheTextDiffersOrTheOtherCopyWasDeleted() {
+        let remote = [
+            SyncRecord(key: "snippet:r1", modifiedAt: t0, deleted: false,
+                       payload: .object(["abbreviation": .string(";addr"), "content": .string("Home")]), device: "m1"),
+            SyncRecord(key: "snippet:r2", modifiedAt: t0, deleted: false,
+                       payload: .object(["abbreviation": .string(";sig"), "content": .string("Best")]), device: "m1"),
+            SyncRecord(key: "snippet:r2", modifiedAt: t1, deleted: true, payload: nil, device: "m2")
         ]
-        XCTAssertEqual(Set(SyncMerge.pruned(ledger, now: t0.addingTimeInterval(100 * 86_400)).keys), ["snippet:live"])
+        let local: [String: JSONValue] = [
+            "snippet:l1": .object(["abbreviation": .string(";addr"), "content": .string("Work")]),
+            "snippet:l2": .object(["abbreviation": .string(";sig"), "content": .string("Best")])
+        ]
+        XCTAssertTrue(SyncMerge.firstJoin(local: local, remote: remote).dropSnippets.isEmpty)
+    }
+
+    func testALocalEditIsNewerThanWhatItReplacesEvenWithAFastClockElsewhere() {
+        let ahead = t1.addingTimeInterval(600)
+        let ledger = ["snippet:a": SyncLedgerEntry(hash: "old", modifiedAt: ahead, deleted: false, device: "fast")]
+        let stamped = SyncMerge.stamp(local: ["snippet:a": .string("mine")], ledger: ledger, kinds: ["snippet"], now: t1, device: "slow")
+        XCTAssertGreaterThan(try XCTUnwrap(stamped["snippet:a"]?.modifiedAt), ahead)
+    }
+
+    func testAStaleLiveCopyNeverBringsBackADeletedRecord() {
+        let ledger = ["snippet:a": SyncLedgerEntry(hash: "", modifiedAt: t1, deleted: true, device: "m1")]
+        let stale = SyncRecord(key: "snippet:a", modifiedAt: t0, deleted: false, payload: .string("old"), device: "m3")
+        XCTAssertTrue(SyncMerge.incoming(remote: [stale], ledger: ledger, kinds: ["snippet"]).isEmpty)
     }
 }
 
@@ -774,7 +794,7 @@ final class FolderSyncTests: XCTestCase {
 
     private func snippets(on mac: Int) throws -> [String: String] {
         let all = try macs[mac].stack.viewContext.fetch(Snippet.fetchRequest())
-        return Dictionary(uniqueKeysWithValues: all.map { ($0.abbreviation, $0.content) })
+        return Dictionary(all.map { ($0.abbreviation, $0.content) }, uniquingKeysWith: { [$0, $1].sorted().joined(separator: " | ") })
     }
 
     private func syncAll() async {
@@ -783,14 +803,14 @@ final class FolderSyncTests: XCTestCase {
     }
 
     func testTwoMacsShareSnippetsEditsDeletionsAndPinsWithoutDuplicatingTheStarters() async throws {
-        try addSnippet(".sig", content: "Best, A", group: "Personal", on: 0)
+        try addSnippet(".sig", content: "Best", group: "Personal", on: 0)
         try addSnippet(".hi", content: "Hello", group: "Personal", on: 0)
-        try addSnippet(".sig", content: "Best, B", group: "Personal", on: 1)
+        try addSnippet(".sig", content: "Best", group: "Personal", on: 1)
         await syncAll()
 
-        XCTAssertEqual(try snippets(on: 1), [".sig": "Best, A", ".hi": "Hello"], "the joining Mac's own .sig folds into the first Mac's")
+        XCTAssertEqual(try snippets(on: 1), [".sig": "Best", ".hi": "Hello"], "the joining Mac's identical .sig folds into the first Mac's")
         XCTAssertEqual(SnippetGroup.ordered(in: macs[1].stack.viewContext).map(\.name), ["Personal"])
-        XCTAssertEqual(try snippets(on: 0), [".sig": "Best, A", ".hi": "Hello"])
+        XCTAssertEqual(try snippets(on: 0), [".sig": "Best", ".hi": "Hello"])
 
         let hi = try XCTUnwrap(try macs[1].stack.viewContext.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".hi" })
         hi.content = "Hello there"
@@ -811,6 +831,40 @@ final class FolderSyncTests: XCTestCase {
         XCTAssertEqual(macs[1].defaults.string(forKey: "viewMode"), "simple")
 
         guard case .synced(_, let otherMacs) = macs[0].sync.status else { return XCTFail("expected a synced status") }
+        XCTAssertEqual(otherMacs, 1)
+    }
+
+    func testDeletingAGroupKeepsASnippetEditedSinceOnTheOtherMac() async throws {
+        try addSnippet(".a", content: "A", group: "Work", on: 0)
+        try addSnippet(".b", content: "B", group: "Work", on: 0)
+        await syncAll()
+
+        let contextA = macs[0].stack.viewContext
+        let work = try XCTUnwrap(SnippetGroup.ordered(in: contextA).first { $0.name == "Work" })
+        for snippet in work.snippets { contextA.delete(snippet) }
+        contextA.delete(work)
+        try contextA.save()
+        await macs[0].sync.sync()
+
+        try await Task.sleep(nanoseconds: 5_000_000)
+        let onB = try XCTUnwrap(try macs[1].stack.viewContext.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".b" })
+        onB.content = "B edited later"
+        try macs[1].stack.viewContext.save()
+        await syncAll()
+
+        XCTAssertEqual(try snippets(on: 1), [".b": "B edited later"], ".a goes with the group, the later edit of .b stays")
+        XCTAssertEqual(try snippets(on: 0), [".b": "B edited later"])
+        XCTAssertTrue(SnippetGroup.ordered(in: macs[1].stack.viewContext).isEmpty)
+    }
+
+    func testAConflictCopyMadeByTheCloudIsNotAnotherMac() async throws {
+        try addSnippet(".a", content: "A", group: "Work", on: 0)
+        await macs[0].sync.sync()
+        let devices = folder.appendingPathComponent("shared/devices")
+        let own = try XCTUnwrap(try FileManager.default.contentsOfDirectory(atPath: devices.path).first)
+        try FileManager.default.copyItem(at: devices.appendingPathComponent(own), to: devices.appendingPathComponent("conflict 2.json"))
+        await macs[1].sync.sync()
+        guard case .synced(_, let otherMacs) = macs[1].sync.status else { return XCTFail("expected a synced status") }
         XCTAssertEqual(otherMacs, 1)
     }
 }

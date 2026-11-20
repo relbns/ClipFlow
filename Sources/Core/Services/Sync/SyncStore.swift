@@ -103,46 +103,54 @@ final class SyncStore {
 
     /// Drops this Mac's copies of snippets another Mac already has, and moves the snippets of a group another Mac
     /// has under the same name into that group once it arrives.
-    func applyFirstJoin(dropSnippets: Set<String>, groupMap: [String: String]) -> [String: String] {
-        for key in dropSnippets {
+    func dropSnippets(_ keys: Set<String>) -> Bool {
+        for key in keys {
             if let snippet = snippet(id: SyncMerge.id(of: key)) { context.delete(snippet) }
         }
-        save()
-        return groupMap
+        return save()
     }
 
-    func foldGroups(_ groupMap: [String: String]) {
+    func foldGroups(_ groupMap: [String: String]) -> Bool {
         for (localID, remoteID) in groupMap {
             guard let local = group(id: localID), let remote = group(id: remoteID), local != remote else { continue }
             for snippet in local.snippets { snippet.group = remote }
             context.delete(local)
         }
-        save()
+        return save()
     }
 
     // MARK: - Apply
 
-    func apply(_ records: [SyncRecord]) {
+    struct ApplyResult {
+        let saved: Bool
+        /// Snippets whose group has not arrived yet (its Mac's file is still downloading); tried again next time.
+        let deferred: Set<String>
+    }
+
+    func apply(_ records: [SyncRecord]) -> ApplyResult {
         let ordered = records.sorted { order($0.kind) < order($1.kind) }
+        var deferred: Set<String> = []
         for record in ordered {
             let id = SyncMerge.id(of: record.key)
             switch record.kind {
             case "group": applyGroup(id: id, record: record)
-            case "snippet": applySnippet(id: id, record: record)
+            case "snippet": if !applySnippet(id: id, record: record) { deferred.insert(record.key) }
             case "pin": applyPin(record)
             case "setting": applySetting(key: id, record: record)
             default: break
             }
         }
-        save()
+        return ApplyResult(saved: save(), deferred: deferred)
     }
 
     private func order(_ kind: String) -> Int { ["group": 0, "snippet": 1, "pin": 2, "setting": 3][kind] ?? 4 }
 
     private func applyGroup(id: String, record: SyncRecord) {
         if record.deleted {
+            // Snippets carry their own records: one deleted with the group arrives as its own deletion, and one
+            // edited here since stays, out of the group.
             if let group = group(id: id) {
-                for snippet in group.snippets { context.delete(snippet) }
+                for snippet in group.snippets { snippet.group = nil }
                 context.delete(group)
             }
             return
@@ -159,12 +167,16 @@ final class SyncStore {
         group.sortOrder = Int32(payload["sortOrder"]?.number ?? Double(group.sortOrder))
     }
 
-    private func applySnippet(id: String, record: SyncRecord) {
+    /// False when the snippet's group is not here yet, so it is not filed under no group by mistake.
+    private func applySnippet(id: String, record: SyncRecord) -> Bool {
         if record.deleted {
             if let snippet = snippet(id: id) { context.delete(snippet) }
-            return
+            return true
         }
-        guard let payload = record.payload, let uuid = UUID(uuidString: id) else { return }
+        guard let payload = record.payload, let uuid = UUID(uuidString: id) else { return true }
+        let groupID = payload["group"]?.string
+        let targetGroup = groupID.flatMap { group(id: $0) }
+        if groupID != nil, targetGroup == nil { return false }
         let snippet = snippet(id: id) ?? {
             let created = Snippet(context: context)
             created.id = uuid
@@ -181,7 +193,7 @@ final class SyncStore {
         snippet.restrictToApps = payload["restrictToApps"]?.bool ?? false
         snippet.isFavorite = payload["isFavorite"]?.bool ?? false
         snippet.updatedAt = record.modifiedAt
-        snippet.group = payload["group"]?.string.flatMap { group(id: $0) }
+        snippet.group = targetGroup
         for rule in snippet.appRules ?? [] { context.delete(rule) }
         if case .array(let rules)? = payload["appRules"] {
             for rule in rules {
@@ -193,6 +205,7 @@ final class SyncStore {
                 created.snippet = snippet
             }
         }
+        return true
     }
 
     private func applyPin(_ record: SyncRecord) {
@@ -220,8 +233,8 @@ final class SyncStore {
             return
         }
         guard Self.settingKeys.contains(key) else { return }
-        if key == LanguageManager.choiceKey, let choice = record.payload?.string {
-            LanguageManager.shared.setLanguage(choice)
+        if key == LanguageManager.choiceKey {
+            LanguageManager.shared.setLanguage(record.deleted ? "system" : record.payload?.string ?? "system")
             return
         }
         switch record.payload {
@@ -250,13 +263,16 @@ final class SyncStore {
         return try? context.fetch(request).first
     }
 
-    private func save() {
-        guard context.hasChanges else { return }
+    @discardableResult
+    private func save() -> Bool {
+        guard context.hasChanges else { return true }
         do {
             try context.save()
+            return true
         } catch {
             context.rollback()
             Log.storage.error("Sync could not save: \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 }

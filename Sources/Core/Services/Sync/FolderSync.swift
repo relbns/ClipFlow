@@ -1,6 +1,8 @@
 import AppKit
 import Combine
 import CoreData
+import IOKit
+import SystemConfiguration
 
 /// Syncs snippets, groups, pinned text and settings through a folder that a cloud service keeps in step between
 /// Macs: iCloud Drive by default, or a folder shared with another Apple ID, Google Drive or Dropbox for Macs on
@@ -49,18 +51,39 @@ final class FolderSync: ObservableObject {
         return kinds
     }
 
+    private static let deviceHardwareKey = "syncDeviceHardware"
+
+    /// This Mac's id in the folder. Migration Assistant copies preferences to a new Mac, so the id is tied to the
+    /// hardware: on another Mac it is replaced, and the copied ledger is dropped with it.
     private var deviceID: String {
-        if let id = defaults.string(forKey: Self.deviceIDKey) { return id }
+        let hardware = hardwareID
+        if let id = defaults.string(forKey: Self.deviceIDKey), defaults.string(forKey: Self.deviceHardwareKey) == hardware {
+            return id
+        }
+        if defaults.string(forKey: Self.deviceIDKey) != nil { try? FileManager.default.removeItem(at: ledgerURL) }
         let id = UUID().uuidString
         defaults.set(id, forKey: Self.deviceIDKey)
+        defaults.set(hardware, forKey: Self.deviceHardwareKey)
         return id
     }
 
     private let ledgerURL: URL
+    private let hardwareID: String
+    private lazy var computerName: String = {
+        (SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? "Mac"
+    }()
 
     init(ledgerDirectory: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("ClipFlow")) {
+        .appendingPathComponent("ClipFlow"), hardwareID: String = FolderSync.platformUUID()) {
         ledgerURL = ledgerDirectory.appendingPathComponent("sync-ledger.json")
+        self.hardwareID = hardwareID
+    }
+
+    nonisolated static func platformUUID() -> String {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
+        defer { IOObjectRelease(service) }
+        let value = IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, 0)
+        return (value?.takeRetainedValue() as? String) ?? "unknown"
     }
 
     func configure(store: SyncStore, defaults: UserDefaults) {
@@ -68,11 +91,14 @@ final class FolderSync: ObservableObject {
         self.defaults = defaults
     }
 
+    /// Sync runs in a context of its own, so its saves never commit the Snippet Editor's unsaved edits.
     func start(context: NSManagedObjectContext, monitor: ClipboardMonitor, defaults: UserDefaults = .standard) {
         configure(store: SyncStore(context: context, monitor: monitor, defaults: defaults), defaults: defaults)
         cancellables = []
         NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
-            .merge(with: NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification))
+            .filter { Self.touchesSyncedData($0) }
+            .map { _ in () }
+            .merge(with: NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).map { _ in () })
             .debounce(for: .seconds(3), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.syncSoon() }
             .store(in: &cancellables)
@@ -109,28 +135,32 @@ final class FolderSync: ObservableObject {
         }
         if case .synced = status {} else { status = .syncing }
         do {
+            let deviceID = self.deviceID
             let devices = folder.appendingPathComponent("devices", isDirectory: true)
             try FileManager.default.createDirectory(at: devices, withIntermediateDirectories: true)
-            let remoteFiles = try readOtherDevices(in: devices)
+            let (remoteFiles, downloading) = try readOtherDevices(in: devices, deviceID: deviceID)
             let remote = remoteFiles.flatMap(\.records)
             let kinds = self.kinds
             var ledger = readLedger()
 
-            if ledger.isEmpty, !remote.isEmpty {
-                let join = SyncMerge.firstJoin(local: store.export(kinds: kinds), remote: remote)
-                _ = store.applyFirstJoin(dropSnippets: join.dropSnippets, groupMap: join.groupMap)
-                ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: [:], kinds: kinds, now: .distantPast, device: deviceID)
-                apply(SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store)
-                store.foldGroups(join.groupMap)
+            if ledger.isEmpty {
+                // Joining: wait until the other Macs' files are here, or this Mac's copies would spread as new items.
+                guard downloading == 0 else { return }
+                if !remote.isEmpty {
+                    let join = SyncMerge.firstJoin(local: store.export(kinds: kinds), remote: remote)
+                    guard store.dropSnippets(join.dropSnippets) else { throw SyncError.saveFailed }
+                    ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: [:], kinds: kinds, now: .distantPast, device: deviceID)
+                    try apply(SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store)
+                    guard store.foldGroups(join.groupMap) else { throw SyncError.saveFailed }
+                }
             } else {
                 ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: ledger, kinds: kinds, now: Date(), device: deviceID)
-                apply(SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store)
+                try apply(SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store)
             }
             ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: ledger, kinds: kinds, now: Date(), device: deviceID)
-            ledger = SyncMerge.pruned(ledger, now: Date())
 
             let file = SyncDeviceFile(
-                deviceID: deviceID, deviceName: Host.current().localizedName ?? "Mac", writtenAt: Date(),
+                deviceID: deviceID, deviceName: computerName, writtenAt: Date(),
                 records: SyncMerge.records(ledger: ledger, local: store.export(kinds: kinds))
             )
             try write(file, to: devices.appendingPathComponent("\(deviceID).json"))
@@ -142,37 +172,63 @@ final class FolderSync: ObservableObject {
         }
     }
 
+    enum SyncError: LocalizedError {
+        case saveFailed
+        var errorDescription: String? { "The changes from the other Macs could not be saved." }
+    }
+
     /// Applies remote winners and records them in the ledger as already seen, so they are not echoed as local edits.
-    private func apply(_ incoming: [SyncRecord], to ledger: inout [String: SyncLedgerEntry], store: SyncStore) {
+    /// A failed save stops the sync before anything is written, so a rolled-back state is never published.
+    private func apply(_ incoming: [SyncRecord], to ledger: inout [String: SyncLedgerEntry], store: SyncStore) throws {
         guard !incoming.isEmpty else { return }
-        store.apply(incoming)
-        for record in incoming {
+        let result = store.apply(incoming)
+        guard result.saved else { throw SyncError.saveFailed }
+        for record in incoming where !result.deferred.contains(record.key) {
             ledger[record.key] = SyncLedgerEntry(
                 hash: record.payload?.stableHash ?? "", modifiedAt: record.modifiedAt, deleted: record.deleted, device: record.device
             )
         }
-        Log.storage.info("Sync applied \(incoming.count, privacy: .public) changes from other Macs")
+        Log.storage.info("Sync applied \(incoming.count - result.deferred.count, privacy: .public) changes from other Macs")
+    }
+
+    /// Changes to snippets, groups, app rules or a clip (a pin) can need a sync; a new clip in history cannot.
+    nonisolated private static func touchesSyncedData(_ notification: Notification) -> Bool {
+        let synced: Set<String> = ["Snippet", "SnippetGroup", "AppRule"]
+        let info = notification.userInfo ?? [:]
+        for key in [NSInsertedObjectsKey, NSUpdatedObjectsKey, NSDeletedObjectsKey] {
+            guard let objects = info[key] as? Set<NSManagedObject> else { continue }
+            if objects.contains(where: { object in
+                let name = object.entity.name ?? ""
+                return synced.contains(name) || (name == "ClipItem" && key == NSUpdatedObjectsKey)
+            }) { return true }
+        }
+        return false
     }
 
     // MARK: - Files
 
-    private func readOtherDevices(in devices: URL) throws -> [SyncDeviceFile] {
+    /// The other Macs' files, and how many are still downloading. A file whose name is not its own device id is a
+    /// conflict copy a cloud service made (`<id> 2.json`) and is skipped.
+    private func readOtherDevices(in devices: URL, deviceID: String) throws -> (files: [SyncDeviceFile], downloading: Int) {
         let names = try FileManager.default.contentsOfDirectory(atPath: devices.path)
         var files: [SyncDeviceFile] = []
+        var downloading = 0
         for name in names {
             let url = devices.appendingPathComponent(name)
             // iCloud Drive keeps a file it has not downloaded yet as ".<name>.icloud"; ask for it and read it next time.
             if name.hasPrefix("."), name.hasSuffix(".icloud") {
                 let real = devices.appendingPathComponent(String(name.dropFirst().dropLast(".icloud".count)))
                 try? FileManager.default.startDownloadingUbiquitousItem(at: real)
+                if real.lastPathComponent != "\(deviceID).json" { downloading += 1 }
                 continue
             }
             guard name.hasSuffix(".json"), name != "\(deviceID).json",
                   let data = try? Data(contentsOf: url),
-                  let file = try? JSONDecoder.sync.decode(SyncDeviceFile.self, from: data), file.version == 1 else { continue }
+                  let file = try? JSONDecoder.sync.decode(SyncDeviceFile.self, from: data), file.version == 1,
+                  name == "\(file.deviceID).json" else { continue }
             files.append(file)
         }
-        return files
+        return (files, downloading)
     }
 
     private func write(_ file: SyncDeviceFile, to url: URL) throws {

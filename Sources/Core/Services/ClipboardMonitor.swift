@@ -134,9 +134,13 @@ final class ClipboardMonitor: ObservableObject {
         }
     }
 
+    /// Unpins every clip with this text, so a duplicate left pinned does not pin it again on the other Macs.
     func unpinText(_ content: String) {
-        guard let item = fetchItem(content: content), item.isPinned else { return }
-        item.isPinned = false
+        let request = ClipItem.fetchRequest()
+        request.predicate = NSPredicate(format: "content == %@ AND isPinned == YES", content)
+        let items = (try? context.fetch(request)) ?? []
+        guard !items.isEmpty else { return }
+        for item in items { item.isPinned = false }
         saveAndReload()
     }
 

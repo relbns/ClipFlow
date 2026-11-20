@@ -89,12 +89,18 @@ enum SyncMerge {
         for (key, payload) in local {
             let hash = payload.stableHash
             if let entry = ledger[key], !entry.deleted, entry.hash == hash { continue }
-            result[key] = SyncLedgerEntry(hash: hash, modifiedAt: now, deleted: false, device: device)
+            result[key] = SyncLedgerEntry(hash: hash, modifiedAt: after(ledger[key], now), deleted: false, device: device)
         }
         for (key, entry) in ledger where !entry.deleted && local[key] == nil && kinds.contains(kind(of: key)) {
-            result[key] = SyncLedgerEntry(hash: "", modifiedAt: now, deleted: true, device: device)
+            result[key] = SyncLedgerEntry(hash: "", modifiedAt: after(entry, now), deleted: true, device: device)
         }
         return result
+    }
+
+    /// A local change is always newer than the version it replaces, even when another Mac's clock runs ahead.
+    private static func after(_ entry: SyncLedgerEntry?, _ now: Date) -> Date {
+        guard let entry, entry.modifiedAt != .distantPast else { return now }
+        return max(now, entry.modifiedAt.addingTimeInterval(0.001))
     }
 
     /// Remote records newer than this Mac's; equal times go to the larger device id, the same choice on every Mac.
@@ -113,22 +119,32 @@ enum SyncMerge {
             .sorted { $0.key < $1.key }
     }
 
-    /// When a Mac syncs for the first time, its own snippets that another Mac already has under the same
-    /// abbreviation (the starter snippets, or snippets set up twice) are the same snippets, not new ones; the
-    /// same goes for groups with the same name. Returns the local keys to drop and the local groups to fold.
+    /// When a Mac syncs for the first time, its own snippets that another Mac already has, with the same
+    /// abbreviation and the same text (the starter snippets, or a snippet set up twice), are the same snippets and
+    /// are dropped here; a snippet with the same abbreviation but other text is kept. Groups with the same name fold
+    /// into the other Mac's group. Only each key's newest remote record counts, so a stale file cannot match.
     static func firstJoin(local: [String: JSONValue], remote: [SyncRecord]) -> (dropSnippets: Set<String>, groupMap: [String: String]) {
-        let live = remote.filter { !$0.deleted }
-        let remoteAbbreviations = Set(live.filter { $0.kind == "snippet" }.compactMap { $0.payload?["abbreviation"]?.string?.lowercased() })
+        var newest: [String: SyncRecord] = [:]
+        for record in remote {
+            if let current = newest[record.key], !isNewer(record, than: current.modifiedAt, current.device) { continue }
+            newest[record.key] = record
+        }
+        let live = newest.values.filter { !$0.deleted }
+        func signature(_ payload: JSONValue?) -> String? {
+            guard let abbreviation = payload?["abbreviation"]?.string?.lowercased() else { return nil }
+            return abbreviation + "\u{0}" + (payload?["content"]?.string ?? "")
+        }
+        let remoteSnippets = Set(live.filter { $0.kind == "snippet" }.compactMap { signature($0.payload) })
         var remoteGroups: [String: String] = [:]
         for record in live where record.kind == "group" {
             if let name = record.payload?["name"]?.string { remoteGroups[name] = id(of: record.key) }
         }
         var drop: Set<String> = []
         var groupMap: [String: String] = [:]
-        for (key, payload) in local {
+        for (key, payload) in local where newest[key] == nil {
             switch kind(of: key) {
             case "snippet":
-                if let abbreviation = payload["abbreviation"]?.string?.lowercased(), remoteAbbreviations.contains(abbreviation) {
+                if let signature = signature(payload), remoteSnippets.contains(signature) {
                     drop.insert(key)
                 }
             case "group":
@@ -152,11 +168,6 @@ enum SyncMerge {
             return SyncRecord(key: key, modifiedAt: entry.modifiedAt, deleted: false, payload: payload, device: entry.device)
         }
         .sorted { $0.key < $1.key }
-    }
-
-    /// Tombstones older than `retention` are dropped; every Mac has synced long before then.
-    static func pruned(_ ledger: [String: SyncLedgerEntry], now: Date, retention: TimeInterval = 90 * 86_400) -> [String: SyncLedgerEntry] {
-        ledger.filter { !$0.value.deleted || now.timeIntervalSince($0.value.modifiedAt) < retention }
     }
 
     static func kind(of key: String) -> String { String(key.prefix { $0 != ":" }) }
