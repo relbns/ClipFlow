@@ -261,7 +261,7 @@
 "hotkey_paste_plain" = "הדבקה כטקסט פשוט";
 "hotkey_paste_plain_hint" = "מדביק את מה שבלוח בלי העיצוב, בכל אפליקציה.";
 "pref_always_plain" = "תמיד להדביק כטקסט פשוט";
-"pref_always_plain_hint" = "בחירה מ־ClipFlow מודבקת בלי גופנים, צבעים וקישורים. להדבקה פשוטה חד־פעמית מחזיקים Option.";
+"pref_always_plain_hint" = "בחירה מ־ClipFlow מודבקת בלי גופנים, צבעים וקישורים. החזקת Option בזמן הבחירה עושה את ההפך, פעם אחת.";
 "paste_plain" = "הדבקה כטקסט פשוט";
 "paste_as" = "הדבקה בתור";
 "transform_uppercase" = "אותיות גדולות (UPPERCASE)";

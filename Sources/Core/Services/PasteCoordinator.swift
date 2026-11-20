@@ -53,16 +53,31 @@ final class PasteCoordinator {
     }
 
     enum PasteStyle: Equatable {
-        case original
+        /// Plain text when "Always paste as plain text" is on, the clip as copied otherwise.
+        case preferred
+        /// The opposite of `preferred`, for a pick with Option held.
+        case alternate
         case plainText
         case transformed(TextTransform)
     }
 
-    func paste(_ clip: SimpleClipItem, as style: PasteStyle = .original) {
+    private enum Resolved {
+        case original, plainText, transformed(TextTransform)
+    }
+
+    func paste(_ clip: SimpleClipItem, as style: PasteStyle = .preferred) {
         guard let monitor = clipboardMonitor else { return }
-        let alwaysPlain = UserDefaults.standard.bool(forKey: "alwaysPastePlainText") && clip.hasPlainText
+        let prefersPlain = UserDefaults.standard.bool(forKey: "alwaysPastePlainText")
+        let canBePlain = clip.hasPlainText && !clip.hasAttachments
+        let resolved: Resolved
+        switch style {
+        case .preferred: resolved = prefersPlain && canBePlain ? .plainText : .original
+        case .alternate: resolved = !prefersPlain && clip.hasPlainText ? .plainText : .original
+        case .plainText: resolved = .plainText
+        case .transformed(let transform): resolved = .transformed(transform)
+        }
         let snapshot: PasteboardSnapshot
-        switch style == .original && alwaysPlain ? .plainText : style {
+        switch resolved {
         case .original:
             guard let stored = monitor.snapshot(for: clip) else {
                 Log.ui.error("Picked clip has no stored content; nothing pasted")
@@ -94,7 +109,13 @@ final class PasteCoordinator {
             NSSound.beep()
             return
         }
-        PasteEngine.shared.insert(RenderedSnippet(text: text, cursorOffsetFromEnd: 0), replacingTyped: 0)
+        let rendered = RenderedSnippet(text: text, cursorOffsetFromEnd: 0)
+        guard isPopoverOpen else {
+            PasteEngine.shared.insert(rendered, replacingTyped: 0)
+            return
+        }
+        closePopover()
+        await PasteEngine.shared.insert(rendered, into: target)
     }
 
     func insert(_ snippet: Snippet) {

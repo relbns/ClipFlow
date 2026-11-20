@@ -261,7 +261,7 @@
 "hotkey_paste_plain" = "Paste as plain text";
 "hotkey_paste_plain_hint" = "Pastes what is on the clipboard without its formatting, in any app.";
 "pref_always_plain" = "Always paste as plain text";
-"pref_always_plain_hint" = "Picks from ClipFlow paste without fonts, colors or links. Hold Option to paste plain text just once.";
+"pref_always_plain_hint" = "Picks from ClipFlow paste without fonts, colors or links. Holding Option while you pick does the opposite, once.";
 "paste_plain" = "Paste as Plain Text";
 "paste_as" = "Paste as";
 "transform_uppercase" = "UPPERCASE";

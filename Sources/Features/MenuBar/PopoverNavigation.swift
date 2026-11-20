@@ -291,11 +291,11 @@ final class PopoverNavigation: ObservableObject {
         selectedItemID = item.id
     }
 
-    /// `plainText`: Option was held, so a clip pastes without its formatting.
-    func activate(_ item: PopoverItem, plainText: Bool = false) {
+    /// `optionHeld`: the clip pastes the other way from the plain-text preference, once.
+    func activate(_ item: PopoverItem, optionHeld: Bool = false) {
         switch item {
         case .clip(let clip, _), .pinned(let clip, _):
-            PasteCoordinator.shared.paste(clip, as: plainText && clip.hasPlainText ? .plainText : .original)
+            PasteCoordinator.shared.paste(clip, as: optionHeld ? .alternate : .preferred)
         case .category(let category, _):
             showsAllSnippets = false
             drilledCategory = category
@@ -405,7 +405,11 @@ final class PopoverNavigation: ObservableObject {
             return handleCommand(keyCode: key.keyCode)
         }
         if key.modifiers == .option, key.keyCode == KeyCode.returnKey || key.keyCode == KeyCode.enter {
-            if let item = selectedItem { activate(item, plainText: true) }
+            if let item = selectedItem { activate(item, optionHeld: true) }
+            return true
+        }
+        if key.modifiers == .option, searchText.isEmpty, let match = numberedItem(for: key) {
+            activate(match, optionHeld: true)
             return true
         }
         if key.modifiers == .option, key.keyCode == KeyCode.delete, searchText.isEmpty {
@@ -452,15 +456,18 @@ final class PopoverNavigation: ObservableObject {
             break
         }
 
-        guard searchText.isEmpty, let digit = digit(of: key) else { return false }
+        guard searchText.isEmpty, let match = numberedItem(for: key) else { return false }
+        activate(match)
+        return true
+    }
+
+    private func numberedItem(for key: KeyInput) -> PopoverItem? {
+        guard let digit = digit(of: key) else { return nil }
         let number = digit == 0 ? 10 : digit
-        let match = items.first { item in
+        return items.first { item in
             if case .clip(_, let itemNumber) = item { return itemNumber == number }
             return false
         }
-        guard let match else { return false }
-        activate(match)
-        return true
     }
 
     private var selectedItem: PopoverItem? {

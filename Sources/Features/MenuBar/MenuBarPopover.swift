@@ -103,7 +103,7 @@ struct MenuBarPopover: View {
     }
 
     private func rowButton(_ item: PopoverItem) -> some View {
-        Button { navigation.activate(item, plainText: NSEvent.modifierFlags.contains(.option)) } label: { rowContent(item) }
+        Button { navigation.activate(item, optionHeld: NSEvent.modifierFlags.contains(.option)) } label: { rowContent(item) }
             .buttonStyle(.plain)
     }
 
