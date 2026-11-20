@@ -678,6 +678,143 @@ final class TextTransformTests: XCTestCase {
     }
 }
 
+final class SyncMergeTests: XCTestCase {
+    private let t0 = Date(timeIntervalSince1970: 1_000)
+    private let t1 = Date(timeIntervalSince1970: 2_000)
+
+    func testOnlyRealEditsAndDeletionsOfSyncedKindsAreStamped() {
+        let ledger = [
+            "snippet:a": SyncLedgerEntry(hash: JSONValue.string("A").stableHash, modifiedAt: t0, deleted: false, device: "m1"),
+            "snippet:gone": SyncLedgerEntry(hash: "x", modifiedAt: t0, deleted: false, device: "m1"),
+            "setting:viewMode": SyncLedgerEntry(hash: "y", modifiedAt: t0, deleted: false, device: "m1")
+        ]
+        let stamped = SyncMerge.stamp(
+            local: ["snippet:a": .string("A"), "snippet:b": .string("B")], ledger: ledger, kinds: ["snippet"], now: t1, device: "m1"
+        )
+        XCTAssertEqual(stamped["snippet:a"]?.modifiedAt, t0, "unchanged keeps its time")
+        XCTAssertEqual(stamped["snippet:b"]?.modifiedAt, t1)
+        XCTAssertEqual(stamped["snippet:gone"]?.deleted, true)
+        XCTAssertEqual(stamped["setting:viewMode"]?.deleted, false, "a kind that is not synced is never deleted")
+    }
+
+    func testTheNewestRecordWinsAndTiesGoToTheLargerDevice() {
+        let ledger = ["snippet:a": SyncLedgerEntry(hash: JSONValue.string("mine").stableHash, modifiedAt: t1, deleted: false, device: "m1")]
+        let older = SyncRecord(key: "snippet:a", modifiedAt: t0, deleted: false, payload: .string("old"), device: "m2")
+        let tie = SyncRecord(key: "snippet:a", modifiedAt: t1, deleted: false, payload: .string("theirs"), device: "m2")
+        XCTAssertTrue(SyncMerge.incoming(remote: [older], ledger: ledger, kinds: ["snippet"]).isEmpty)
+        XCTAssertEqual(SyncMerge.incoming(remote: [tie], ledger: ledger, kinds: ["snippet"]).first?.payload, .string("theirs"))
+        let deletion = SyncRecord(key: "snippet:a", modifiedAt: t1.addingTimeInterval(1), deleted: true, payload: nil, device: "m0")
+        XCTAssertEqual(SyncMerge.incoming(remote: [deletion], ledger: ledger, kinds: ["snippet"]).first?.deleted, true)
+        XCTAssertTrue(SyncMerge.incoming(remote: [deletion], ledger: [:], kinds: ["snippet"]).isEmpty, "nothing to delete here")
+    }
+
+    func testAJoiningMacFoldsItsCopiesIntoTheOtherMacs() {
+        let remote = [
+            SyncRecord(key: "group:R", modifiedAt: t0, deleted: false, payload: .object(["name": .string("Personal")]), device: "m1"),
+            SyncRecord(key: "snippet:r1", modifiedAt: t0, deleted: false, payload: .object(["abbreviation": .string(".sig")]), device: "m1")
+        ]
+        let local: [String: JSONValue] = [
+            "group:L": .object(["name": .string("Personal")]),
+            "snippet:l1": .object(["abbreviation": .string(".SIG")]),
+            "snippet:l2": .object(["abbreviation": .string(".mine")])
+        ]
+        let join = SyncMerge.firstJoin(local: local, remote: remote)
+        XCTAssertEqual(join.dropSnippets, ["snippet:l1"])
+        XCTAssertEqual(join.groupMap, ["L": "R"])
+    }
+
+    func testTombstonesExpireAfterTheRetention() {
+        let ledger = [
+            "snippet:old": SyncLedgerEntry(hash: "", modifiedAt: t0, deleted: true, device: "m1"),
+            "snippet:live": SyncLedgerEntry(hash: "h", modifiedAt: t0, deleted: false, device: "m1")
+        ]
+        XCTAssertEqual(Set(SyncMerge.pruned(ledger, now: t0.addingTimeInterval(100 * 86_400)).keys), ["snippet:live"])
+    }
+}
+
+@MainActor
+final class FolderSyncTests: XCTestCase {
+    private var folder: URL!
+    private var macs: [(sync: FolderSync, stack: CoreDataStack, defaults: UserDefaults, monitor: ClipboardMonitor)] = []
+
+    override func setUp() async throws {
+        folder = FileManager.default.temporaryDirectory.appendingPathComponent("clipflow-sync-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        macs = []
+        for index in 0..<2 {
+            let stack = CoreDataStack(storeURL: nil)
+            let suite = "clipflow-tests-sync-mac\(index)-\(name.filter { $0.isLetter || $0.isNumber })"
+            let defaults = makeTestDefaults(suite)
+            AppDefaults.register(in: defaults)
+            defaults.set(true, forKey: FolderSync.enabledKey)
+            defaults.set(folder.appendingPathComponent("shared").path, forKey: FolderSync.folderKey)
+            let monitor = ClipboardMonitor(context: stack.viewContext, pasteboard: NSPasteboard(name: .init("clipflow-tests")), defaults: defaults)
+            let sync = FolderSync(ledgerDirectory: folder.appendingPathComponent("ledger\(index)"))
+            let store = SyncStore(
+                context: stack.viewContext, monitor: monitor, defaults: defaults,
+                explicitSettings: { ["viewMode": defaults.string(forKey: "viewMode") ?? "organized"] }
+            )
+            sync.configure(store: store, defaults: defaults)
+            macs.append((sync, stack, defaults, monitor))
+        }
+    }
+
+    override func tearDown() async throws {
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    @discardableResult
+    private func addSnippet(_ abbreviation: String, content: String, group: String, on mac: Int) throws -> Snippet {
+        let context = macs[mac].stack.viewContext
+        let existing = SnippetGroup.ordered(in: context).first { $0.name == group } ?? SnippetGroup.insert(named: group, in: context)
+        let snippet = Snippet.insert(title: abbreviation, abbreviation: abbreviation, content: content, group: existing, in: context)
+        try context.save()
+        return snippet
+    }
+
+    private func snippets(on mac: Int) throws -> [String: String] {
+        let all = try macs[mac].stack.viewContext.fetch(Snippet.fetchRequest())
+        return Dictionary(uniqueKeysWithValues: all.map { ($0.abbreviation, $0.content) })
+    }
+
+    private func syncAll() async {
+        for mac in macs { await mac.sync.sync() }
+        for mac in macs { await mac.sync.sync() }
+    }
+
+    func testTwoMacsShareSnippetsEditsDeletionsAndPinsWithoutDuplicatingTheStarters() async throws {
+        try addSnippet(".sig", content: "Best, A", group: "Personal", on: 0)
+        try addSnippet(".hi", content: "Hello", group: "Personal", on: 0)
+        try addSnippet(".sig", content: "Best, B", group: "Personal", on: 1)
+        await syncAll()
+
+        XCTAssertEqual(try snippets(on: 1), [".sig": "Best, A", ".hi": "Hello"], "the joining Mac's own .sig folds into the first Mac's")
+        XCTAssertEqual(SnippetGroup.ordered(in: macs[1].stack.viewContext).map(\.name), ["Personal"])
+        XCTAssertEqual(try snippets(on: 0), [".sig": "Best, A", ".hi": "Hello"])
+
+        let hi = try XCTUnwrap(try macs[1].stack.viewContext.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".hi" })
+        hi.content = "Hello there"
+        try macs[1].stack.viewContext.save()
+        await syncAll()
+        XCTAssertEqual(try snippets(on: 0)[".hi"], "Hello there")
+
+        let onA = try XCTUnwrap(try macs[0].stack.viewContext.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".hi" })
+        macs[0].stack.viewContext.delete(onA)
+        try macs[0].stack.viewContext.save()
+        await syncAll()
+        XCTAssertNil(try snippets(on: 1)[".hi"])
+
+        macs[0].monitor.pinText("Account 1234")
+        macs[0].defaults.set("simple", forKey: "viewMode")
+        await syncAll()
+        XCTAssertEqual(macs[1].monitor.pinnedTexts().map(\.content), ["Account 1234"])
+        XCTAssertEqual(macs[1].defaults.string(forKey: "viewMode"), "simple")
+
+        guard case .synced(_, let otherMacs) = macs[0].sync.status else { return XCTFail("expected a synced status") }
+        XCTAssertEqual(otherMacs, 1)
+    }
+}
+
 final class TextRecognizerTests: XCTestCase {
     private let supported = ["en-US", "fr-FR", "ar-SA", "ru-RU"]
 

@@ -109,6 +109,45 @@ final class ClipboardMonitor: ObservableObject {
         saveAndReload()
     }
 
+    /// Pinned clips that are text, for sync; images and files stay on their own Mac.
+    func pinnedTexts() -> [(kind: ClipType, content: String)] {
+        let request = ClipItem.fetchRequest()
+        request.predicate = NSPredicate(format: "isPinned == YES AND type IN %@", [ClipType.text, .rtf, .url, .color].map(\.rawValue))
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        return ((try? context.fetch(request)) ?? []).map { (ClipType(rawValue: $0.type) ?? .text, $0.content) }
+    }
+
+    /// Pins the text clip with this content, recording it first when this Mac does not have it.
+    func pinText(_ content: String) {
+        if let item = fetchItem(content: content) {
+            guard !item.isPinned else { return }
+            item.isPinned = true
+            saveAndReload()
+            return
+        }
+        let snapshot = PasteboardSnapshot.text(content, transient: false)
+        guard let capture = ClipCapture.classify(snapshot) else { return }
+        record(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier)
+        if let item = fetchItem(content: content), !item.isPinned {
+            item.isPinned = true
+            saveAndReload()
+        }
+    }
+
+    func unpinText(_ content: String) {
+        guard let item = fetchItem(content: content), item.isPinned else { return }
+        item.isPinned = false
+        saveAndReload()
+    }
+
+    private func fetchItem(content: String) -> ClipItem? {
+        let request = ClipItem.fetchRequest()
+        request.predicate = NSPredicate(format: "content == %@ AND type IN %@", content, [ClipType.text, .rtf, .url, .color].map(\.rawValue))
+        request.sortDescriptors = [NSSortDescriptor(key: "isPinned", ascending: false)]
+        request.fetchLimit = 1
+        return try? context.fetch(request).first
+    }
+
     func setPinned(_ clip: SimpleClipItem, _ pinned: Bool) {
         guard let item = fetchItem(id: clip.id) else { return }
         item.isPinned = pinned
