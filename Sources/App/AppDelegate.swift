@@ -87,6 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if UserDefaults.standard.bool(forKey: "startMonitoring") {
             clipboardMonitor.startMonitoring()
         }
+        ImageTextIndexer.shared.start(monitor: clipboardMonitor)
 
         permissions.startWatching()
         permissions.$canListen
@@ -164,7 +165,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onSnippetEditor: { [weak self] in self?.openSnippetEditor() },
             onClearHistory: { [weak self] in self?.clipboardMonitor.clearHistory() },
             onFixLayout: { Task { await LayoutFixer.shared.fix() } },
-            onPastePlainText: { Task { await PasteCoordinator.shared.pasteClipboardAsPlainText() } }
+            onPastePlainText: { Task { await PasteCoordinator.shared.pasteClipboardAsPlainText() } },
+            onCaptureScreenText: { [weak self] in
+                guard let monitor = self?.clipboardMonitor else { return }
+                Task { await ScreenTextCapture.run(monitor: monitor) }
+            }
         )
     }
 

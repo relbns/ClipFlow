@@ -110,6 +110,40 @@ final class ClipboardMonitor: ObservableObject {
         saveAndReload()
     }
 
+    /// Records a screen capture as an image clip with the text already found in it.
+    func recordScreenshot(_ png: Data, recognizedText: String) {
+        let snapshot = PasteboardSnapshot(items: [[NSPasteboard.PasteboardType.png.rawValue: png]])
+        guard let capture = ClipCapture.classify(snapshot) else { return }
+        record(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier)
+        guard let item = fetchItem(hash: capture.hash) else { return }
+        item.recognizedText = recognizedText
+        saveAndReload()
+    }
+
+    /// "" marks an image as read with no text, so it is not read again.
+    func setRecognizedText(_ text: String, forClipID id: UUID) {
+        guard let item = fetchItem(id: id), item.recognizedText != text else { return }
+        item.recognizedText = text
+        saveAndReload()
+    }
+
+    /// The newest image clip whose text has not been read yet, with its full image.
+    func nextImageToRecognize() -> (id: UUID, image: Data)? {
+        let request = ClipItem.fetchRequest()
+        request.predicate = NSPredicate(format: "type == %@ AND recognizedText == nil", ClipType.image.rawValue)
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        guard let items = try? context.fetch(request) else { return nil }
+        for item in items {
+            if let data = item.pasteboardData, let snapshot = try? PasteboardSnapshot.decoded(from: data),
+               let image = snapshot.data(for: .png) ?? snapshot.data(for: .tiff) {
+                return (item.id, image)
+            }
+            item.recognizedText = ""
+        }
+        if context.hasChanges { saveAndReload() }
+        return nil
+    }
+
     func delete(_ clip: SimpleClipItem) {
         guard let item = fetchItem(id: clip.id) else { return }
         context.delete(item)

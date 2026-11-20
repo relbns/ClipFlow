@@ -15,6 +15,7 @@ struct SimpleClipItem: Identifiable, Hashable {
     let byteCount: Int
     let pixelWidth: Int
     let pixelHeight: Int
+    let recognizedText: String?
 
     var kind: ClipType { ClipType(rawValue: type) ?? .text }
     /// Text, rich text, a link or a color: something that pastes, transforms and saves as plain text.
@@ -44,6 +45,7 @@ struct SimpleClipItem: Identifiable, Hashable {
         byteCount = Int(item.byteCount)
         pixelWidth = Int(item.pixelWidth)
         pixelHeight = Int(item.pixelHeight)
+        recognizedText = item.recognizedText
     }
 
     func hash(into hasher: inout Hasher) {

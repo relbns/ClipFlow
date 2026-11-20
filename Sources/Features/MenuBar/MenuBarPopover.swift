@@ -137,6 +137,10 @@ struct MenuBarPopover: View {
             }
             Divider()
         }
+        if clip.kind == .image {
+            Button(L("copy_text")) { navigation.copyText(from: clip) }
+            Divider()
+        }
         Button(clip.isPinned ? L("unpin") : L("pin")) { navigation.togglePin(clip) }
         if clip.hasPlainText {
             if navigation.snippetGroups.isEmpty {

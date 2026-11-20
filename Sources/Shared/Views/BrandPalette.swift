@@ -52,6 +52,7 @@ enum BrandPalette {
         static let sync = Color.oklch(0.60, 0.14, 220)
         static let privacy = Color.oklch(0.55, 0.12, 200)
         static let language = Color.oklch(0.60, 0.14, 320)
+        static let imageText = Color.oklch(0.62, 0.13, 60)
     }
 
     // MARK: About credits

@@ -16,6 +16,8 @@ enum AppDefaults {
             "closePopoverOnOutsideClick": true,
             "layoutFixSwitchesKeyboard": true,
             "alwaysPastePlainText": false,
+            "ocrSaveScreenshots": true,
+            "ocrIndexImages": true,
             "excludedApps": "[]"
         ])
     }

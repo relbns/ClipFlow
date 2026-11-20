@@ -15,7 +15,8 @@ struct SettingsView: View {
         (.key, "tab_hotkeys", BrandPalette.SettingsTab.hotkeys),
         (.cloud, "tab_backup", BrandPalette.SettingsTab.sync),
         (.lock, "tab_privacy", BrandPalette.SettingsTab.privacy),
-        (.hebrew, "tab_language", BrandPalette.SettingsTab.language)
+        (.hebrew, "tab_language", BrandPalette.SettingsTab.language),
+        (.image, "tab_image_text", BrandPalette.SettingsTab.imageText)
     ]
 
     /// The last tab is remembered, so a language switch that rebuilds the window keeps it.
@@ -63,6 +64,7 @@ struct SettingsView: View {
                 case 4: BackupSettingsView()
                 case 5: PrivacySettingsView()
                 case 6: LanguageSettingsView()
+                case 7: ImageTextSettingsView()
                 default: GeneralSettingsView()
                 }
             }
