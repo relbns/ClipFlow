@@ -3,6 +3,18 @@ import CoreData
 import XCTest
 @testable import ClipFlow
 
+extension XCTestCase {
+    /// An empty defaults suite named after the test: runs reuse its file, and parallel workers never share one.
+    func makeTestDefaults(_ purpose: String) -> UserDefaults {
+        let testName = self.name.filter { $0.isLetter || $0.isNumber }
+        let name = "\(purpose)-\(testName)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        addTeardownBlock { defaults.removePersistentDomain(forName: name) }
+        return defaults
+    }
+}
+
 final class AbbreviationMatcherTests: XCTestCase {
     private func candidate(
         _ abbreviation: String,
@@ -276,10 +288,8 @@ final class StorageTests: XCTestCase {
 
     func testStarterSnippetsAreSeededOnceAndOnlyIntoAnEmptyStore() throws {
         let stack = CoreDataStack(storeURL: nil)
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: "clipflow-test-\(UUID().uuidString)"))
-
-        stack.prepareDefaultData(defaults: defaults)
-        stack.prepareDefaultData(defaults: UserDefaults(suiteName: "clipflow-test-\(UUID().uuidString)")!)
+        stack.prepareDefaultData(defaults: makeTestDefaults("clipflow-tests-seed-first"))
+        stack.prepareDefaultData(defaults: makeTestDefaults("clipflow-tests-seed-second"))
 
         XCTAssertEqual(try stack.viewContext.count(for: SnippetGroup.fetchRequest()), 1)
         XCTAssertEqual(try stack.viewContext.count(for: Snippet.fetchRequest()), 4)
@@ -339,7 +349,7 @@ final class PopoverNavigationTests: XCTestCase {
 
     override func setUp() async throws {
         stack = CoreDataStack(storeURL: nil)
-        defaults = UserDefaults(suiteName: "clipflow-nav-\(UUID().uuidString)")!
+        defaults = makeTestDefaults("clipflow-tests-navigation")
         AppDefaults.register(in: defaults)
         monitor = ClipboardMonitor(context: stack.viewContext, defaults: defaults)
         let base = Date()
@@ -605,16 +615,13 @@ final class SnippetEditorModelTests: XCTestCase {
 }
 
 final class PreviousBundleIDTests: XCTestCase {
-    private let previous = "clipflow-test-previous-id"
-    private let current = "clipflow-test-current-id"
+    private var previous: String { "clipflow-tests-previous-id-\(name.filter { $0.isLetter || $0.isNumber })" }
+    private var current: String { "clipflow-tests-current-id-\(name.filter { $0.isLetter || $0.isNumber })" }
     private let defaults = UserDefaults.standard
 
     override func tearDown() {
-        let preferences = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Preferences")
         for name in [previous, current] {
             defaults.removePersistentDomain(forName: name)
-            try? FileManager.default.removeItem(at: preferences.appendingPathComponent("\(name).plist"))
         }
     }
 
