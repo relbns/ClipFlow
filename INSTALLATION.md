@@ -14,9 +14,9 @@ See [Building from Source](#building-from-source) below
 
 ## Installation Steps
 
-### 1. Download & Extract
-- Download `ClipFlow.zip` from Releases
-- Unzip the archive (double-click or use Archive Utility)
+### 1. Download
+- Download `ClipFlow.dmg` from Releases and open it
+- Drag ClipFlow onto Applications in the window that opens
 
 ### 2. Move to Applications
 ```bash
@@ -149,8 +149,8 @@ cd ClipFlow
 
 #### 2. Distribution Build (for GitHub releases)
 ```bash
-# Ad-hoc signing (no certificate needed)
-./build-app.sh --release
+# Ad-hoc signing (no certificate needed), Apple Silicon and Intel
+./build-app.sh --adhoc --universal
 
 # Create release package
 ./package-release.sh
@@ -168,7 +168,7 @@ cd ClipFlow
 - **build-app.sh** - Compiles and signs the app
 - **install-app.sh** - Installs to /Applications
 - **check-app.sh** - Verifies installation and permissions
-- **package-release.sh** - Creates ZIP for distribution
+- **package-release.sh** - Creates the installer disk image (DMG) for distribution
 
 ---
 
