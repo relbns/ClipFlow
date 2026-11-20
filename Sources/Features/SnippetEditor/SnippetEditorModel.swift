@@ -3,6 +3,25 @@ import Combine
 import CoreData
 import SwiftUI
 
+/// Asks the Snippet Editor, open or about to open, to show one snippet.
+@MainActor
+final class SnippetEditorRequests {
+    static let shared = SnippetEditorRequests()
+    let reveals = PassthroughSubject<NSManagedObjectID, Never>()
+    /// Kept until an editor model takes it, for an editor that is not open yet.
+    private(set) var pending: NSManagedObjectID?
+
+    func reveal(_ id: NSManagedObjectID) {
+        pending = id
+        reveals.send(id)
+    }
+
+    func takePending() -> NSManagedObjectID? {
+        defer { pending = nil }
+        return pending
+    }
+}
+
 /// State and actions of the Snippet Editor. Edits write to the managed objects and are saved 400ms
 /// after the last change; the abbreviation reaches the object only once it is valid.
 @MainActor
@@ -44,6 +63,19 @@ final class SnippetEditorModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+        SnippetEditorRequests.shared.reveals
+            .sink { [weak self] id in MainActor.assumeIsolated { self?.reveal(id) } }
+            .store(in: &cancellables)
+        if let id = SnippetEditorRequests.shared.takePending() { reveal(id) }
+    }
+
+    func reveal(_ id: NSManagedObjectID) {
+        _ = SnippetEditorRequests.shared.takePending()
+        guard let snippet = try? context.existingObject(with: id) as? Snippet, !snippet.isDeleted else { return }
+        filterText = ""
+        library = nil
+        if let group = snippet.group { collapsedGroups.remove(group.objectID) }
+        select(snippet)
     }
 
     // MARK: - Reading
@@ -53,11 +85,7 @@ final class SnippetEditorModel: ObservableObject {
         return snippet
     }
 
-    var groups: [SnippetGroup] {
-        let request = SnippetGroup.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(key: "sortOrder", ascending: true), NSSortDescriptor(key: "createdAt", ascending: true)]
-        return (try? context.fetch(request)) ?? []
-    }
+    var groups: [SnippetGroup] { SnippetGroup.ordered(in: context) }
 
     func snippets(in group: SnippetGroup) -> [Snippet] {
         group.snippets.filter(matchesFilter).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
@@ -182,16 +210,7 @@ final class SnippetEditorModel: ObservableObject {
         filterText = ""
         library = nil
         let group = selected?.group ?? groups.first ?? newGroup(select: false)
-        let snippet = Snippet(context: context)
-        snippet.id = UUID()
-        snippet.title = L("editor_new_snippet")
-        snippet.abbreviation = uniqueAbbreviation(".new")
-        snippet.content = ""
-        snippet.isEnabled = true
-        snippet.createdAt = Date()
-        snippet.updatedAt = Date()
-        snippet.expandTrigger = UserDefaults.standard.string(forKey: "expandAfter") ?? ExpandTrigger.delimiter.rawValue
-        snippet.group = group
+        let snippet = Snippet.insert(title: L("editor_new_snippet"), abbreviation: ".new", content: "", group: group, in: context)
         collapsedGroups.remove(group.objectID)
         save()
         select(snippet)
@@ -201,7 +220,7 @@ final class SnippetEditorModel: ObservableObject {
         let copy = Snippet(context: context)
         copy.id = UUID()
         copy.title = snippet.title
-        copy.abbreviation = uniqueAbbreviation(snippet.abbreviation)
+        copy.abbreviation = Snippet.uniqueAbbreviation(snippet.abbreviation, in: context)
         copy.content = snippet.content
         copy.isEnabled = snippet.isEnabled
         copy.createdAt = Date()
@@ -227,12 +246,7 @@ final class SnippetEditorModel: ObservableObject {
 
     @discardableResult
     func newGroup(select: Bool = true) -> SnippetGroup {
-        let group = SnippetGroup(context: context)
-        group.id = UUID()
-        group.name = L("editor_new_group")
-        group.isEnabled = true
-        group.createdAt = Date()
-        group.sortOrder = Int32((groups.map(\.sortOrder).max() ?? 0) + 1)
+        let group = SnippetGroup.insert(named: L("editor_new_group"), in: context)
         save()
         if select { renamingGroupID = group.objectID }
         return group
@@ -307,14 +321,6 @@ final class SnippetEditorModel: ObservableObject {
         }
     }
 
-    private func uniqueAbbreviation(_ base: String) -> String {
-        let request = Snippet.fetchRequest()
-        let existing = Set(((try? context.fetch(request)) ?? []).map { $0.abbreviation.lowercased() })
-        guard existing.contains(base.lowercased()) else { return base }
-        var number = 2
-        while existing.contains("\(base)\(number)".lowercased()) { number += 1 }
-        return "\(base)\(number)"
-    }
 }
 
 extension Snippet {

@@ -37,6 +37,29 @@ extension Snippet {
     @nonobjc class func fetchRequest() -> NSFetchRequest<Snippet> {
         return NSFetchRequest<Snippet>(entityName: "Snippet")
     }
+
+    /// An enabled snippet with the trigger chosen in Preferences; the caller saves the context.
+    static func insert(title: String, abbreviation: String, content: String, group: SnippetGroup?, in context: NSManagedObjectContext) -> Snippet {
+        let snippet = Snippet(context: context)
+        snippet.id = UUID()
+        snippet.title = title
+        snippet.abbreviation = uniqueAbbreviation(abbreviation, in: context)
+        snippet.content = content
+        snippet.isEnabled = true
+        snippet.createdAt = Date()
+        snippet.updatedAt = Date()
+        snippet.expandTrigger = UserDefaults.standard.string(forKey: "expandAfter") ?? ExpandTrigger.delimiter.rawValue
+        snippet.group = group
+        return snippet
+    }
+
+    static func uniqueAbbreviation(_ base: String, in context: NSManagedObjectContext) -> String {
+        let existing = Set(((try? context.fetch(fetchRequest())) ?? []).map { $0.abbreviation.lowercased() })
+        guard existing.contains(base.lowercased()) else { return base }
+        var number = 2
+        while existing.contains("\(base)\(number)".lowercased()) { number += 1 }
+        return "\(base)\(number)"
+    }
 }
 
 enum ExpandTrigger: String, Codable {

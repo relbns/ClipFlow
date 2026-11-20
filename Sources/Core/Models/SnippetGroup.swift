@@ -26,4 +26,23 @@ extension SnippetGroup {
     @nonobjc class func fetchRequest() -> NSFetchRequest<SnippetGroup> {
         return NSFetchRequest<SnippetGroup>(entityName: "SnippetGroup")
     }
+
+    /// Groups in the order the Snippet Editor shows them.
+    static func ordered(in context: NSManagedObjectContext) -> [SnippetGroup] {
+        let request = fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(key: "sortOrder", ascending: true), NSSortDescriptor(key: "createdAt", ascending: true)]
+        return (try? context.fetch(request)) ?? []
+    }
+
+    /// An enabled group placed last; the caller saves the context.
+    static func insert(named name: String, in context: NSManagedObjectContext) -> SnippetGroup {
+        let sortOrder = (ordered(in: context).map(\.sortOrder).max() ?? 0) + 1
+        let group = SnippetGroup(context: context)
+        group.id = UUID()
+        group.name = name
+        group.isEnabled = true
+        group.createdAt = Date()
+        group.sortOrder = sortOrder
+        return group
+    }
 }

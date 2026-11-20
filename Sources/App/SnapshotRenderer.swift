@@ -66,6 +66,12 @@ enum SnapshotRenderer {
             PopoverNavigation.shared.drilledCategory = .links
             save("mb-org-links", MenuBarPopover(clipboardMonitor: monitor, isPresented: .constant(true)), size: nil)
             PopoverNavigation.shared.drilledCategory = nil
+            PopoverNavigation.shared.showsAllSnippets = true
+            save("mb-org-snippets", MenuBarPopover(clipboardMonitor: monitor, isPresented: .constant(true)), size: nil)
+            PopoverNavigation.shared.showsAllSnippets = false
+            PopoverNavigation.shared.searchText = "sig"
+            save("mb-search", MenuBarPopover(clipboardMonitor: monitor, isPresented: .constant(true)), size: nil)
+            PopoverNavigation.shared.searchText = ""
             save("prefs-exp", SettingsView(initialTab: 2), size: CGSize(width: 760, height: 620))
             save("onboarding", WelcomeView(isPresented: .constant(true), onGetStarted: {}), size: CGSize(width: 780, height: 520))
             save("about", AboutView(), size: CGSize(width: 560, height: 680))
@@ -184,6 +190,9 @@ private enum SampleData {
             if let capture = ClipCapture.classify(snapshot) {
                 monitor.record(capture, snapshot: snapshot, sourceName: app, sourceBundleID: nil, at: now.addingTimeInterval(-age))
             }
+        }
+        if let order = monitor.clipHistory.first(where: { $0.content.hasPrefix("Order #") }) {
+            monitor.setPinned(order, true)
         }
 
         let groups: [(String, [(String, String, String)])] = [

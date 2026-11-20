@@ -173,6 +173,10 @@
 "section_pinned" = "מוצמדים";
 "section_categories" = "קטגוריות";
 "section_snippets" = "קטעי טקסט";
+"all_snippets" = "כל קטעי הטקסט";
+"snippets_no_group" = "ללא קבוצה";
+"save_as_snippet" = "שמירה כקטע טקסט";
+"clip_pinned" = "מוצמד";
 "cat_recent" = "אחרונים";
 "cat_images" = "תמונות";
 "cat_links" = "קישורים";

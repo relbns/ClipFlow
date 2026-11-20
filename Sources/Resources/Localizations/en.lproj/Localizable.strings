@@ -173,6 +173,10 @@
 "section_pinned" = "Pinned";
 "section_categories" = "Categories";
 "section_snippets" = "Snippets";
+"all_snippets" = "All Snippets";
+"snippets_no_group" = "No Group";
+"save_as_snippet" = "Save as Snippet";
+"clip_pinned" = "Pinned";
 "cat_recent" = "Recent";
 "cat_images" = "Images";
 "cat_links" = "Links";
