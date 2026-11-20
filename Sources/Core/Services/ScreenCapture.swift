@@ -11,7 +11,7 @@ enum ScreenCapture {
 
     static let saveScreenshotsKey = "ocrSaveScreenshots"
     private static let accessRequestedKey = "ocrScreenAccessRequested"
-    private static var isCapturing = false
+    private(set) static var isCapturing = false
 
     static func run(_ result: Result, monitor: ClipboardMonitor, defaults: UserDefaults = .standard) async {
         guard !isCapturing else { return }

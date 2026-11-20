@@ -172,6 +172,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func captureScreen(_ result: ScreenCapture.Result) {
+        guard !ScreenCapture.isCapturing else { return }
         if menuBarPopover?.isShown == true { menuBarPopover?.performClose(nil) }
         guard let monitor = clipboardMonitor else { return }
         Task { await ScreenCapture.run(result, monitor: monitor) }
