@@ -22,7 +22,7 @@ The **Accessibility** permission is used only to type the expansion and to paste
 
 ClipFlow reads text in images with Apple's on-device text recognition. Nothing is sent anywhere for this.
 
-- **Copy text from screen.** Only when you press its shortcut and select an area, ClipFlow captures that area with the **Screen Recording** permission. The text found in it goes to the clipboard and history, and the image is kept as a clip unless you turn that off in Preferences → Image Text.
+- **Copy text from screen.** Only when you press its shortcut and select an area, ClipFlow captures that area with the **Screen Recording** permission. The text found in it goes to the clipboard. While history recording is on, the text and the image are kept as clips; turn off keeping the image in Preferences → Image Text.
 - **Finding images by their text.** When this is on, ClipFlow reads the text in the image clips already in your history and stores it with each clip, so search can find them. Turn it off in Preferences → Image Text.
 
 ## What ClipFlow shares

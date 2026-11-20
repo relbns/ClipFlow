@@ -167,8 +167,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onFixLayout: { Task { await LayoutFixer.shared.fix() } },
             onPastePlainText: { Task { await PasteCoordinator.shared.pasteClipboardAsPlainText() } },
             onCaptureScreenText: { [weak self] in
-                guard let monitor = self?.clipboardMonitor else { return }
-                Task { await ScreenTextCapture.run(monitor: monitor) }
+                guard let self else { return }
+                if menuBarPopover?.isShown == true { menuBarPopover?.performClose(nil) }
+                Task { await ScreenTextCapture.run(monitor: self.clipboardMonitor) }
             }
         )
     }

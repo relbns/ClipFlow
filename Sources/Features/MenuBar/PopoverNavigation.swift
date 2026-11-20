@@ -370,8 +370,7 @@ final class PopoverNavigation: ObservableObject {
                 NSSound.beep()
                 return
             }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
+            monitor.copy(text)
         }
     }
 

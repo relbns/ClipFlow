@@ -10,6 +10,8 @@ final class ImageTextIndexer {
     private weak var monitor: ClipboardMonitor?
     private var defaults: UserDefaults = .standard
     private var isRunning = false
+    /// Clips already tried in this launch; one whose result could not be saved is not read again and again.
+    private var attempted: Set<UUID> = []
     private var cancellables: Set<AnyCancellable> = []
 
     func start(monitor: ClipboardMonitor, defaults: UserDefaults = .standard) {
@@ -31,12 +33,22 @@ final class ImageTextIndexer {
         isRunning = true
         Task {
             defer { isRunning = false }
-            var attempted: Set<UUID> = []
-            while defaults.bool(forKey: Self.enabledKey), let monitor, let next = monitor.nextImageToRecognize(),
-                  attempted.insert(next.id).inserted {
-                let text = await TextRecognizer.recognize(imageData: next.image, languages: TextRecognizer.currentLanguages(defaults: defaults)) ?? ""
+            let languages = TextRecognizer.currentLanguages(defaults: defaults)
+            while defaults.bool(forKey: Self.enabledKey), let monitor, let next = monitor.nextImageToRecognize(excluding: attempted) {
+                attempted.insert(next.id)
+                let text = await Self.recognize(pasteboardData: next.pasteboardData, languages: languages)
                 monitor.setRecognizedText(text, forClipID: next.id)
             }
         }
+    }
+
+    /// Decodes the stored clip and reads its image off the main thread; "" when there is no image or no text.
+    private static func recognize(pasteboardData: Data?, languages: [String]) async -> String {
+        let image = await Task.detached(priority: .utility) { () -> Data? in
+            guard let pasteboardData, let snapshot = try? PasteboardSnapshot.decoded(from: pasteboardData) else { return nil }
+            return snapshot.data(for: .png) ?? snapshot.data(for: .tiff)
+        }.value
+        guard let image else { return "" }
+        return await TextRecognizer.recognize(imageData: image, languages: languages) ?? ""
     }
 }

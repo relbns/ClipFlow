@@ -77,7 +77,7 @@ enum SnapshotRenderer {
             save("about", AboutView(), size: CGSize(width: 560, height: 680))
             save("snip-edit", SnippetEditorView(), size: CGSize(width: 1080, height: 700))
             save("tokens", ThemeTokenSheet(), size: nil)
-            for (index, tab) in ["general", "appearance", "expansion", "hotkeys", "backup", "privacy", "language"].enumerated() where index != 2 {
+            for (index, tab) in ["general", "appearance", "expansion", "hotkeys", "backup", "privacy", "language", "image-text"].enumerated() where index != 2 {
                 save("prefs-\(tab)", SettingsView(initialTab: index), size: CGSize(width: 760, height: 620))
             }
         }

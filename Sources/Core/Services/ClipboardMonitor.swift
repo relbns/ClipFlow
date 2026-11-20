@@ -59,11 +59,15 @@ final class ClipboardMonitor: ObservableObject {
         record(capture, snapshot: snapshot, sourceName: source?.localizedName, sourceBundleID: source?.bundleIdentifier)
     }
 
-    func record(_ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?, at date: Date = Date()) {
+    func record(
+        _ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?,
+        at date: Date = Date(), recognizedText: String? = nil
+    ) {
         if removeDuplicates, let existing = fetchItem(hash: capture.hash) {
             existing.createdAt = date
             existing.sourceAppName = sourceName
             existing.sourceBundleID = sourceBundleID
+            if let recognizedText { existing.recognizedText = recognizedText }
             saveAndReload()
             return
         }
@@ -83,6 +87,7 @@ final class ClipboardMonitor: ObservableObject {
         item.pasteboardData = try? snapshot.encoded()
         if capture.kind == .image {
             item.imageData = thumbnail(from: snapshot)
+            item.recognizedText = recognizedText
         }
 
         saveAndReload()
@@ -110,14 +115,25 @@ final class ClipboardMonitor: ObservableObject {
         saveAndReload()
     }
 
-    /// Records a screen capture as an image clip with the text already found in it.
+    /// Whether ClipFlow records history at all ("Record clipboard history" in Preferences).
+    var isRecording: Bool { defaults.bool(forKey: "startMonitoring") }
+
+    /// Records a screen capture as an image clip with the text already found in it, unless history is off.
     func recordScreenshot(_ png: Data, recognizedText: String) {
+        guard isRecording else { return }
         let snapshot = PasteboardSnapshot(items: [[NSPasteboard.PasteboardType.png.rawValue: png]])
         guard let capture = ClipCapture.classify(snapshot) else { return }
+        record(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier, recognizedText: recognizedText)
+    }
+
+    /// Puts text ClipFlow produced (read from the screen or an image) on the clipboard and into history as ClipFlow's.
+    func copy(_ text: String) {
+        let snapshot = PasteboardSnapshot.text(text, transient: false)
+        let changeCount = snapshot.write(to: pasteboard)
+        OwnPasteboardWrites.shared.record(changeCount)
+        lastChangeCount = changeCount
+        guard isRecording, let capture = ClipCapture.classify(snapshot) else { return }
         record(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier)
-        guard let item = fetchItem(hash: capture.hash) else { return }
-        item.recognizedText = recognizedText
-        saveAndReload()
     }
 
     /// "" marks an image as read with no text, so it is not read again.
@@ -127,21 +143,17 @@ final class ClipboardMonitor: ObservableObject {
         saveAndReload()
     }
 
-    /// The newest image clip whose text has not been read yet, with its full image.
-    func nextImageToRecognize() -> (id: UUID, image: Data)? {
+    /// The newest image clip whose text has not been read, skipping `excluded`, with its stored pasteboard data
+    /// still encoded; decoding a large image happens off the main thread.
+    func nextImageToRecognize(excluding excluded: Set<UUID> = []) -> (id: UUID, pasteboardData: Data?)? {
         let request = ClipItem.fetchRequest()
-        request.predicate = NSPredicate(format: "type == %@ AND recognizedText == nil", ClipType.image.rawValue)
+        request.predicate = NSPredicate(
+            format: "type == %@ AND recognizedText == nil AND NOT (id IN %@)", ClipType.image.rawValue, Array(excluded)
+        )
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
-        guard let items = try? context.fetch(request) else { return nil }
-        for item in items {
-            if let data = item.pasteboardData, let snapshot = try? PasteboardSnapshot.decoded(from: data),
-               let image = snapshot.data(for: .png) ?? snapshot.data(for: .tiff) {
-                return (item.id, image)
-            }
-            item.recognizedText = ""
-        }
-        if context.hasChanges { saveAndReload() }
-        return nil
+        request.fetchLimit = 1
+        guard let item = try? context.fetch(request).first else { return nil }
+        return (item.id, item.pasteboardData)
     }
 
     func delete(_ clip: SimpleClipItem) {

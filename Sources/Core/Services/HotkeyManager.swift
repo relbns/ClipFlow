@@ -6,7 +6,7 @@ extension KeyboardShortcuts.Name {
     static let showHistoryMenu = Self("showHistoryMenu", default: .init(.v, modifiers: [.command, .control]))
     static let fixKeyboardLayout = Self("fixKeyboardLayout", default: .init(.l, modifiers: [.command, .control]))
     static let pastePlainText = Self("pastePlainText", default: .init(.v, modifiers: [.command, .control, .shift]))
-    static let captureScreenText = Self("captureScreenText", default: .init(.t, modifiers: [.command, .control]))
+    static let captureScreenText = Self("captureScreenText", default: .init(.t, modifiers: [.command, .control, .shift]))
     static let showSnippetEditor = Self("showSnippetEditor")
     static let clearHistory = Self("clearHistory")
 }

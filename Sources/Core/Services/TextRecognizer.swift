@@ -7,11 +7,14 @@ import Vision
 enum TextRecognizer {
     static let languagesKey = "ocrLanguages"
 
-    static func supportedLanguages() -> [String] {
+    /// Read once per launch; a language Apple adds with a macOS update shows up after the next launch.
+    private static let supported: [String] = {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         return (try? request.supportedRecognitionLanguages()) ?? ["en-US"]
-    }
+    }()
+
+    static func supportedLanguages() -> [String] { supported }
 
     /// The saved choice where the system still supports it; otherwise the user's own languages that are supported,
     /// then English.

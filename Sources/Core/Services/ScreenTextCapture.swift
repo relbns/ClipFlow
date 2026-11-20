@@ -5,13 +5,19 @@ import AppKit
 @MainActor
 enum ScreenTextCapture {
     static let saveScreenshotsKey = "ocrSaveScreenshots"
+    private static let accessRequestedKey = "ocrScreenAccessRequested"
     private static var isCapturing = false
 
     static func run(monitor: ClipboardMonitor, defaults: UserDefaults = .standard) async {
         guard !isCapturing else { return }
         guard CGPreflightScreenCaptureAccess() else {
-            CGRequestScreenCaptureAccess()
-            showPermissionAlert()
+            // The first time, the system asks; after that, explain, since macOS may need a relaunch to see the grant.
+            if defaults.bool(forKey: accessRequestedKey) {
+                showPermissionAlert()
+            } else {
+                defaults.set(true, forKey: accessRequestedKey)
+                CGRequestScreenCaptureAccess()
+            }
             return
         }
         isCapturing = true
@@ -30,8 +36,7 @@ enum ScreenTextCapture {
             NSSound.beep()
             return
         }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        monitor.copy(text)
         Log.ui.info("Copied \(text.count, privacy: .public) characters of text from the screen")
     }
 
@@ -57,9 +62,21 @@ enum ScreenTextCapture {
         alert.messageText = L("ocr_permission_title")
         alert.informativeText = L("ocr_permission_body")
         alert.addButton(withTitle: L("ocr_permission_open"))
+        alert.addButton(withTitle: L("ocr_permission_relaunch"))
         alert.addButton(withTitle: L("cancel"))
-        if alert.runModal() == .alertFirstButtonReturn {
-            openScreenRecordingSettings()
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: openScreenRecordingSettings()
+        case .alertSecondButtonReturn: relaunch()
+        default: break
+        }
+    }
+
+    /// macOS 14 reports a new Screen Recording grant only to a relaunched app.
+    static func relaunch() {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
         }
     }
 

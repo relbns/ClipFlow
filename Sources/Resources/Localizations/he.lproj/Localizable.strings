@@ -210,7 +210,7 @@
 "hotkey_capture_text" = "העתקת טקסט מהמסך";
 "hotkey_capture_text_hint" = "מסמנים אזור כלשהו במסך, והטקסט שבו עובר ללוח.";
 "ocr_screen_access" = "הקלטת מסך";
-"ocr_screen_access_hint" = "נדרשת כדי לקרוא את האזור שמסמנים. שום דבר לא מצולם עד שלוחצים על הקיצור.";
+"ocr_screen_access_hint" = "נדרשת כדי לקרוא את האזור שמסמנים. שום דבר לא מצולם עד שלוחצים על הקיצור. אחרי האישור צריך להפעיל את ClipFlow מחדש.";
 "ocr_screen_access_granted" = "מאושרת";
 "ocr_save_screenshots" = "שמירת הצילום בהיסטוריה";
 "ocr_save_screenshots_hint" = "האזור שסומן נשמר גם כתמונה בהיסטוריה, לצד הטקסט שלו.";
@@ -219,8 +219,9 @@
 "ocr_languages" = "שפות זיהוי";
 "ocr_languages_hint" = "השפות ש־macOS יודע לקרוא. עברית עוד לא ביניהן, והיא תופיע כאן כשאפל תוסיף אותה.";
 "ocr_permission_title" = "אישור הקלטת מסך";
-"ocr_permission_body" = "כדי לקרוא טקסט מהמסך, צריך לאשר את ClipFlow בהגדרות המערכת ← פרטיות ואבטחה ← הקלטת מסך, ואז ללחוץ שוב על הקיצור.";
+"ocr_permission_body" = "כדי לקרוא טקסט מהמסך, צריך לאשר את ClipFlow בהגדרות המערכת ← פרטיות ואבטחה ← הקלטת מסך. אם כבר אישרת, צריך להפעיל את ClipFlow מחדש כדי ש־macOS יחיל את האישור.";
 "ocr_permission_open" = "פתיחת הגדרות המערכת";
+"ocr_permission_relaunch" = "הפעלה מחדש של ClipFlow";
 "copy_text" = "העתקת הטקסט";
 "pref_launch_at_login" = "הפעלה עם הכניסה למחשב";
 "pref_launch_at_login_hint" = "‏ClipFlow תיפתח אוטומטית כשנכנסים למחשב.";

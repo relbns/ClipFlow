@@ -27,9 +27,12 @@ struct ImageTextSettingsView: View {
                 if hasScreenAccess {
                     Text(L("ocr_screen_access_granted")).font(.system(size: 12)).foregroundColor(theme.textMid)
                 } else {
-                    CFToolbarBtn(label: L("ocr_permission_open")) {
-                        CGRequestScreenCaptureAccess()
-                        ScreenTextCapture.openScreenRecordingSettings()
+                    HStack(spacing: 8) {
+                        CFToolbarBtn(label: L("ocr_permission_open")) {
+                            CGRequestScreenCaptureAccess()
+                            ScreenTextCapture.openScreenRecordingSettings()
+                        }
+                        CFToolbarBtn(label: L("ocr_permission_relaunch")) { ScreenTextCapture.relaunch() }
                     }
                 }
             }
@@ -61,7 +64,7 @@ struct ImageTextSettingsView: View {
                 var languages = selected.filter { $0 != language }
                 if isOn { languages.append(language) }
                 guard !languages.isEmpty else { return }
-                savedLanguages = supported.filter(languages.contains).joined(separator: ",")
+                savedLanguages = languages.joined(separator: ",")
             }
         )
     }

@@ -369,7 +369,7 @@ final class PopoverNavigationTests: XCTestCase {
         stack = CoreDataStack(storeURL: nil)
         defaults = makeTestDefaults("clipflow-tests-navigation")
         AppDefaults.register(in: defaults)
-        monitor = ClipboardMonitor(context: stack.viewContext, defaults: defaults)
+        monitor = ClipboardMonitor(context: stack.viewContext, pasteboard: NSPasteboard(name: .init("clipflow-tests")), defaults: defaults)
         let base = Date()
         let texts = (1...11).map { "clip \($0)" } + ["https://example.com", "#FF5733"]
         for (offset, text) in texts.enumerated() {
@@ -506,8 +506,17 @@ final class PopoverNavigationTests: XCTestCase {
         let snapshot = PasteboardSnapshot(items: [[NSPasteboard.PasteboardType.png.rawValue: png + Data([0])]])
         monitor.record(try XCTUnwrap(ClipCapture.classify(snapshot)), snapshot: snapshot, sourceName: nil, sourceBundleID: nil)
         let next = try XCTUnwrap(monitor.nextImageToRecognize())
+        XCTAssertNil(monitor.nextImageToRecognize(excluding: [next.id]), "an image already tried is skipped")
         monitor.setRecognizedText("", forClipID: next.id)
         XCTAssertNil(monitor.nextImageToRecognize(), "an image with no text is marked read")
+    }
+
+    func testNothingIsKeptWhileHistoryRecordingIsOff() throws {
+        defaults.set(false, forKey: "startMonitoring")
+        let before = monitor.clipHistory.count
+        monitor.recordScreenshot(Data([0x89, 0x50]), recognizedText: "secret")
+        monitor.copy("text read from the screen")
+        XCTAssertEqual(monitor.clipHistory.count, before)
     }
 
     func testSearchRanksTheClosestMatchFirstAndAcceptsInitials() {
