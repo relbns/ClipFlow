@@ -3,6 +3,16 @@ import CoreData
 import XCTest
 @testable import ClipFlow
 
+extension XCTestCase {
+    /// An empty defaults suite with a fixed name: every run reuses one preferences file instead of leaving a new one.
+    func makeTestDefaults(_ name: String) -> UserDefaults {
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        addTeardownBlock { defaults.removePersistentDomain(forName: name) }
+        return defaults
+    }
+}
+
 final class AbbreviationMatcherTests: XCTestCase {
     private func candidate(
         _ abbreviation: String,
@@ -276,10 +286,8 @@ final class StorageTests: XCTestCase {
 
     func testStarterSnippetsAreSeededOnceAndOnlyIntoAnEmptyStore() throws {
         let stack = CoreDataStack(storeURL: nil)
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: "clipflow-test-\(UUID().uuidString)"))
-
-        stack.prepareDefaultData(defaults: defaults)
-        stack.prepareDefaultData(defaults: UserDefaults(suiteName: "clipflow-test-\(UUID().uuidString)")!)
+        stack.prepareDefaultData(defaults: makeTestDefaults("clipflow-tests-seed-first"))
+        stack.prepareDefaultData(defaults: makeTestDefaults("clipflow-tests-seed-second"))
 
         XCTAssertEqual(try stack.viewContext.count(for: SnippetGroup.fetchRequest()), 1)
         XCTAssertEqual(try stack.viewContext.count(for: Snippet.fetchRequest()), 4)
@@ -339,7 +347,7 @@ final class PopoverNavigationTests: XCTestCase {
 
     override func setUp() async throws {
         stack = CoreDataStack(storeURL: nil)
-        defaults = UserDefaults(suiteName: "clipflow-nav-\(UUID().uuidString)")!
+        defaults = makeTestDefaults("clipflow-tests-navigation")
         AppDefaults.register(in: defaults)
         monitor = ClipboardMonitor(context: stack.viewContext, defaults: defaults)
         let base = Date()
@@ -605,16 +613,13 @@ final class SnippetEditorModelTests: XCTestCase {
 }
 
 final class PreviousBundleIDTests: XCTestCase {
-    private let previous = "clipflow-test-previous-id"
-    private let current = "clipflow-test-current-id"
+    private let previous = "clipflow-tests-previous-id"
+    private let current = "clipflow-tests-current-id"
     private let defaults = UserDefaults.standard
 
     override func tearDown() {
-        let preferences = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Preferences")
         for name in [previous, current] {
             defaults.removePersistentDomain(forName: name)
-            try? FileManager.default.removeItem(at: preferences.appendingPathComponent("\(name).plist"))
         }
     }
 
