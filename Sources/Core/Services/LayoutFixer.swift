@@ -1,14 +1,18 @@
 import AppKit
 import ApplicationServices
+import Carbon.HIToolbox
 
 /// The fix-layout hotkey: retypes the selection, or what was just typed, in the other keyboard layout.
 @MainActor
 final class LayoutFixer {
     static let shared = LayoutFixer()
 
-    /// Supplied by the expansion engine; nil when nothing was typed right before the hotkey.
+    /// Supplied by the expansion engine; nil unless the hotkey came right after typing.
     var takeTypedText: () -> String? = { nil }
     var defaults: UserDefaults = .standard
+    private var isFixing = false
+    /// Layouts the user switched to, newest first, so the fix aims at the one used before the current.
+    private var recentLayoutIDs: [String] = []
 
     private enum Selection {
         case text(String)
@@ -16,58 +20,87 @@ final class LayoutFixer {
         case unknown
     }
 
-    private struct Source {
-        let text: String
-        let typedCount: Int
+    private init() {
+        if let current = KeyboardLayouts.currentLayoutID() { recentLayoutIDs = [current] }
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String), object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.noteLayoutChange() }
+        }
+    }
+
+    private func noteLayoutChange() {
+        guard let current = KeyboardLayouts.currentLayoutID() else { return }
+        recentLayoutIDs.removeAll { $0 == current }
+        recentLayoutIDs.insert(current, at: 0)
+        recentLayoutIDs = Array(recentLayoutIDs.prefix(8))
     }
 
     func fix() async {
         let typed = takeTypedText()
-        await waitForModifierRelease()
-        guard let pair = KeyboardLayouts.currentPair() else {
-            Log.expansion.notice("Layout fix: fewer than two keyboard layouts of different languages are enabled")
+        guard !isFixing else { return }
+        isFixing = true
+        defer { isFixing = false }
+        guard await modifiersReleased() else { return }
+
+        let pairs = KeyboardLayouts.candidatePairs(recentIDs: Array(recentLayoutIDs.dropFirst()))
+        guard !pairs.isEmpty else {
+            Log.expansion.notice("Layout fix: no enabled keyboard layout of another language")
             NSSound.beep()
             return
         }
-        guard let source = await source(typed: typed),
-              let result = LayoutConverter.convert(source.text, with: pair) else {
+
+        let selection = Self.selectionInFocusedElement()
+        let text: String
+        let replacesTyped: Bool
+        switch selection {
+        case .text(let selected):
+            text = selected
+            replacesTyped = false
+        case .empty, .unknown:
+            guard let typed else {
+                NSSound.beep()
+                return
+            }
+            text = typed
+            replacesTyped = true
+        }
+
+        guard let pair = LayoutConverter.choosePair(for: text, among: pairs) else { return }
+        let source = replacesTyped ? LayoutConverter.trailingRun(of: text, with: pair) : text
+        guard let result = LayoutConverter.convert(source, with: pair) else {
             NSSound.beep()
             return
         }
-        PasteEngine.shared.insert(RenderedSnippet(text: result.text, cursorOffsetFromEnd: 0), replacingTyped: source.typedCount)
+        let deleteCount = replacesTyped ? source.unicodeScalars.count : 0
+        PasteEngine.shared.insert(RenderedSnippet(text: result.text, cursorOffsetFromEnd: 0), replacingTyped: deleteCount)
         if defaults.bool(forKey: "layoutFixSwitchesKeyboard") {
             KeyboardLayouts.select(result.toSecond ? pair.second : pair.first)
         }
-        Log.expansion.info("Layout fix converted \(source.text.count, privacy: .public) characters (\(source.typedCount > 0 ? "typed" : "selected", privacy: .public))")
-    }
-
-    private func source(typed: String?) async -> Source? {
-        switch Self.selectionInFocusedElement() {
-        case .text(let text):
-            return Source(text: text, typedCount: 0)
-        case .empty:
-            return typed.map { Source(text: $0, typedCount: $0.count) }
-        case .unknown:
-            if let typed { return Source(text: typed, typedCount: typed.count) }
-            return await PasteEngine.shared.copySelection().flatMap { $0.isEmpty ? nil : Source(text: $0, typedCount: 0) }
-        }
+        Log.expansion.info("Layout fix converted \(source.count, privacy: .public) characters (\(replacesTyped ? "typed" : "selected", privacy: .public))")
     }
 
     private static func selectionInFocusedElement() -> Selection {
+        let system = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(system, 0.3)
         var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+        guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
               let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return .unknown }
+        let element = focused as! AXUIElement
+        AXUIElementSetMessagingTimeout(element, 0.3)
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(focused as! AXUIElement, kAXSelectedTextAttribute as CFString, &value) == .success,
+        guard AXUIElementCopyAttributeValue(element, kAXSelectedTextAttribute as CFString, &value) == .success,
               let text = value as? String else { return .unknown }
         return text.isEmpty ? .empty : .text(text)
     }
 
-    /// The hotkey fires while its modifiers may still be held; synthetic keys sent then would carry them.
-    private func waitForModifierRelease() async {
+    /// Synthetic keys sent while the hotkey's modifiers are held would carry them; gives up after a second.
+    private func modifiersReleased() async -> Bool {
         let held: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
-        for _ in 0..<100 where !CGEventSource.flagsState(.hidSystemState).isDisjoint(with: held) {
+        for _ in 0..<100 {
+            if CGEventSource.flagsState(.hidSystemState).isDisjoint(with: held) { return true }
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
+        return false
     }
 }

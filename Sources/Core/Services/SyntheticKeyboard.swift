@@ -23,10 +23,6 @@ enum SyntheticKeyboard {
         tap(keyCode(for: "v") ?? Key.v, flags: .maskCommand)
     }
 
-    static func copy() {
-        tap(keyCode(for: "c") ?? 0x08, flags: .maskCommand)
-    }
-
     /// The key that types `character` in the current Latin layout, so Cmd+V stays Cmd+V on Dvorak or AZERTY.
     static func keyCode(for character: Character) -> CGKeyCode? {
         guard let source = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),
@@ -42,7 +38,7 @@ enum SyntheticKeyboard {
                 var characters = [UniChar](repeating: 0, count: 4)
                 let status = UCKeyTranslate(
                     layout, code, UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
-                    OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
+                    OptionBits(1 << kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
                 )
                 if status == noErr, String(utf16CodeUnits: characters, count: length) == target {
                     return code

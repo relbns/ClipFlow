@@ -525,6 +525,19 @@ final class LayoutConverterTests: XCTestCase {
         }
     }
 
+    func testOnlyTheTrailingRunInOneLayoutIsRetyped() {
+        XCTAssertEqual(LayoutConverter.trailingRun(of: "שלום akuo", with: pair), " akuo")
+        XCTAssertEqual(LayoutConverter.trailingRun(of: "akuo, tk.", with: pair), "akuo, tk.")
+        XCTAssertEqual(LayoutConverter.trailingRun(of: "tk שלום", with: pair), " שלום")
+        XCTAssertEqual(LayoutConverter.trailingRun(of: "123", with: pair), "123")
+    }
+
+    func testThePairIsTheLayoutTheLettersCameFromElseTheMostRecent() {
+        let russian = LayoutPair(first: "en", second: "ru", keys: [("a", "ф"), ("k", "л")])
+        XCTAssertEqual(LayoutConverter.choosePair(for: "שלום", among: [russian, pair])?.second, "he")
+        XCTAssertEqual(LayoutConverter.choosePair(for: "akuo", among: [russian, pair])?.second, "ru", "letters of the current layout go to the most recent other")
+    }
+
     func testTheRealHebrewLayoutRetypesWhatTheKeysMeant() throws {
         guard let real = KeyboardLayouts.pair("com.apple.keylayout.ABC", "com.apple.keylayout.Hebrew") else {
             throw XCTSkip("ABC and Hebrew layouts are not installed")
@@ -546,6 +559,11 @@ final class LayoutConverterTests: XCTestCase {
         engine.handle(.reset)
         engine.handle(.shortcut)
         XCTAssertNil(engine.takeTextBeforeShortcut(), "a click between typing and the hotkey drops the text")
+
+        engine.handle(.characters("akuo"))
+        engine.handle(.shortcut)
+        engine.handle(.shortcut)
+        XCTAssertNil(engine.takeTextBeforeShortcut(), "another shortcut such as Cmd+Z between typing and the hotkey drops it")
     }
 }
 

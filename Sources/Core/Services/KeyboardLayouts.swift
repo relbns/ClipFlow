@@ -2,15 +2,24 @@ import Carbon.HIToolbox
 
 /// The keyboard layouts enabled in System Settings, read through Text Input Sources.
 enum KeyboardLayouts {
-    /// The current layout and the first enabled layout of another language, with what each types per key.
-    static func currentPair() -> LayoutPair? {
+    /// The current layout paired with each enabled layout of another language, the most recently used first.
+    static func candidatePairs(recentIDs: [String]) -> [LayoutPair] {
         guard let current = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
-              let currentID = string(current, kTISPropertyInputSourceID) else { return nil }
+              let currentID = string(current, kTISPropertyInputSourceID) else { return [] }
         let currentLanguage = languages(of: current).first
-        guard let other = layouts().first(where: { source in
+        let others = layouts().filter { source in
             string(source, kTISPropertyInputSourceID) != currentID && languages(of: source).first != currentLanguage
-        }) else { return nil }
-        return pair(current, other)
+        }
+        let rank: (TISInputSource) -> Int = { source in
+            recentIDs.firstIndex(of: string(source, kTISPropertyInputSourceID) ?? "") ?? Int.max
+        }
+        return others.enumerated()
+            .sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }
+            .compactMap { pair(current, $0.element) }
+    }
+
+    static func currentLayoutID() -> String? {
+        TISCopyCurrentKeyboardLayoutInputSource().flatMap { string($0.takeRetainedValue(), kTISPropertyInputSourceID) }
     }
 
     /// The pair for two layouts by id, installed ones included; for tests and diagnostics.
@@ -62,7 +71,7 @@ enum KeyboardLayouts {
                     let modifiers = UInt32(shift ? (shiftKey >> 8) & 0xFF : 0)
                     let status = UCKeyTranslate(
                         layout, code, UInt16(kUCKeyActionDown), modifiers, UInt32(LMGetKbdType()),
-                        OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
+                        OptionBits(1 << kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
                     )
                     let text = String(utf16CodeUnits: characters, count: length)
                     guard status == noErr, text.count == 1, let character = text.first,

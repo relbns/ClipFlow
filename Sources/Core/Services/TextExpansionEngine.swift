@@ -38,13 +38,14 @@ final class TextExpansionEngine {
 
     func handle(_ event: TypingEvent) {
         if case .shortcut = event {
-            if !buffer.text.isEmpty { textBeforeShortcut = buffer.text }
+            textBeforeShortcut = buffer.text.isEmpty ? nil : buffer.text
             buffer.reset()
             return
         }
         textBeforeShortcut = nil
         switch event {
         case .reset, .shortcut:
+            // .shortcut returned above; listed so the switch stays exhaustive.
             buffer.reset()
         case .deleteBackward:
             buffer.deleteBackward()
