@@ -63,9 +63,9 @@
 
 ### Download
 
-1. Download `ClipFlow.zip` from the [latest release](https://github.com/relbns/ClipFlow/releases/latest) and unzip it.
-2. Move `ClipFlow.app` to your Applications folder.
-3. Open it. ClipFlow is not notarized by Apple yet, so macOS blocks the first launch. Then open **System Settings → Privacy & Security**, scroll to the message about ClipFlow, click **Open Anyway** and confirm with your password. The button shows up for about an hour after the blocked launch.
+1. Download `ClipFlow.dmg` from the [latest release](https://github.com/relbns/ClipFlow/releases/latest) and open it.
+2. Drag **ClipFlow** onto **Applications** in the window that opens.
+3. Open ClipFlow from Applications. ClipFlow is not notarized by Apple yet, so macOS blocks the first launch. Then open **System Settings → Privacy & Security**, scroll to the message about ClipFlow, click **Open Anyway** and confirm with your password. The button shows up for about an hour after the blocked launch.
 4. Grant the two permissions the welcome screen asks for (see [Permissions](#permissions)).
 
 The download runs on Apple Silicon and Intel Macs with macOS 14 or later. Each new version has to be allowed again the same way. After an update, remove ClipFlow from both permission lists with **−** and grant them again: the old entry stays switched on but no longer applies.
