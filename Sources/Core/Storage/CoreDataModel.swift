@@ -3,8 +3,8 @@ import CoreData
 /// The model is built in code so it works the same from `swift build` and from Xcode.
 /// v1 is the shape stores were created with before v2; it is kept only to migrate them.
 extension NSManagedObjectModel {
-    static let currentVersion = 3
-    static let knownVersions = [1, 2, 3]
+    static let currentVersion = 4
+    static let knownVersions = [1, 2, 3, 4]
     static let clipFlowCurrent = clipFlowModel(version: currentVersion, bindClasses: true)
 
     static func clipFlowModel(version: Int, bindClasses: Bool) -> NSManagedObjectModel {
@@ -38,6 +38,9 @@ extension NSManagedObjectModel {
                 int32("pixelWidth"),
                 int32("pixelHeight")
             ]
+        }
+        if version >= 4 {
+            clipProperties.append(optionalString("recognizedText"))
         }
         clipItem.properties = clipProperties
 

@@ -21,6 +21,8 @@ public class ClipItem: NSManagedObject, Identifiable {
     @NSManaged public var byteCount: Int64
     @NSManaged public var pixelWidth: Int32
     @NSManaged public var pixelHeight: Int32
+    /// Text found in an image clip; "" once recognized with no text, nil before.
+    @NSManaged public var recognizedText: String?
 
     @nonobjc public class func fetchRequest() -> NSFetchRequest<ClipItem> {
         NSFetchRequest<ClipItem>(entityName: "ClipItem")

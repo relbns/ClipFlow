@@ -256,6 +256,24 @@ final class StorageTests: XCTestCase {
         XCTAssertFalse(migrated.isFavorite)
     }
 
+    func testStoreWrittenByModelV3KeepsItsClipsWithNoTextReadYet() throws {
+        let storeURL = directory.appendingPathComponent("ClipFlow.sqlite")
+        let model = NSManagedObjectModel.clipFlowModel(version: 3, bindClasses: false)
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+        let store = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL, options: nil)
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = coordinator
+        let clip = NSEntityDescription.insertNewObject(forEntityName: "ClipItem", into: context)
+        clip.setValuesForKeys(["id": UUID(), "content": "Image", "type": "image", "createdAt": Date(), "dataHash": "h"])
+        try context.save()
+        try coordinator.remove(store)
+
+        let stack = CoreDataStack(storeURL: storeURL)
+        let migrated = try XCTUnwrap(try stack.viewContext.fetch(ClipItem.fetchRequest()).first)
+        XCTAssertEqual(migrated.type, "image")
+        XCTAssertNil(migrated.recognizedText)
+    }
+
     func testStoreFromANewerVersionIsLeftUntouched() throws {
         let storeURL = directory.appendingPathComponent("ClipFlow.sqlite")
         let newer = NSManagedObjectModel.clipFlowModel(version: NSManagedObjectModel.currentVersion, bindClasses: false)
@@ -351,7 +369,7 @@ final class PopoverNavigationTests: XCTestCase {
         stack = CoreDataStack(storeURL: nil)
         defaults = makeTestDefaults("clipflow-tests-navigation")
         AppDefaults.register(in: defaults)
-        monitor = ClipboardMonitor(context: stack.viewContext, defaults: defaults)
+        monitor = ClipboardMonitor(context: stack.viewContext, pasteboard: NSPasteboard(name: .init("clipflow-tests")), defaults: defaults)
         let base = Date()
         let texts = (1...11).map { "clip \($0)" } + ["https://example.com", "#FF5733"]
         for (offset, text) in texts.enumerated() {
@@ -469,6 +487,36 @@ final class PopoverNavigationTests: XCTestCase {
         XCTAssertEqual(navigation.sections.map(\.id), ["results"])
         navigation.searchText = "of .sig"
         XCTAssertEqual(navigation.sections.first?.items.count, 1, "content matches too")
+    }
+
+    func testAScreenshotIsFoundByItsTextAndReadImagesAreNotReadAgain() throws {
+        let image = NSImage(size: NSSize(width: 4, height: 4), flipped: false) { rect in
+            NSColor.red.setFill()
+            rect.fill()
+            return true
+        }
+        let png = try XCTUnwrap(NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation))?.representation(using: .png, properties: [:]))
+        monitor.recordScreenshot(png, recognizedText: "Quarterly revenue table")
+        XCTAssertNil(monitor.nextImageToRecognize(), "a screenshot arrives with its text already read")
+
+        navigation.searchText = "revenue"
+        guard case .clip(let found, _)? = navigation.items.first else { return XCTFail("expected the screenshot") }
+        XCTAssertEqual(found.kind, .image)
+
+        let snapshot = PasteboardSnapshot(items: [[NSPasteboard.PasteboardType.png.rawValue: png + Data([0])]])
+        monitor.record(try XCTUnwrap(ClipCapture.classify(snapshot)), snapshot: snapshot, sourceName: nil, sourceBundleID: nil)
+        let next = try XCTUnwrap(monitor.nextImageToRecognize())
+        XCTAssertNil(monitor.nextImageToRecognize(excluding: [next.id]), "an image already tried is skipped")
+        monitor.setRecognizedText("", forClipID: next.id)
+        XCTAssertNil(monitor.nextImageToRecognize(), "an image with no text is marked read")
+    }
+
+    func testNothingIsKeptWhileHistoryRecordingIsOff() throws {
+        defaults.set(false, forKey: "startMonitoring")
+        let before = monitor.clipHistory.count
+        monitor.recordScreenshot(Data([0x89, 0x50]), recognizedText: "secret")
+        monitor.copy("text read from the screen")
+        XCTAssertEqual(monitor.clipHistory.count, before)
     }
 
     func testSearchRanksTheClosestMatchFirstAndAcceptsInitials() {
@@ -613,6 +661,35 @@ final class TextTransformTests: XCTestCase {
         let pair = LayoutPair(first: "en", second: "he", keys: [("a", "ש"), ("k", "ל"), ("u", "ו"), ("o", "ם")])
         XCTAssertEqual(TextTransform.fixLayout.apply("akuo", layoutPairs: [pair]), "שלום")
         XCTAssertNil(TextTransform.fixLayout.apply("akuo"), "no layouts, no change")
+    }
+}
+
+final class TextRecognizerTests: XCTestCase {
+    private let supported = ["en-US", "fr-FR", "ar-SA", "ru-RU"]
+
+    func testLanguagesFollowTheSavedChoiceElseTheUsersLanguagesThenEnglish() {
+        XCTAssertEqual(TextRecognizer.languages(saved: ["ru-RU"], preferred: ["he-IL"], supported: supported), ["ru-RU"])
+        XCTAssertEqual(TextRecognizer.languages(saved: ["he-IL"], preferred: ["fr-CA", "he-IL"], supported: supported), ["fr-FR", "en-US"],
+                       "a saved language the system dropped falls back")
+        XCTAssertEqual(TextRecognizer.languages(saved: [], preferred: ["he-IL", "en-IL"], supported: supported), ["en-US"],
+                       "Hebrew is skipped until the system supports it")
+        XCTAssertEqual(TextRecognizer.languages(saved: [], preferred: ["he-IL"], supported: supported + ["he-IL"]), ["he-IL", "en-US"],
+                       "once supported, Hebrew is picked up with no update")
+    }
+
+    func testRecognizesTextInARenderedImage() async throws {
+        let image = NSImage(size: NSSize(width: 520, height: 120), flipped: false) { rect in
+            NSColor.white.setFill()
+            rect.fill()
+            NSAttributedString(string: "Invoice 4821 paid", attributes: [.font: NSFont.systemFont(ofSize: 44), .foregroundColor: NSColor.black])
+                .draw(at: NSPoint(x: 20, y: 35))
+            return true
+        }
+        let png = try XCTUnwrap(NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation))?.representation(using: .png, properties: [:]))
+        let text = await TextRecognizer.recognize(imageData: png, languages: ["en-US"])
+        XCTAssertEqual(text, "Invoice 4821 paid")
+        let notAnImage = await TextRecognizer.recognize(imageData: Data("text".utf8), languages: ["en-US"])
+        XCTAssertNil(notAnImage)
     }
 }
 

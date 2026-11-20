@@ -140,7 +140,11 @@ final class PopoverNavigation: ObservableObject {
         if !searchText.isEmpty {
             let query = searchText
             let results = Self.ranked(history) { clip in
-                [FuzzyMatch.score(query, in: clip.title), FuzzyMatch.score(query, in: clip.content, allowGaps: false)].compactMap { $0 }.max()
+                [
+                    FuzzyMatch.score(query, in: clip.title),
+                    FuzzyMatch.score(query, in: clip.content, allowGaps: false),
+                    clip.recognizedText.flatMap { FuzzyMatch.score(query, in: $0, allowGaps: false) }
+                ].compactMap { $0 }.max()
             }
             let clipSection = numberedSection(id: "results", title: L("search_results"), clips: results)
             let matchingSnippets = Self.ranked(snippets) { $0.searchScore(query) }
@@ -350,6 +354,24 @@ final class PopoverNavigation: ObservableObject {
             selectedItemID = items[index - 1].id
         }
         clipboardMonitor?.delete(clip)
+    }
+
+    /// Copies the text in an image clip, read now unless the background pass already did.
+    func copyText(from clip: SimpleClipItem) {
+        guard let monitor = clipboardMonitor else { return }
+        onClose()
+        Task {
+            var text = clip.recognizedText ?? ""
+            if text.isEmpty, let image = monitor.snapshot(for: clip).flatMap({ $0.data(for: .png) ?? $0.data(for: .tiff) }) {
+                text = await TextRecognizer.recognize(imageData: image, languages: TextRecognizer.currentLanguages()) ?? ""
+                monitor.setRecognizedText(text, forClipID: clip.id)
+            }
+            guard !text.isEmpty else {
+                NSSound.beep()
+                return
+            }
+            monitor.copy(text)
+        }
     }
 
     func togglePin(_ clip: SimpleClipItem) {

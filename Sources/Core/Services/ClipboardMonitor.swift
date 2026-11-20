@@ -59,11 +59,15 @@ final class ClipboardMonitor: ObservableObject {
         record(capture, snapshot: snapshot, sourceName: source?.localizedName, sourceBundleID: source?.bundleIdentifier)
     }
 
-    func record(_ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?, at date: Date = Date()) {
+    func record(
+        _ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?,
+        at date: Date = Date(), recognizedText: String? = nil
+    ) {
         if removeDuplicates, let existing = fetchItem(hash: capture.hash) {
             existing.createdAt = date
             existing.sourceAppName = sourceName
             existing.sourceBundleID = sourceBundleID
+            if let recognizedText { existing.recognizedText = recognizedText }
             saveAndReload()
             return
         }
@@ -83,6 +87,7 @@ final class ClipboardMonitor: ObservableObject {
         item.pasteboardData = try? snapshot.encoded()
         if capture.kind == .image {
             item.imageData = thumbnail(from: snapshot)
+            item.recognizedText = recognizedText
         }
 
         saveAndReload()
@@ -108,6 +113,47 @@ final class ClipboardMonitor: ObservableObject {
         guard let item = fetchItem(id: clip.id) else { return }
         item.isPinned = pinned
         saveAndReload()
+    }
+
+    /// Whether ClipFlow records history at all ("Record clipboard history" in Preferences).
+    var isRecording: Bool { defaults.bool(forKey: "startMonitoring") }
+
+    /// Records a screen capture as an image clip with the text already found in it, unless history is off.
+    func recordScreenshot(_ png: Data, recognizedText: String) {
+        guard isRecording else { return }
+        let snapshot = PasteboardSnapshot(items: [[NSPasteboard.PasteboardType.png.rawValue: png]])
+        guard let capture = ClipCapture.classify(snapshot) else { return }
+        record(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier, recognizedText: recognizedText)
+    }
+
+    /// Puts text ClipFlow produced (read from the screen or an image) on the clipboard and into history as ClipFlow's.
+    func copy(_ text: String) {
+        let snapshot = PasteboardSnapshot.text(text, transient: false)
+        let changeCount = snapshot.write(to: pasteboard)
+        OwnPasteboardWrites.shared.record(changeCount)
+        lastChangeCount = changeCount
+        guard isRecording, let capture = ClipCapture.classify(snapshot) else { return }
+        record(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier)
+    }
+
+    /// "" marks an image as read with no text, so it is not read again.
+    func setRecognizedText(_ text: String, forClipID id: UUID) {
+        guard let item = fetchItem(id: id), item.recognizedText != text else { return }
+        item.recognizedText = text
+        saveAndReload()
+    }
+
+    /// The newest image clip whose text has not been read, skipping `excluded`, with its stored pasteboard data
+    /// still encoded; decoding a large image happens off the main thread.
+    func nextImageToRecognize(excluding excluded: Set<UUID> = []) -> (id: UUID, pasteboardData: Data?)? {
+        let request = ClipItem.fetchRequest()
+        request.predicate = NSPredicate(
+            format: "type == %@ AND recognizedText == nil AND NOT (id IN %@)", ClipType.image.rawValue, Array(excluded)
+        )
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+        request.fetchLimit = 1
+        guard let item = try? context.fetch(request).first else { return nil }
+        return (item.id, item.pasteboardData)
     }
 
     func delete(_ clip: SimpleClipItem) {
