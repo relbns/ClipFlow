@@ -504,6 +504,51 @@ final class PopoverNavigationTests: XCTestCase {
     }
 }
 
+final class LayoutConverterTests: XCTestCase {
+    private let pair = LayoutPair(first: "en", second: "he", keys: [
+        ("a", "ש"), ("k", "ל"), ("u", "ו"), ("o", "ם"), ("t", "א"), ("e", "ק"),
+        (",", "ת"), (".", "ץ"), ("/", "."), (";", "ף"), ("1", "1"), ("A", "A")
+    ])
+
+    func testConvertsTowardTheLayoutTheLettersDoNotBelongTo() {
+        let cases: [(String, LayoutConverter.Result?)] = [
+            ("akuo", .init(text: "שלום", toSecond: true)),
+            ("שלום", .init(text: "akuo", toSecond: false)),
+            ("akuo, tk.", .init(text: "שלוםת אלץ", toSecond: true)),
+            ("שלום.", .init(text: "akuo/", toSecond: false)),
+            ("akuo 1A", .init(text: "שלום 1A", toSecond: true)),
+            ("123 !", nil),
+            ("", nil)
+        ]
+        for (text, expected) in cases {
+            XCTAssertEqual(LayoutConverter.convert(text, with: pair), expected, text)
+        }
+    }
+
+    func testTheRealHebrewLayoutRetypesWhatTheKeysMeant() throws {
+        guard let real = KeyboardLayouts.pair("com.apple.keylayout.ABC", "com.apple.keylayout.Hebrew") else {
+            throw XCTSkip("ABC and Hebrew layouts are not installed")
+        }
+        XCTAssertEqual(LayoutConverter.convert("akuo", with: real)?.text, "שלום")
+        XCTAssertEqual(LayoutConverter.convert("שלום", with: real)?.text, "akuo")
+        XCTAssertEqual(LayoutConverter.convert("vhh, mh", with: real)?.text, "היית צי")
+    }
+
+    @MainActor
+    func testTheTextTypedBeforeAShortcutIsKeptForOneHotkeyOnly() {
+        let engine = TextExpansionEngine(context: CoreDataStack(storeURL: nil).viewContext)
+        engine.handle(.characters("akuo"))
+        engine.handle(.shortcut)
+        XCTAssertEqual(engine.takeTextBeforeShortcut(), "akuo")
+        XCTAssertNil(engine.takeTextBeforeShortcut())
+
+        engine.handle(.characters("tk"))
+        engine.handle(.reset)
+        engine.handle(.shortcut)
+        XCTAssertNil(engine.takeTextBeforeShortcut(), "a click between typing and the hotkey drops the text")
+    }
+}
+
 final class FuzzyMatchTests: XCTestCase {
     func testTiersRankExactThenPrefixThenWordThenAnywhereThenGaps() {
         let cases: [(query: String, text: String, score: Int?)] = [

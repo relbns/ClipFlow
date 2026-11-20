@@ -75,6 +75,21 @@ final class PasteEngine {
         insert(rendered, replacingTyped: 0)
     }
 
+    /// Copies the frontmost app's selection and puts the clipboard back; nil when nothing was copied within 300ms.
+    func copySelection() async -> String? {
+        let original = PasteboardSnapshot.capture(from: pasteboard, maxBytes: .max)
+        let before = pasteboard.changeCount
+        SyntheticKeyboard.copy()
+        for _ in 0..<30 where pasteboard.changeCount == before {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        guard pasteboard.changeCount != before else { return nil }
+        OwnPasteboardWrites.shared.record(pasteboard.changeCount)
+        let copied = pasteboard.string(forType: .string)
+        if let original { write(original) }
+        return copied
+    }
+
     @discardableResult
     private func write(_ snapshot: PasteboardSnapshot) -> Int {
         beforeWrite()

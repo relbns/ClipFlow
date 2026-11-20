@@ -4,6 +4,8 @@ enum TypingEvent {
     case characters(String)
     case deleteBackward
     case reset
+    /// A key pressed with Command or Control: it ends the typed run, which may still be what a hotkey acts on.
+    case shortcut
 }
 
 /// A listen-only event tap: it sees keystrokes and clicks but never delays or changes them.
@@ -84,7 +86,7 @@ final class KeystrokeMonitor {
         guard !SyntheticKeyboard.isSynthetic(event) else { return }
 
         if !event.flags.isDisjoint(with: [.maskCommand, .maskControl]) {
-            onEvent(.reset)
+            onEvent(.shortcut)
             return
         }
 

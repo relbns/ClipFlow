@@ -258,6 +258,10 @@
 "hotkey_editor" = "עורך קטעי הטקסט";
 "hotkey_clear" = "ניקוי ההיסטוריה";
 "hotkey_no_default_hint" = "אין קיצור עד שמגדירים אחד.";
+"hotkey_fix_layout" = "תיקון שפת מקלדת";
+"hotkey_fix_layout_hint" = "מקליד מחדש את הטקסט המסומן, או את מה שהקלדת עכשיו, בשפת המקלדת השנייה: akuo הופך לשלום.";
+"pref_fix_layout_switch" = "החלפת שפת המקלדת אחרי תיקון";
+"pref_fix_layout_switch_hint" = "אחרי התיקון המקלדת עוברת לשפה של הטקסט המתוקן.";
 "pref_export" = "ייצוא קטעי טקסט";
 "pref_export_hint" = "שמירת כל קטעי הטקסט והקבוצות לקובץ JSON.";
 "pref_export_button" = "ייצוא…";

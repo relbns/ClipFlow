@@ -258,6 +258,10 @@
 "hotkey_editor" = "Snippet Editor";
 "hotkey_clear" = "Clear history";
 "hotkey_no_default_hint" = "No shortcut until you set one.";
+"hotkey_fix_layout" = "Fix keyboard layout";
+"hotkey_fix_layout_hint" = "Retypes the selected text, or what you just typed, in your other keyboard layout: akuo becomes שלום.";
+"pref_fix_layout_switch" = "Switch the keyboard after a fix";
+"pref_fix_layout_switch_hint" = "After the fix, the keyboard changes to the language of the fixed text.";
 "pref_export" = "Export snippets";
 "pref_export_hint" = "Save all snippets and groups to a JSON file.";
 "pref_export_button" = "Export…";
