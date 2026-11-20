@@ -49,10 +49,12 @@ struct SnippetSummary: Equatable {
     let groupID: NSManagedObjectID?
     let groupName: String?
 
-    func matches(_ query: String) -> Bool {
-        title.localizedCaseInsensitiveContains(query)
-            || abbreviation.localizedCaseInsensitiveContains(query)
-            || content.localizedCaseInsensitiveContains(query)
+    func searchScore(_ query: String) -> Int? {
+        [
+            FuzzyMatch.score(query, in: abbreviation),
+            FuzzyMatch.score(query, in: title),
+            FuzzyMatch.score(query, in: content, allowGaps: false)
+        ].compactMap { $0 }.max()
     }
 }
 
@@ -136,11 +138,12 @@ final class PopoverNavigation: ObservableObject {
 
     var sections: [PopoverSection] {
         if !searchText.isEmpty {
-            let results = history.filter {
-                $0.content.localizedCaseInsensitiveContains(searchText) || $0.title.localizedCaseInsensitiveContains(searchText)
+            let query = searchText
+            let results = Self.ranked(history) { clip in
+                [FuzzyMatch.score(query, in: clip.title), FuzzyMatch.score(query, in: clip.content, allowGaps: false)].compactMap { $0 }.max()
             }
             let clipSection = numberedSection(id: "results", title: L("search_results"), clips: results)
-            let matchingSnippets = snippets.filter { $0.matches(searchText) }
+            let matchingSnippets = Self.ranked(snippets) { $0.searchScore(query) }
             guard !matchingSnippets.isEmpty else { return [clipSection] }
             let snippetSection = PopoverSection(
                 id: "snippet-results", title: L("section_snippets"),
@@ -182,6 +185,14 @@ final class PopoverNavigation: ObservableObject {
             sections.append(PopoverSection(id: "snippets", title: L("section_snippets"), trailing: nil, items: items))
         }
         return sections
+    }
+
+    /// The matching items, best score first; equal scores keep their order (newest clip first).
+    static func ranked<Item>(_ items: [Item], by score: (Item) -> Int?) -> [Item] {
+        items.enumerated()
+            .compactMap { offset, item in score(item).map { (offset, item, $0) } }
+            .sorted { $0.2 != $1.2 ? $0.2 > $1.2 : $0.0 < $1.0 }
+            .map(\.1)
     }
 
     private var snippetGroupSections: [PopoverSection] {
@@ -254,7 +265,7 @@ final class PopoverNavigation: ObservableObject {
     func reloadSnippets() {
         guard let context else { return }
         let groups = SnippetGroup.ordered(in: context)
-        snippetGroups = groups.map { SnippetGroupSummary(objectID: $0.objectID, name: $0.name) }
+        snippetGroups = groups.filter(\.isEnabled).map { SnippetGroupSummary(objectID: $0.objectID, name: $0.name) }
         let ungrouped = Snippet.fetchRequest()
         ungrouped.predicate = NSPredicate(format: "isEnabled == YES AND group == nil")
         let byTitle: (Snippet, Snippet) -> Bool = { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
@@ -296,9 +307,12 @@ final class PopoverNavigation: ObservableObject {
         }
     }
 
+    /// Back to the top level, with the row that was opened selected.
     func goBack() {
+        let openedRow = showsAllSnippets ? "all-snippets" : drilledCategory.map { "category-\($0.rawValue)" }
         drilledCategory = nil
         showsAllSnippets = false
+        selectedItemID = openedRow
     }
 
     static func canSaveAsSnippet(_ clip: SimpleClipItem) -> Bool {
@@ -311,7 +325,11 @@ final class PopoverNavigation: ObservableObject {
         guard let context, Self.canSaveAsSnippet(clip) else { return nil }
         let group = groupID.flatMap { try? context.existingObject(with: $0) as? SnippetGroup }
             ?? SnippetGroup.insert(named: L("editor_new_group"), in: context)
-        let snippet = Snippet.insert(title: String(clip.title.prefix(60)), abbreviation: ".clip", content: clip.content, group: group, in: context)
+        let title = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let snippet = Snippet.insert(
+            title: title.isEmpty ? L("editor_new_snippet") : String(title.prefix(60)),
+            abbreviation: ".clip", content: clip.content, group: group, in: context
+        )
         do {
             try context.save()
         } catch {
@@ -320,7 +338,7 @@ final class PopoverNavigation: ObservableObject {
             return nil
         }
         reloadSnippets()
-        SnippetEditorRequests.shared.reveal = snippet.objectID
+        SnippetEditorRequests.shared.reveal(snippet.objectID)
         onClose()
         NotificationCenter.default.post(name: NSNotification.Name("OpenSnippetEditor"), object: nil)
         return snippet
@@ -415,7 +433,12 @@ final class PopoverNavigation: ObservableObject {
             if let item = selectedItem { activate(item) }
             return true
         case KeyCode.escape:
-            if isDrilled, searchText.isEmpty { goBack() } else { onClose() }
+            if isDrilled, searchText.isEmpty {
+                goBack()
+            } else {
+                PasteCoordinator.shared.returnFocus()
+                onClose()
+            }
             return true
         case back where searchText.isEmpty && isDrilled:
             goBack()

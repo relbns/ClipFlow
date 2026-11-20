@@ -37,13 +37,19 @@ final class PasteCoordinator {
             lastOtherApp = front
             return
         }
-        let ownWindow = NSApp.windows.first { $0.isVisible && $0.styleMask.contains(.titled) }
-        target = ownWindow == nil ? lastOtherApp : nil
+        let ownWindow = NSApp.keyWindow.flatMap { $0.styleMask.contains(.titled) ? $0 : nil }
+        target = ownWindow == nil ? lastOtherApp.flatMap { $0.isTerminated ? nil : $0 } : nil
         Log.ui.info("Popover opened over ClipFlow; window \(ownWindow?.title ?? "none", privacy: .public), paste target \(self.target?.bundleIdentifier ?? "ClipFlow's key window", privacy: .public)")
     }
 
     func forgetFrontmostApp() {
         isPopoverOpen = false
+    }
+
+    /// After a close without a pick, gives focus back to the app the popover opened over, so ClipFlow is not left in front.
+    func returnFocus() {
+        guard NSApp?.isActive == true, let target, !target.isTerminated else { return }
+        target.activate()
     }
 
     func paste(_ clip: SimpleClipItem) {

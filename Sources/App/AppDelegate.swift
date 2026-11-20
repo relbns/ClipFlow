@@ -244,6 +244,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard let popover = menuBarPopover else { return }
         if popover.isShown {
+            PasteCoordinator.shared.returnFocus()
             popover.performClose(nil)
         } else {
             PasteCoordinator.shared.rememberFrontmostApp()
@@ -274,7 +275,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let location = NSEvent.mouseLocation
             MainActor.assumeIsolated {
                 guard let popover = self?.menuBarPopover, popover.isShown else { return }
-                if let frame = popover.contentViewController?.view.window?.frame, frame.contains(location) {
+                if let view = popover.contentViewController?.view, let window = view.window,
+                   window.convertToScreen(view.convert(view.bounds, to: nil)).contains(location) {
                     Log.ui.info("Ignored a click inside the popover that macOS reported as another app's")
                     return
                 }

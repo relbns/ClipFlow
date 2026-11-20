@@ -7,7 +7,19 @@ import SwiftUI
 @MainActor
 final class SnippetEditorRequests {
     static let shared = SnippetEditorRequests()
-    @Published var reveal: NSManagedObjectID?
+    let reveals = PassthroughSubject<NSManagedObjectID, Never>()
+    /// Kept until an editor model takes it, for an editor that is not open yet.
+    private(set) var pending: NSManagedObjectID?
+
+    func reveal(_ id: NSManagedObjectID) {
+        pending = id
+        reveals.send(id)
+    }
+
+    func takePending() -> NSManagedObjectID? {
+        defer { pending = nil }
+        return pending
+    }
 }
 
 /// State and actions of the Snippet Editor. Edits write to the managed objects and are saved 400ms
@@ -51,14 +63,14 @@ final class SnippetEditorModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
-        SnippetEditorRequests.shared.$reveal
-            .compactMap { $0 }
+        SnippetEditorRequests.shared.reveals
             .sink { [weak self] id in MainActor.assumeIsolated { self?.reveal(id) } }
             .store(in: &cancellables)
+        if let id = SnippetEditorRequests.shared.takePending() { reveal(id) }
     }
 
     func reveal(_ id: NSManagedObjectID) {
-        SnippetEditorRequests.shared.reveal = nil
+        _ = SnippetEditorRequests.shared.takePending()
         guard let snippet = try? context.existingObject(with: id) as? Snippet, !snippet.isDeleted else { return }
         filterText = ""
         library = nil

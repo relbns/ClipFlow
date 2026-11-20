@@ -361,7 +361,7 @@ final class PopoverNavigationTests: XCTestCase {
         navigation.context = nil
         navigation.reloadSnippets()
         navigation.defaults = .standard
-        SnippetEditorRequests.shared.reveal = nil
+        _ = SnippetEditorRequests.shared.takePending()
     }
 
     private func numbers(_ items: [PopoverItem]) -> [Int?] {
@@ -461,6 +461,24 @@ final class PopoverNavigationTests: XCTestCase {
         XCTAssertEqual(navigation.sections.first?.items.count, 1, "content matches too")
     }
 
+    func testSearchRanksTheClosestMatchFirstAndAcceptsInitials() {
+        navigation.searchText = "clip 1"
+        let first = navigation.items.first.flatMap { item -> String? in
+            if case .clip(let clip, _) = item { return clip.content }
+            return nil
+        }
+        XCTAssertEqual(first, "clip 1", "the exact title ranks before the newer clips that only start with it")
+        navigation.searchText = "hec"
+        XCTAssertEqual(navigation.items.count, 1, "h-e-c in order matches https://example.com only")
+    }
+
+    func testGoingBackSelectsTheRowThatWasOpened() {
+        defaults.set("organized", forKey: "viewMode")
+        navigation.activate(.category(.links, count: 1))
+        XCTAssertTrue(navigation.handle(.init(keyCode: 53)))
+        XCTAssertEqual(navigation.selectedID, "category-links")
+    }
+
     func testSavingAClipAsASnippetTakesAFreeAbbreviationAndOpensIt() throws {
         let group = SnippetGroup.insert(named: "Work", in: stack.viewContext)
         addSnippet(".clip", to: group)
@@ -471,8 +489,36 @@ final class PopoverNavigationTests: XCTestCase {
         XCTAssertEqual(snippet.abbreviation, ".clip2")
         XCTAssertEqual(snippet.content, "clip 3")
         XCTAssertEqual(snippet.group, group)
-        XCTAssertEqual(SnippetEditorRequests.shared.reveal, snippet.objectID)
+        XCTAssertEqual(SnippetEditorRequests.shared.pending, snippet.objectID)
         XCTAssertFalse(stack.viewContext.hasChanges)
+    }
+}
+
+final class FuzzyMatchTests: XCTestCase {
+    func testTiersRankExactThenPrefixThenWordThenAnywhereThenGaps() {
+        let cases: [(query: String, text: String, score: Int?)] = [
+            (".sig", ".sig", FuzzyMatch.exact),
+            ("SIG", ".sig", FuzzyMatch.wordStart),
+            ("email", "Email signature", FuzzyMatch.prefix),
+            ("sign", "Email signature", FuzzyMatch.wordStart),
+            ("nat", "Email signature", FuzzyMatch.substring),
+            ("cafe", "Café menu", FuzzyMatch.prefix),
+            ("חתי", "חתימה", FuzzyMatch.prefix),
+            ("sgi", "Email signature", nil),
+            ("x", "Email signature", nil),
+            ("", "Email signature", nil)
+        ]
+        for item in cases {
+            XCTAssertEqual(FuzzyMatch.score(item.query, in: item.text), item.score, "\(item.query) in \(item.text)")
+        }
+    }
+
+    func testGapsMatchInOrderAndPreferWordStarts() throws {
+        let initials = try XCTUnwrap(FuzzyMatch.score("esig", in: "Email signature"))
+        let scattered = try XCTUnwrap(FuzzyMatch.score("eint", in: "Email signature"))
+        XCTAssertLessThan(initials, FuzzyMatch.substring)
+        XCTAssertGreaterThan(initials, scattered)
+        XCTAssertNil(FuzzyMatch.score("esig", in: "Email signature", allowGaps: false))
     }
 }
 
