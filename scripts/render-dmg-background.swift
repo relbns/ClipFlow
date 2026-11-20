@@ -34,8 +34,7 @@ func render(scale: CGFloat) -> Data? {
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
     let lines: [(String, CGFloat, NSFont, NSColor)] = [
-        ("Drag ClipFlow to Applications to install it", 106, .systemFont(ofSize: 15, weight: .medium), NSColor(white: 0.2, alpha: 1)),
-        ("גררו את ClipFlow לתיקיית Applications כדי להתקין", 82, .systemFont(ofSize: 14), NSColor(white: 0.4, alpha: 1))
+        ("Drag ClipFlow to Applications to install it", 96, .systemFont(ofSize: 15, weight: .medium), NSColor(white: 0.25, alpha: 1))
     ]
     for (text, y, font, color) in lines {
         NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph])

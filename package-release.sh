@@ -29,19 +29,31 @@ if gh release view "v$VERSION" >/dev/null 2>&1; then
 fi
 echo "📦 Packaging ClipFlow $VERSION..."
 
-rm -rf "$RELEASE_DIR"
-mkdir -p "$RELEASE_DIR"
-
 # The installer: a disk image that opens to ClipFlow, an arrow and the Applications folder
 VOLUME="ClipFlow"
 STAGING="$RELEASE_DIR/dmg-staging"
 WRITABLE="$RELEASE_DIR/ClipFlow-rw.dmg"
 # Finder names a disk after its mount folder, which the layout script below refers to
-MOUNT="$RELEASE_DIR/$VOLUME"
+MOUNT="$(pwd)/$RELEASE_DIR/$VOLUME"
 if [ -d "/Volumes/$VOLUME" ]; then
     echo "❌ A volume named $VOLUME is mounted. Eject it first."
     exit 1
 fi
+# A mount left by an interrupted run would otherwise be emptied by the rm below
+if mount | grep -q " on $MOUNT "; then
+    hdiutil detach -force -quiet "$MOUNT"
+fi
+detach_image() {
+    for _ in 1 2 3 4 5; do
+        hdiutil detach -quiet "$MOUNT" 2>/dev/null && return 0
+        sleep 1
+    done
+    hdiutil detach -force -quiet "$MOUNT"
+}
+trap 'mount | grep -q " on $MOUNT " && hdiutil detach -force -quiet "$MOUNT"' EXIT
+
+rm -rf "$RELEASE_DIR"
+mkdir -p "$RELEASE_DIR"
 mkdir -p "$STAGING/.background"
 ditto --norsrc --noextattr --noacl "$APP_DIR" "$STAGING/ClipFlow.app"
 ln -s /Applications "$STAGING/Applications"
@@ -49,7 +61,8 @@ tiffutil -cathidpicheck Packaging/dmg-background.png Packaging/dmg-background@2x
 hdiutil create -quiet -srcfolder "$STAGING" -volname "$VOLUME" -fs HFS+ -format UDRW -ov "$WRITABLE"
 mkdir -p "$MOUNT"
 hdiutil attach -quiet -readwrite -noverify -noautoopen -mountpoint "$MOUNT" "$WRITABLE"
-if ! osascript <<APPLESCRIPT
+# A Finder automation prompt left unanswered would otherwise hang the script; give up after a minute
+if ! perl -e 'alarm shift; exec @ARGV' 60 osascript <<APPLESCRIPT
 tell application "Finder"
     tell disk "$VOLUME"
         open
@@ -79,14 +92,22 @@ APPLESCRIPT
 then
     echo "⚠️  Finder did not lay out the installer window; the disk image still holds ClipFlow and Applications."
 fi
-# Wait for Finder to finish writing the layout before the disk is detached
-for _ in 1 2 3 4 5; do
-    before=$(stat -f %m "$MOUNT/.DS_Store" 2>/dev/null || echo 0)
+# Wait until Finder has written the layout and left it alone for two seconds
+stable=0
+previous=""
+for _ in $(seq 1 15); do
+    current=$(stat -f "%m %z" "$MOUNT/.DS_Store" 2>/dev/null || echo "missing")
+    if [ "$current" != "missing" ] && [ "$current" = "$previous" ]; then
+        stable=$((stable + 1))
+        [ "$stable" -ge 2 ] && break
+    else
+        stable=0
+    fi
+    previous="$current"
     sleep 1
-    [ "$before" = "$(stat -f %m "$MOUNT/.DS_Store" 2>/dev/null || echo 0)" ] && break
 done
 sync
-hdiutil detach -quiet "$MOUNT"
+detach_image
 hdiutil convert -quiet "$WRITABLE" -format UDZO -imagekey zlib-level=9 -o "$RELEASE_DIR/ClipFlow.dmg"
 rm -rf "$WRITABLE" "$STAGING" "$MOUNT"
 

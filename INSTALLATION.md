@@ -18,16 +18,7 @@ See [Building from Source](#building-from-source) below
 - Download `ClipFlow.dmg` from Releases and open it
 - Drag ClipFlow onto Applications in the window that opens
 
-### 2. Move to Applications
-```bash
-# Option A: Drag & Drop
-# Drag ClipFlow.app to /Applications in Finder
-
-# Option B: Terminal
-cp -R ClipFlow.app /Applications/
-```
-
-### 3. First Launch (Important!)
+### 2. First Launch (Important!)
 
 ⚠️ **ClipFlow is not notarized by Apple** (we're open source and free). You'll see a security warning.
 
@@ -43,7 +34,7 @@ xattr -cr /Applications/ClipFlow.app
 open /Applications/ClipFlow.app
 ```
 
-### 4. Grant Accessibility Permission
+### 3. Grant Accessibility Permission
 
 ClipFlow needs Accessibility permission for:
 - Monitoring clipboard changes
