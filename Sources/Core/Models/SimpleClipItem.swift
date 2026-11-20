@@ -17,6 +17,15 @@ struct SimpleClipItem: Identifiable, Hashable {
     let pixelHeight: Int
 
     var kind: ClipType { ClipType(rawValue: type) ?? .text }
+    /// Text, rich text, a link or a color: something that pastes, transforms and saves as plain text.
+    /// Rich text that is only an embedded image carries U+FFFC as its string, which is not text.
+    var hasPlainText: Bool {
+        kind != .image && kind != .file
+            && !content.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{FFFC}"))).isEmpty
+    }
+
+    /// Rich text with embedded images or files, which plain text would drop.
+    var hasAttachments: Bool { content.contains("\u{FFFC}") }
 
     var lineCount: Int {
         content.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).count

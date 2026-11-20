@@ -15,6 +15,7 @@ enum AppDefaults {
             "appearanceMode": "auto",
             "closePopoverOnOutsideClick": true,
             "layoutFixSwitchesKeyboard": true,
+            "alwaysPastePlainText": false,
             "excludedApps": "[]"
         ])
     }

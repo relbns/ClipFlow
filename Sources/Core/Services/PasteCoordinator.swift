@@ -52,10 +52,46 @@ final class PasteCoordinator {
         target.activate()
     }
 
-    func paste(_ clip: SimpleClipItem) {
-        guard let monitor = clipboardMonitor, let snapshot = monitor.snapshot(for: clip) else {
-            Log.ui.error("Picked clip has no stored content; nothing pasted")
-            return
+    enum PasteStyle: Equatable {
+        /// Plain text when "Always paste as plain text" is on, the clip as copied otherwise.
+        case preferred
+        /// The opposite of `preferred`, for a pick with Option held.
+        case alternate
+        case plainText
+        case transformed(TextTransform)
+    }
+
+    private enum Resolved {
+        case original, plainText, transformed(TextTransform)
+    }
+
+    func paste(_ clip: SimpleClipItem, as style: PasteStyle = .preferred) {
+        guard let monitor = clipboardMonitor else { return }
+        let prefersPlain = UserDefaults.standard.bool(forKey: "alwaysPastePlainText")
+        let canBePlain = clip.hasPlainText && !clip.hasAttachments
+        let resolved: Resolved
+        switch style {
+        case .preferred: resolved = prefersPlain && canBePlain ? .plainText : .original
+        case .alternate: resolved = !prefersPlain && clip.hasPlainText ? .plainText : .original
+        case .plainText: resolved = .plainText
+        case .transformed(let transform): resolved = .transformed(transform)
+        }
+        let snapshot: PasteboardSnapshot
+        switch resolved {
+        case .original:
+            guard let stored = monitor.snapshot(for: clip) else {
+                Log.ui.error("Picked clip has no stored content; nothing pasted")
+                return
+            }
+            snapshot = stored
+        case .plainText:
+            snapshot = .text(clip.content, transient: false)
+        case .transformed(let transform):
+            guard let text = transform.apply(clip.content, layoutPairs: LayoutFixer.shared.layoutPairs) else {
+                NSSound.beep()
+                return
+            }
+            snapshot = .text(text, transient: false)
         }
         closePopover()
         let target = target
@@ -64,6 +100,22 @@ final class PasteCoordinator {
             await PasteEngine.shared.paste(snapshot, into: target)
             monitor.markUsed(clip)
         }
+    }
+
+    /// The plain-text hotkey: pastes the clipboard's text into the frontmost app and puts the clipboard back.
+    func pasteClipboardAsPlainText() async {
+        guard await SyntheticKeyboard.modifiersReleased(),
+              let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        let rendered = RenderedSnippet(text: text, cursorOffsetFromEnd: 0)
+        guard isPopoverOpen else {
+            PasteEngine.shared.insert(rendered, replacingTyped: 0)
+            return
+        }
+        closePopover()
+        await PasteEngine.shared.insert(rendered, into: target)
     }
 
     func insert(_ snippet: Snippet) {

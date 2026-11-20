@@ -9,6 +9,9 @@ struct HotkeySettingsView: View {
             CFSettingsRow(label: L("hotkey_history"), hint: L("hotkey_history_hint")) {
                 KeyboardShortcuts.Recorder(for: .showHistoryMenu)
             }
+            CFSettingsRow(label: L("hotkey_paste_plain"), hint: L("hotkey_paste_plain_hint")) {
+                KeyboardShortcuts.Recorder(for: .pastePlainText)
+            }
             CFSettingsRow(label: L("hotkey_fix_layout"), hint: L("hotkey_fix_layout_hint")) {
                 KeyboardShortcuts.Recorder(for: .fixKeyboardLayout)
             }

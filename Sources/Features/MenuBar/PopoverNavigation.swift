@@ -291,10 +291,11 @@ final class PopoverNavigation: ObservableObject {
         selectedItemID = item.id
     }
 
-    func activate(_ item: PopoverItem) {
+    /// `optionHeld`: the clip pastes the other way from the plain-text preference, once.
+    func activate(_ item: PopoverItem, optionHeld: Bool = false) {
         switch item {
         case .clip(let clip, _), .pinned(let clip, _):
-            PasteCoordinator.shared.paste(clip)
+            PasteCoordinator.shared.paste(clip, as: optionHeld ? .alternate : .preferred)
         case .category(let category, _):
             showsAllSnippets = false
             drilledCategory = category
@@ -315,14 +316,10 @@ final class PopoverNavigation: ObservableObject {
         selectedItemID = openedRow
     }
 
-    static func canSaveAsSnippet(_ clip: SimpleClipItem) -> Bool {
-        clip.kind != .image && clip.kind != .file
-    }
-
     /// Saves the clip's text as a snippet in the group, or in a new group when there is none, and opens it in the editor.
     @discardableResult
     func saveAsSnippet(_ clip: SimpleClipItem, in groupID: NSManagedObjectID?) -> Snippet? {
-        guard let context, Self.canSaveAsSnippet(clip) else { return nil }
+        guard let context, clip.hasPlainText else { return nil }
         let group = groupID.flatMap { try? context.existingObject(with: $0) as? SnippetGroup }
             ?? SnippetGroup.insert(named: L("editor_new_group"), in: context)
         let title = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -407,6 +404,14 @@ final class PopoverNavigation: ObservableObject {
             }
             return handleCommand(keyCode: key.keyCode)
         }
+        if key.modifiers == .option, key.keyCode == KeyCode.returnKey || key.keyCode == KeyCode.enter {
+            if let item = selectedItem { activate(item, optionHeld: true) }
+            return true
+        }
+        if key.modifiers == .option, searchText.isEmpty, let match = numberedItem(for: key) {
+            activate(match, optionHeld: true)
+            return true
+        }
         if key.modifiers == .option, key.keyCode == KeyCode.delete, searchText.isEmpty {
             switch selectedItem {
             case .clip(let clip, _)?, .pinned(let clip, _)?:
@@ -451,15 +456,18 @@ final class PopoverNavigation: ObservableObject {
             break
         }
 
-        guard searchText.isEmpty, let digit = digit(of: key) else { return false }
+        guard searchText.isEmpty, let match = numberedItem(for: key) else { return false }
+        activate(match)
+        return true
+    }
+
+    private func numberedItem(for key: KeyInput) -> PopoverItem? {
+        guard let digit = digit(of: key) else { return nil }
         let number = digit == 0 ? 10 : digit
-        let match = items.first { item in
+        return items.first { item in
             if case .clip(_, let itemNumber) = item { return itemNumber == number }
             return false
         }
-        guard let match else { return false }
-        activate(match)
-        return true
     }
 
     private var selectedItem: PopoverItem? {

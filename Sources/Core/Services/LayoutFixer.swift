@@ -41,9 +41,9 @@ final class LayoutFixer {
         guard !isFixing else { return }
         isFixing = true
         defer { isFixing = false }
-        guard await modifiersReleased() else { return }
+        guard await SyntheticKeyboard.modifiersReleased() else { return }
 
-        let pairs = KeyboardLayouts.candidatePairs(recentIDs: Array(recentLayoutIDs.dropFirst()))
+        let pairs = layoutPairs
         guard !pairs.isEmpty else {
             Log.expansion.notice("Layout fix: no enabled keyboard layout of another language")
             NSSound.beep()
@@ -94,13 +94,8 @@ final class LayoutFixer {
         return text.isEmpty ? .empty : .text(text)
     }
 
-    /// Synthetic keys sent while the hotkey's modifiers are held would carry them; gives up after a second.
-    private func modifiersReleased() async -> Bool {
-        let held: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
-        for _ in 0..<100 {
-            if CGEventSource.flagsState(.hidSystemState).isDisjoint(with: held) { return true }
-            try? await Task.sleep(nanoseconds: 10_000_000)
-        }
-        return false
+    /// The current layout paired with each other-language layout, the most recently used first.
+    var layoutPairs: [LayoutPair] {
+        KeyboardLayouts.candidatePairs(recentIDs: Array(recentLayoutIDs.dropFirst()))
     }
 }

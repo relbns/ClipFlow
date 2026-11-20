@@ -567,6 +567,55 @@ final class LayoutConverterTests: XCTestCase {
     }
 }
 
+final class TextTransformTests: XCTestCase {
+    func testEachTransformRewritesItsFixture() {
+        let cases: [(TextTransform, String, String?)] = [
+            (.uppercase, "Hello world", "HELLO WORLD"),
+            (.lowercase, "Hello World", "hello world"),
+            (.titleCase, "hello big world", "Hello Big World"),
+            (.titleCase, "NASA sent my iPhone", "NASA Sent My iPhone"),
+            (.titleCase, "SHOUTING TEXT", "Shouting Text"),
+            (.sentenceCase, "hello. how are you?\nfine", "Hello. How are you?\nFine"),
+            (.sentenceCase, "i met John in NYC.", "I met John in NYC."),
+            (.sentenceCase, "HELLO THERE. BYE", "Hello there. Bye"),
+            (.trim, "  padded \n", "padded"),
+            (.collapseSpaces, "a   b\t\tc\nd  e", "a b c\nd e"),
+            (.collapseSpaces, "\t\tcode  x", "\t\tcode x"),
+            (.joinLines, "first line\n  second\r\nthird", "first line second third"),
+            (.removeEmptyLines, "a\n\n  \nb", "a\nb"),
+            (.removeEmptyLines, "a\r\n\r\nb\r\n", "a\r\nb"),
+            (.removeEmptyLines, "a\r\nb", nil),
+            (.camelCase, "user ID list", "userIdList"),
+            (.camelCase, "שלום עולם", nil),
+            (.snakeCase, "userIDList", "user_id_list"),
+            (.kebabCase, "Hello World_again", "hello-world-again"),
+            (.urlEncode, "a b&c=ש", "a%20b%26c%3D%D7%A9"),
+            (.urlDecode, "a%20b%26c", "a b&c"),
+            (.base64Encode, "שלום", "16nXnNeV150="),
+            (.base64Decode, "16nXnNeV150=", "שלום"),
+            (.base64Decode, "not base64 ✗", nil),
+            (.base64Decode, "aGVsbG8", "hello"),
+            (.base64Decode, "Pz8-Pw", "??>?"),
+            (.prettyJSON, "{\"b\":1.10,\"a\":[1e2,{}],\"s\":\"x, {y}: \\\"z\\\"\"}",
+             "{\n  \"b\": 1.10,\n  \"a\": [\n    1e2,\n    {}\n  ],\n  \"s\": \"x, {y}: \\\"z\\\"\"\n}"),
+            (.prettyJSON, "{broken", nil),
+            (.removeNiqqud, "שָׁלוֹם בֵּית־סֵפֶר", "שלום בית־ספר"),
+            (.removeNiqqud, "\u{FB2A}\u{FB31}", "שב"),
+            (.removeNiqqud, "café", nil),
+            (.uppercase, "ALREADY", nil)
+        ]
+        for (transform, input, expected) in cases {
+            XCTAssertEqual(transform.apply(input), expected, "\(transform) on \(input)")
+        }
+    }
+
+    func testFixLayoutUsesTheGivenLayoutPairs() {
+        let pair = LayoutPair(first: "en", second: "he", keys: [("a", "ש"), ("k", "ל"), ("u", "ו"), ("o", "ם")])
+        XCTAssertEqual(TextTransform.fixLayout.apply("akuo", layoutPairs: [pair]), "שלום")
+        XCTAssertNil(TextTransform.fixLayout.apply("akuo"), "no layouts, no change")
+    }
+}
+
 final class FuzzyMatchTests: XCTestCase {
     func testTiersRankExactThenPrefixThenWordThenAnywhereThenGaps() {
         let cases: [(query: String, text: String, score: Int?)] = [

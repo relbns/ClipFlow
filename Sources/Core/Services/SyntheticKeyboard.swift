@@ -23,6 +23,16 @@ enum SyntheticKeyboard {
         tap(keyCode(for: "v") ?? Key.v, flags: .maskCommand)
     }
 
+    /// A hotkey fires while its modifiers may still be held; keys sent then would carry them. Gives up after a second.
+    static func modifiersReleased() async -> Bool {
+        let held: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
+        for _ in 0..<100 {
+            if CGEventSource.flagsState(.hidSystemState).isDisjoint(with: held) { return true }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        return false
+    }
+
     /// The key that types `character` in the current Latin layout, so Cmd+V stays Cmd+V on Dvorak or AZERTY.
     static func keyCode(for character: Character) -> CGKeyCode? {
         guard let source = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue(),

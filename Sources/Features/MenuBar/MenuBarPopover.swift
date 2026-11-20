@@ -103,7 +103,7 @@ struct MenuBarPopover: View {
     }
 
     private func rowButton(_ item: PopoverItem) -> some View {
-        Button { navigation.activate(item) } label: { rowContent(item) }
+        Button { navigation.activate(item, optionHeld: NSEvent.modifierFlags.contains(.option)) } label: { rowContent(item) }
             .buttonStyle(.plain)
     }
 
@@ -125,8 +125,20 @@ struct MenuBarPopover: View {
 
     @ViewBuilder
     private func clipMenu(_ clip: SimpleClipItem) -> some View {
+        if clip.hasPlainText {
+            Button(L("paste_plain")) { PasteCoordinator.shared.paste(clip, as: .plainText) }
+            Menu(L("paste_as")) {
+                ForEach(TextTransform.Group.allCases, id: \.self) { group in
+                    if group != TextTransform.Group.allCases.first { Divider() }
+                    ForEach(TextTransform.allCases.filter { $0.group == group }) { transform in
+                        Button(L(transform.titleKey)) { PasteCoordinator.shared.paste(clip, as: .transformed(transform)) }
+                    }
+                }
+            }
+            Divider()
+        }
         Button(clip.isPinned ? L("unpin") : L("pin")) { navigation.togglePin(clip) }
-        if PopoverNavigation.canSaveAsSnippet(clip) {
+        if clip.hasPlainText {
             if navigation.snippetGroups.isEmpty {
                 Button(L("save_as_snippet")) { navigation.saveAsSnippet(clip, in: nil) }
             } else {
