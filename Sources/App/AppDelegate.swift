@@ -72,6 +72,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         textExpansionEngine = TextExpansionEngine(context: stack.makeServiceContext())
         PasteEngine.shared.beforeWrite = { [weak self] in self?.clipboardMonitor.checkPasteboard() }
         keystrokeMonitor.onEvent = { [weak self] event in self?.textExpansionEngine.handle(event) }
+        LayoutFixer.shared.takeTypedText = { [weak self] in self?.textExpansionEngine.takeTextBeforeShortcut() }
 
         PasteCoordinator.shared.clipboardMonitor = clipboardMonitor
         PasteCoordinator.shared.closePopover = { [weak self] in self?.menuBarPopover?.performClose(nil) }
@@ -161,7 +162,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyManager.shared.setupHotkeys(
             onHistoryMenu: { [weak self] in self?.showMenuPopover() },
             onSnippetEditor: { [weak self] in self?.openSnippetEditor() },
-            onClearHistory: { [weak self] in self?.clipboardMonitor.clearHistory() }
+            onClearHistory: { [weak self] in self?.clipboardMonitor.clearHistory() },
+            onFixLayout: { Task { await LayoutFixer.shared.fix() } }
         )
     }
 

@@ -21,13 +21,31 @@ final class TextExpansionEngine {
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.buffer.reset() }
+            MainActor.assumeIsolated {
+                self?.buffer.reset()
+                self?.textBeforeShortcut = nil
+            }
         })
     }
 
+    /// What was typed right before the latest Command/Control shortcut, while nothing else happened since.
+    private var textBeforeShortcut: String?
+
+    func takeTextBeforeShortcut() -> String? {
+        defer { textBeforeShortcut = nil }
+        return textBeforeShortcut
+    }
+
     func handle(_ event: TypingEvent) {
+        if case .shortcut = event {
+            textBeforeShortcut = buffer.text.isEmpty ? nil : buffer.text
+            buffer.reset()
+            return
+        }
+        textBeforeShortcut = nil
         switch event {
-        case .reset:
+        case .reset, .shortcut:
+            // .shortcut returned above; listed so the switch stays exhaustive.
             buffer.reset()
         case .deleteBackward:
             buffer.deleteBackward()

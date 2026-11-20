@@ -14,6 +14,7 @@ enum AppDefaults {
             "viewMode": "organized",
             "appearanceMode": "auto",
             "closePopoverOnOutsideClick": true,
+            "layoutFixSwitchesKeyboard": true,
             "excludedApps": "[]"
         ])
     }

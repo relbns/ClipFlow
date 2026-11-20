@@ -504,6 +504,69 @@ final class PopoverNavigationTests: XCTestCase {
     }
 }
 
+final class LayoutConverterTests: XCTestCase {
+    private let pair = LayoutPair(first: "en", second: "he", keys: [
+        ("a", "ש"), ("k", "ל"), ("u", "ו"), ("o", "ם"), ("t", "א"), ("e", "ק"),
+        (",", "ת"), (".", "ץ"), ("/", "."), (";", "ף"), ("1", "1"), ("A", "A")
+    ])
+
+    func testConvertsTowardTheLayoutTheLettersDoNotBelongTo() {
+        let cases: [(String, LayoutConverter.Result?)] = [
+            ("akuo", .init(text: "שלום", toSecond: true)),
+            ("שלום", .init(text: "akuo", toSecond: false)),
+            ("akuo, tk.", .init(text: "שלוםת אלץ", toSecond: true)),
+            ("שלום.", .init(text: "akuo/", toSecond: false)),
+            ("akuo 1A", .init(text: "שלום 1A", toSecond: true)),
+            ("123 !", nil),
+            ("", nil)
+        ]
+        for (text, expected) in cases {
+            XCTAssertEqual(LayoutConverter.convert(text, with: pair), expected, text)
+        }
+    }
+
+    func testOnlyTheTrailingRunInOneLayoutIsRetyped() {
+        XCTAssertEqual(LayoutConverter.trailingRun(of: "שלום akuo", with: pair), " akuo")
+        XCTAssertEqual(LayoutConverter.trailingRun(of: "akuo, tk.", with: pair), "akuo, tk.")
+        XCTAssertEqual(LayoutConverter.trailingRun(of: "tk שלום", with: pair), " שלום")
+        XCTAssertEqual(LayoutConverter.trailingRun(of: "123", with: pair), "123")
+    }
+
+    func testThePairIsTheLayoutTheLettersCameFromElseTheMostRecent() {
+        let russian = LayoutPair(first: "en", second: "ru", keys: [("a", "ф"), ("k", "л")])
+        XCTAssertEqual(LayoutConverter.choosePair(for: "שלום", among: [russian, pair])?.second, "he")
+        XCTAssertEqual(LayoutConverter.choosePair(for: "akuo", among: [russian, pair])?.second, "ru", "letters of the current layout go to the most recent other")
+    }
+
+    func testTheRealHebrewLayoutRetypesWhatTheKeysMeant() throws {
+        guard let real = KeyboardLayouts.pair("com.apple.keylayout.ABC", "com.apple.keylayout.Hebrew") else {
+            throw XCTSkip("ABC and Hebrew layouts are not installed")
+        }
+        XCTAssertEqual(LayoutConverter.convert("akuo", with: real)?.text, "שלום")
+        XCTAssertEqual(LayoutConverter.convert("שלום", with: real)?.text, "akuo")
+        XCTAssertEqual(LayoutConverter.convert("vhh, mh", with: real)?.text, "היית צי")
+    }
+
+    @MainActor
+    func testTheTextTypedBeforeAShortcutIsKeptForOneHotkeyOnly() {
+        let engine = TextExpansionEngine(context: CoreDataStack(storeURL: nil).viewContext)
+        engine.handle(.characters("akuo"))
+        engine.handle(.shortcut)
+        XCTAssertEqual(engine.takeTextBeforeShortcut(), "akuo")
+        XCTAssertNil(engine.takeTextBeforeShortcut())
+
+        engine.handle(.characters("tk"))
+        engine.handle(.reset)
+        engine.handle(.shortcut)
+        XCTAssertNil(engine.takeTextBeforeShortcut(), "a click between typing and the hotkey drops the text")
+
+        engine.handle(.characters("akuo"))
+        engine.handle(.shortcut)
+        engine.handle(.shortcut)
+        XCTAssertNil(engine.takeTextBeforeShortcut(), "another shortcut such as Cmd+Z between typing and the hotkey drops it")
+    }
+}
+
 final class FuzzyMatchTests: XCTestCase {
     func testTiersRankExactThenPrefixThenWordThenAnywhereThenGaps() {
         let cases: [(query: String, text: String, score: Int?)] = [

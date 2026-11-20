@@ -38,7 +38,7 @@ enum SyntheticKeyboard {
                 var characters = [UniChar](repeating: 0, count: 4)
                 let status = UCKeyTranslate(
                     layout, code, UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
-                    OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
+                    OptionBits(1 << kUCKeyTranslateNoDeadKeysBit), &deadKeyState, characters.count, &length, &characters
                 )
                 if status == noErr, String(utf16CodeUnits: characters, count: length) == target {
                     return code
