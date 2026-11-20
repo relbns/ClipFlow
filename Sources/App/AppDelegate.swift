@@ -271,7 +271,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func startOutsideClickMonitor() {
         guard outsideClickMonitor == nil else { return }
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
-            MainActor.assumeIsolated { self?.menuBarPopover?.performClose(nil) }
+            let location = NSEvent.mouseLocation
+            MainActor.assumeIsolated {
+                guard let popover = self?.menuBarPopover, popover.isShown else { return }
+                if let frame = popover.contentViewController?.view.window?.frame, frame.contains(location) {
+                    Log.ui.info("Ignored a click inside the popover that macOS reported as another app's")
+                    return
+                }
+                Log.ui.info("Popover closed by a click in another app at \(Int(location.x), privacy: .public),\(Int(location.y), privacy: .public), popover frame \(String(describing: popover.contentViewController?.view.window?.frame), privacy: .public)")
+                popover.performClose(nil)
+            }
         }
     }
 

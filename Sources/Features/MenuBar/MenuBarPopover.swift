@@ -13,7 +13,7 @@ struct MenuBarPopover: View {
     var body: some View {
         VStack(spacing: 0) {
             searchField
-            if navigation.drilledCategory != nil, navigation.searchText.isEmpty {
+            if navigation.isDrilled, navigation.searchText.isEmpty {
                 drillHeader
             }
             list
@@ -49,7 +49,7 @@ struct MenuBarPopover: View {
         Button(action: navigation.goBack) {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.backward").font(.system(size: 11, weight: .semibold))
-                Text(L("section_categories")).font(.system(size: 12))
+                Text(L(navigation.showsAllSnippets ? "back" : "section_categories")).font(.system(size: 12))
                 Spacer()
             }
             .foregroundColor(theme.textMuted)
@@ -91,29 +91,52 @@ struct MenuBarPopover: View {
         }
     }
 
+    /// A Button, not a tap gesture: a click whose pointer moves a few points still counts.
     @ViewBuilder
     private func row(for item: PopoverItem) -> some View {
         switch item {
+        case .clip(let clip, _), .pinned(let clip, _):
+            rowButton(item).contextMenu { clipMenu(clip) }
+        default:
+            rowButton(item)
+        }
+    }
+
+    private func rowButton(_ item: PopoverItem) -> some View {
+        Button { navigation.activate(item) } label: { rowContent(item) }
+            .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func rowContent(_ item: PopoverItem) -> some View {
+        switch item {
         case .clip(let clip, let number):
             PopoverClipRow(clip: clip, trailing: number.map { $0 == 10 ? "0" : "\($0)" }, itemID: item.id)
-                .onTapGesture { navigation.activate(item) }
-                .contextMenu { clipMenu(clip) }
         case .pinned(let clip, let slot):
             PopoverClipRow(clip: clip, trailing: "⌘\(slot)", pinned: true, itemID: item.id)
-                .onTapGesture { navigation.activate(item) }
-                .contextMenu { clipMenu(clip) }
         case .category(let category, let count):
-            PopoverCategoryRow(category: category, count: count, itemID: item.id)
-                .onTapGesture { navigation.activate(item) }
+            PopoverDrillRow(icon: category.icon, accent: category.accent, title: L(category.titleKey), count: count, itemID: item.id)
+        case .allSnippets(let count):
+            PopoverDrillRow(icon: .bolt, accent: BrandPalette.accentLight, title: L("all_snippets"), count: count, itemID: item.id)
         case .snippet(let snippet):
             PopoverSnippetRow(snippet: snippet, itemID: item.id)
-                .onTapGesture { navigation.activate(item) }
         }
     }
 
     @ViewBuilder
     private func clipMenu(_ clip: SimpleClipItem) -> some View {
         Button(clip.isPinned ? L("unpin") : L("pin")) { navigation.togglePin(clip) }
+        if PopoverNavigation.canSaveAsSnippet(clip) {
+            if navigation.snippetGroups.isEmpty {
+                Button(L("save_as_snippet")) { navigation.saveAsSnippet(clip, in: nil) }
+            } else {
+                Menu(L("save_as_snippet")) {
+                    ForEach(navigation.snippetGroups) { group in
+                        Button(group.name) { navigation.saveAsSnippet(clip, in: group.objectID) }
+                    }
+                }
+            }
+        }
         Button(L("delete_clip"), role: .destructive) { navigation.delete(clip) }
     }
 
@@ -152,7 +175,7 @@ struct MenuBarPopover: View {
             CFSegmentedControl(
                 selection: Binding(
                     get: { viewMode == "simple" ? 0 : 1 },
-                    set: { viewMode = $0 == 0 ? "simple" : "organized"; navigation.drilledCategory = nil }
+                    set: { viewMode = $0 == 0 ? "simple" : "organized"; navigation.goBack() }
                 ),
                 options: [L("mode_simple"), L("mode_organized")]
             )
@@ -215,6 +238,11 @@ private struct PopoverClipRow: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if clip.isPinned && !pinned {
+                CFIcon(type: .pin, size: 12, stroke: 1.6)
+                    .foregroundColor(theme.textSubtle)
+                    .accessibilityLabel(L("clip_pinned"))
+            }
             if let trailing {
                 CFKBDChip(trailing, dim: !isSelected)
                     .environment(\.layoutDirection, .leftToRight)
@@ -266,8 +294,10 @@ private struct ClipTile: View {
     }
 }
 
-private struct PopoverCategoryRow: View {
-    let category: PopoverCategory
+private struct PopoverDrillRow: View {
+    let icon: CFIcon.IconType
+    let accent: Color
+    let title: String
     let count: Int
     let itemID: String
     @Environment(\.selectedPopoverItemID) private var selectedID
@@ -276,11 +306,11 @@ private struct PopoverCategoryRow: View {
     var body: some View {
         HStack(spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 6).fill(category.accent.mixed(22))
-                CFIcon(type: category.icon, size: 13, stroke: 1.8).foregroundColor(category.accent)
+                RoundedRectangle(cornerRadius: 6).fill(accent.mixed(22))
+                CFIcon(type: icon, size: 13, stroke: 1.8).foregroundColor(accent)
             }
             .frame(width: 22, height: 22)
-            Text(L(category.titleKey))
+            Text(title)
                 .font(.system(size: 13))
                 .foregroundColor(theme.text)
                 .frame(maxWidth: .infinity, alignment: .leading)

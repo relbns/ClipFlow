@@ -335,8 +335,10 @@ final class PopoverNavigationTests: XCTestCase {
     private var defaults: UserDefaults!
     private let navigation = PopoverNavigation.shared
 
+    private var stack: CoreDataStack!
+
     override func setUp() async throws {
-        let stack = CoreDataStack(storeURL: nil)
+        stack = CoreDataStack(storeURL: nil)
         defaults = UserDefaults(suiteName: "clipflow-nav-\(UUID().uuidString)")!
         AppDefaults.register(in: defaults)
         monitor = ClipboardMonitor(context: stack.viewContext, defaults: defaults)
@@ -349,12 +351,17 @@ final class PopoverNavigationTests: XCTestCase {
         navigation.clipboardMonitor = monitor
         navigation.defaults = defaults
         navigation.searchText = ""
-        navigation.drilledCategory = nil
+        navigation.goBack()
+        navigation.context = stack.viewContext
+        navigation.reloadSnippets()
     }
 
     override func tearDown() async throws {
         navigation.clipboardMonitor = nil
+        navigation.context = nil
+        navigation.reloadSnippets()
         navigation.defaults = .standard
+        SnippetEditorRequests.shared.reveal = nil
     }
 
     private func numbers(_ items: [PopoverItem]) -> [Int?] {
@@ -402,6 +409,70 @@ final class PopoverNavigationTests: XCTestCase {
         XCTAssertEqual(slot, 1)
         XCTAssertTrue(navigation.handle(.init(keyCode: 51, modifiers: .option)), "⌥⌫ deletes a pinned row too")
         XCTAssertFalse(monitor.clipHistory.contains { $0.id == pinnedClip.id })
+    }
+
+    @discardableResult
+    private func addSnippet(_ abbreviation: String, to group: SnippetGroup, uses: Int32 = 0, enabled: Bool = true) -> Snippet {
+        let snippet = Snippet.insert(title: "Title \(abbreviation)", abbreviation: abbreviation, content: "Body of \(abbreviation)", group: group, in: stack.viewContext)
+        snippet.useCount = uses
+        snippet.isEnabled = enabled
+        return snippet
+    }
+
+    func testAllSnippetsRowOpensEveryEnabledSnippetByGroup() throws {
+        defaults.set("organized", forKey: "viewMode")
+        let work = SnippetGroup.insert(named: "Work", in: stack.viewContext)
+        let home = SnippetGroup.insert(named: "Home", in: stack.viewContext)
+        let hidden = SnippetGroup.insert(named: "Hidden", in: stack.viewContext)
+        hidden.isEnabled = false
+        addSnippet(".a", to: work, uses: 1)
+        addSnippet(".b", to: work, uses: 9)
+        addSnippet(".c", to: work)
+        addSnippet(".d", to: home, uses: 5)
+        addSnippet(".off", to: home, enabled: false)
+        addSnippet(".hidden", to: hidden, uses: 50)
+        try stack.viewContext.save()
+        navigation.reloadSnippets()
+
+        let snippetRows = navigation.sections.last?.items.map(\.id) ?? []
+        XCTAssertEqual(snippetRows.count, 4, "three most-used snippets, then the row that opens the rest")
+        XCTAssertEqual(snippetRows.last, "all-snippets")
+        guard case .snippet(let mostUsed)? = navigation.sections.last?.items.first else { return XCTFail("expected a snippet first") }
+        XCTAssertEqual(mostUsed.abbreviation, ".b")
+
+        navigation.activate(.allSnippets(count: 4))
+        XCTAssertEqual(navigation.sections.map(\.title), ["Work", "Home"])
+        XCTAssertEqual(navigation.sections.map(\.items.count), [3, 1])
+        XCTAssertTrue(navigation.handle(.init(keyCode: 53)), "Escape goes back before it closes")
+        XCTAssertFalse(navigation.isDrilled)
+    }
+
+    func testSearchListsMatchingSnippetsAfterClips() throws {
+        let group = SnippetGroup.insert(named: "Work", in: stack.viewContext)
+        addSnippet(".sig", to: group)
+        try stack.viewContext.save()
+        navigation.reloadSnippets()
+
+        navigation.searchText = ".sig"
+        XCTAssertEqual(navigation.sections.map(\.id), ["snippet-results"], "no clip matches, so only the snippets show")
+        navigation.searchText = "clip 1"
+        XCTAssertEqual(navigation.sections.map(\.id), ["results"])
+        navigation.searchText = "of .sig"
+        XCTAssertEqual(navigation.sections.first?.items.count, 1, "content matches too")
+    }
+
+    func testSavingAClipAsASnippetTakesAFreeAbbreviationAndOpensIt() throws {
+        let group = SnippetGroup.insert(named: "Work", in: stack.viewContext)
+        addSnippet(".clip", to: group)
+        try stack.viewContext.save()
+        let clip = try XCTUnwrap(monitor.clipHistory.first { $0.content == "clip 3" })
+
+        let snippet = try XCTUnwrap(navigation.saveAsSnippet(clip, in: group.objectID))
+        XCTAssertEqual(snippet.abbreviation, ".clip2")
+        XCTAssertEqual(snippet.content, "clip 3")
+        XCTAssertEqual(snippet.group, group)
+        XCTAssertEqual(SnippetEditorRequests.shared.reveal, snippet.objectID)
+        XCTAssertFalse(stack.viewContext.hasChanges)
     }
 }
 
