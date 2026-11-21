@@ -23,6 +23,8 @@ final class ClipboardMonitor: ObservableObject {
         }
     }
     private var expiryTimer: Timer?
+    /// Every copy also joins the paste stack while it is on.
+    var pasteStack: PasteStack?
 
     init(context: NSManagedObjectContext, pasteboard: NSPasteboard = .general, defaults: UserDefaults = .standard) {
         self.context = context
@@ -66,6 +68,7 @@ final class ClipboardMonitor: ObservableObject {
 
     /// Records a copy, unless it is a sensitive clip the user does not save, and schedules its removal when asked.
     private func recordCopy(_ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?) {
+        pasteStack?.add(snapshot, preview: capture.text)
         let sensitive = SensitiveText.detectedKind(of: capture, defaults: defaults) != nil
         let handling = SensitiveText.handling(in: defaults)
         if sensitive, handling == .skip {

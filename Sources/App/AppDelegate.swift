@@ -74,6 +74,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keystrokeMonitor.onEvent = { [weak self] event in self?.textExpansionEngine.handle(event) }
         LayoutFixer.shared.takeTypedText = { [weak self] in self?.textExpansionEngine.takeTextBeforeShortcut() }
 
+        clipboardMonitor.pasteStack = PasteStack.shared
         PasteCoordinator.shared.clipboardMonitor = clipboardMonitor
         PasteCoordinator.shared.closePopover = { [weak self] in self?.menuBarPopover?.performClose(nil) }
         PopoverNavigation.shared.clipboardMonitor = clipboardMonitor
@@ -157,7 +158,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.target = self
             button.action = #selector(statusBarButtonClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.imagePosition = .imageLeading
         }
+        let stack = PasteStack.shared
+        stack.$isOn.combineLatest(stack.$items)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isOn, items in
+                self?.statusItem?.button?.title = isOn ? " \(items.count)" : ""
+            }
+            .store(in: &cancellables)
     }
 
     private func setupHotkeys() {
@@ -168,7 +177,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onFixLayout: { Task { await LayoutFixer.shared.fix() } },
             onPastePlainText: { Task { await PasteCoordinator.shared.pasteClipboardAsPlainText() } },
             onCaptureScreenText: { [weak self] in self?.captureScreen(.text) },
-            onCaptureScreenImage: { [weak self] in self?.captureScreen(.image) }
+            onCaptureScreenImage: { [weak self] in self?.captureScreen(.image) },
+            onTogglePasteStack: { PasteStack.shared.toggle() },
+            onPasteNextFromStack: { Task { await PasteStack.shared.pasteNext() } }
         )
     }
 

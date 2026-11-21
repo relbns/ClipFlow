@@ -6,6 +6,7 @@ struct MenuBarPopover: View {
     @Binding var isPresented: Bool
     var onSizeChange: (CGSize) -> Void = { _ in }
     @ObservedObject private var navigation = PopoverNavigation.shared
+    @ObservedObject private var pasteStack = PasteStack.shared
     @AppStorage("viewMode") private var viewMode = "organized"
     @State private var contentHeight: CGFloat = 0
     @Environment(\.cfTheme) private var theme
@@ -13,6 +14,10 @@ struct MenuBarPopover: View {
     var body: some View {
         VStack(spacing: 0) {
             searchField
+            if pasteStack.isOn {
+                PasteStackBanner(stack: pasteStack)
+                PopoverDivider()
+            }
             if navigation.isDrilled, navigation.searchText.isEmpty {
                 drillHeader
             }
@@ -206,6 +211,37 @@ struct MenuBarPopover: View {
 }
 
 // MARK: - Rows
+
+/// Shown while the paste stack is on: how many items wait, which one pastes next, and a way to end it.
+private struct PasteStackBanner: View {
+    @ObservedObject var stack: PasteStack
+    @Environment(\.cfTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            CFIcon(type: .arrowDown, size: 14, stroke: 1.8)
+                .foregroundColor(theme.accent)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(L("stack_banner_title")) · \(L("stack_banner_count", count: stack.items.count))")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(theme.textStrong)
+                Text(stack.upNext.map { L("stack_banner_next", Self.oneLine($0.preview)) } ?? L("stack_banner_empty"))
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.textMuted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 8)
+            CFToolbarBtn(label: L("stack_banner_end")) { stack.end() }
+        }
+        .padding(EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14))
+        .accessibilityElement(children: .combine)
+    }
+
+    private static func oneLine(_ text: String) -> String {
+        text.split(whereSeparator: \.isNewline).first.map(String.init) ?? text
+    }
+}
 
 private struct PopoverSectionHeader: View {
     let title: String

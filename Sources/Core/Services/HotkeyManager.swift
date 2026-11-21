@@ -8,6 +8,8 @@ extension KeyboardShortcuts.Name {
     static let pastePlainText = Self("pastePlainText", default: .init(.v, modifiers: [.command, .control, .shift]))
     static let captureScreenText = Self("captureScreenText", default: .init(.t, modifiers: [.command, .control, .shift]))
     static let captureScreenImage = Self("captureScreenImage", default: .init(.i, modifiers: [.command, .control, .shift]))
+    static let togglePasteStack = Self("togglePasteStack", default: .init(.c, modifiers: [.command, .control]))
+    static let pasteNextFromStack = Self("pasteNextFromStack", default: .init(.b, modifiers: [.command, .control]))
     static let showSnippetEditor = Self("showSnippetEditor")
     static let clearHistory = Self("clearHistory")
 }
@@ -25,8 +27,12 @@ final class HotkeyManager {
         onFixLayout: @escaping () -> Void,
         onPastePlainText: @escaping () -> Void,
         onCaptureScreenText: @escaping () -> Void,
-        onCaptureScreenImage: @escaping () -> Void
+        onCaptureScreenImage: @escaping () -> Void,
+        onTogglePasteStack: @escaping () -> Void,
+        onPasteNextFromStack: @escaping () -> Void
     ) {
+        KeyboardShortcuts.onKeyUp(for: .togglePasteStack, action: onTogglePasteStack)
+        KeyboardShortcuts.onKeyUp(for: .pasteNextFromStack, action: onPasteNextFromStack)
         KeyboardShortcuts.onKeyUp(for: .captureScreenText, action: onCaptureScreenText)
         KeyboardShortcuts.onKeyUp(for: .captureScreenImage, action: onCaptureScreenImage)
         KeyboardShortcuts.onKeyUp(for: .pastePlainText, action: onPastePlainText)

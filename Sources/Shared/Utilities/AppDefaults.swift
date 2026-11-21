@@ -27,7 +27,9 @@ enum AppDefaults {
             SensitiveText.clearClipboardKey: false,
             SensitiveKind.oneTimeCode.defaultsKey: true,
             SensitiveKind.cardNumber.defaultsKey: true,
-            SensitiveKind.iban.defaultsKey: true
+            SensitiveKind.iban.defaultsKey: true,
+            PasteStack.orderKey: PasteStack.Order.copied.rawValue,
+            PasteStack.endsWhenEmptyKey: true
         ])
     }
 }

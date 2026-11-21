@@ -36,6 +36,7 @@
 
 ### 📝 Paste as plain text and transforms
 - **Plain text**: `⌥`+pick in the history, `⌃⇧⌘V` anywhere, or always (Preferences).
+- **Paste stack**: `⌃⌘C` starts collecting, so every copy joins the stack. `⌃⌘B` then pastes the next item into the app in front, first copied first (or last copied first, in Preferences). The menu bar icon shows how many items wait, and the stack ends after its last item unless you turn that off. The stack lives in memory only.
 - **Paste as…**: UPPERCASE, lowercase, Title Case, Sentence case, whitespace cleanup, camelCase / snake_case / kebab-case, URL and Base64 encode and decode, pretty JSON, remove niqqud.
 
 ### ⌨️ Wrong keyboard layout
@@ -210,6 +211,8 @@ Apps: TablePlus, DataGrip
 | Shortcut | Action |
 |----------|--------|
 | ⌃⌘V | Open clipboard history (global, change it in Preferences → Hotkeys) |
+| ⌃⌘C | Start or end the paste stack |
+| ⌃⌘B | Paste the next item from the stack |
 | ↑ ↓ and Return | Pick a clip in the history and paste it |
 | 1-9, 0 | Paste clip 1-10 directly, while the search field is empty |
 | Esc | Close the history |

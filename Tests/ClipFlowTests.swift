@@ -1427,3 +1427,75 @@ final class SensitiveClipTests: XCTestCase {
         XCTAssertEqual(history, ["482913"])
     }
 }
+
+@MainActor
+final class PasteStackTests: XCTestCase {
+    private var defaults: UserDefaults!
+    private var stack: PasteStack!
+
+    override func setUp() async throws {
+        defaults = makeTestDefaults("clipflow-tests-stack")
+        AppDefaults.register(in: defaults)
+        stack = PasteStack(defaults: defaults)
+    }
+
+    private func add(_ texts: String...) {
+        for text in texts { stack.add(.text(text, transient: false), preview: text) }
+    }
+
+    func testCopiesJoinOnlyWhileTheStackIsOn() {
+        add("before")
+        stack.start()
+        add("one", "two")
+        XCTAssertEqual(stack.items.map(\.preview), ["one", "two"])
+        stack.end()
+        add("after")
+        XCTAssertEqual(stack.items, [])
+        XCTAssertFalse(stack.isOn)
+    }
+
+    func testPastesInCopyOrderAndEndsAfterTheLastItem() {
+        stack.start()
+        add("one", "two")
+        XCTAssertEqual(stack.upNext?.preview, "one")
+        XCTAssertEqual(stack.takeNext()?.preview, "one")
+        XCTAssertTrue(stack.isOn)
+        XCTAssertEqual(stack.takeNext()?.preview, "two")
+        XCTAssertFalse(stack.isOn)
+        XCTAssertNil(stack.takeNext())
+    }
+
+    func testReversedOrderAndAStackThatKeepsCollecting() {
+        defaults.set(PasteStack.Order.reversed.rawValue, forKey: PasteStack.orderKey)
+        defaults.set(false, forKey: PasteStack.endsWhenEmptyKey)
+        stack.start()
+        add("one", "two")
+        XCTAssertEqual(stack.takeNext()?.preview, "two")
+        XCTAssertEqual(stack.takeNext()?.preview, "one")
+        XCTAssertTrue(stack.isOn)
+        add("three")
+        XCTAssertEqual(stack.takeNext()?.preview, "three")
+    }
+
+    func testEveryRecordedCopyJoinsTheStackIncludingOnesHistoryDoesNotKeep() {
+        let store = CoreDataStack(storeURL: nil)
+        let pasteboard = NSPasteboard(name: .init("clipflow-tests-stack"))
+        let monitor = ClipboardMonitor(context: store.viewContext, pasteboard: pasteboard, defaults: defaults)
+        monitor.pasteStack = stack
+        monitor.startMonitoring()
+        defer {
+            monitor.stopMonitoring()
+            pasteboard.releaseGlobally()
+        }
+        defaults.set(SensitiveHandling.skip.rawValue, forKey: SensitiveText.handlingKey)
+        stack.start()
+        for text in ["first", "482913"] {
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+            monitor.checkPasteboard()
+        }
+        monitor.copy("screen text")
+        XCTAssertEqual(stack.items.map(\.preview), ["first", "482913", "screen text"])
+        XCTAssertEqual(monitor.clipHistory.map(\.content), ["screen text", "first"])
+    }
+}
