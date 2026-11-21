@@ -77,6 +77,8 @@ final class PasteCoordinator {
         case .transformed(let transform): resolved = .transformed(transform)
         }
         let snapshot: PasteboardSnapshot
+        // The text of every item the clip holds, not only the first.
+        let text = monitor.snapshot(for: clip)?.allText ?? clip.content
         switch resolved {
         case .original:
             guard let stored = monitor.snapshot(for: clip) else {
@@ -85,9 +87,9 @@ final class PasteCoordinator {
             }
             snapshot = stored
         case .plainText:
-            snapshot = .text(clip.content, transient: false)
+            snapshot = .text(text, transient: false)
         case .transformed(let transform):
-            guard let text = transform.apply(clip.content, layoutPairs: LayoutFixer.shared.layoutPairs) else {
+            guard let text = transform.apply(text, layoutPairs: LayoutFixer.shared.layoutPairs) else {
                 NSSound.beep()
                 return
             }

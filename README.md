@@ -58,6 +58,7 @@
   - `{cursor}`: where the caret lands after expansion
   - `{year}`, `{month}`, `{day}`
   - `{prompt:Name}`: asks for a value when the snippet expands
+  - `{lbrace}` and `{rbrace}`: a literal brace, so `{lbrace}date}` types `{date}`. Save as Snippet adds them for you; other braces, such as JSON, are typed as written.
 - **App rules**: restrict a snippet to some apps, never expand it in others, or exclude apps from expansion altogether.
 - **Statistics**: use count and last used, per snippet.
 

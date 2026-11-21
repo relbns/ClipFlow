@@ -20,11 +20,31 @@ struct RenderedSnippet: Equatable {
 }
 
 /// Variables: {date}, {date:FORMAT}, {date:hebrew}, {time}, {time:FORMAT}, {clipboard}, {cursor},
-/// {year}, {month}, {day}, {prompt:Label}, and the legacy {name:prompt="Label"}.
+/// {year}, {month}, {day}, {prompt:Label}, and the legacy {name:prompt="Label"}. {lbrace} and {rbrace} type a
+/// literal brace. Anything else in braces is left as written.
 enum SnippetTemplate {
     private static let tokenPattern = try! NSRegularExpression(pattern: #"\{([^{}:]+)(?::([^{}]*))?\}"#)
     private static let legacyPromptPattern = try! NSRegularExpression(pattern: #"^prompt="([^"]*)"$"#)
     private static let cursorMarker = "\u{E000}"
+    private static let variableNames: Set<String> = ["date", "time", "clipboard", "cursor", "year", "month", "day", "lbrace", "rbrace"]
+
+    /// Text that expands to itself: only braces that would start a variable become `{lbrace}`, so `{date}` stays
+    /// `{date}` while other braces (JSON, `{{name}}`) are kept as they are.
+    static func escaped(_ text: String) -> String {
+        var result = ""
+        var cursor = text.startIndex
+        for token in tokens(in: text) where isVariable(token) {
+            result += text[cursor..<token.range.lowerBound]
+            result += "{lbrace}" + token.raw.dropFirst()
+            cursor = token.range.upperBound
+        }
+        result += text[cursor...]
+        return result
+    }
+
+    private static func isVariable(_ token: Token) -> Bool {
+        prompt(for: token) != nil || variableNames.contains(token.name.lowercased())
+    }
 
     static func prompts(in content: String) -> [SnippetPrompt] {
         var seen = Set<String>()
@@ -105,6 +125,10 @@ enum SnippetTemplate {
             return format(context, pattern: "MM", dateStyle: .none, timeStyle: .none)
         case "day":
             return format(context, pattern: "dd", dateStyle: .none, timeStyle: .none)
+        case "lbrace":
+            return "{"
+        case "rbrace":
+            return "}"
         default:
             return token.raw
         }

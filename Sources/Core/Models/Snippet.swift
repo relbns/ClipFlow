@@ -53,6 +53,22 @@ extension Snippet {
         return snippet
     }
 
+    /// `prefix` plus three random letters, neither the start of another abbreviation nor starting with one, so with
+    /// the "any character" trigger typing it never fires a shorter snippet first. When an existing abbreviation
+    /// makes that impossible (say a `.clip` snippet), any unused one is returned.
+    static func freshAbbreviation(prefix: String, in context: NSManagedObjectContext) -> String {
+        let existing = ((try? context.fetch(fetchRequest())) ?? [])
+            .map { $0.abbreviation.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+        let letters = Array("abcdefghijkmnpqrstuvwxyz")
+        var candidate = prefix
+        for _ in 0..<200 {
+            candidate = prefix + String((0..<3).map { _ in letters.randomElement()! })
+            if !existing.contains(where: { $0.hasPrefix(candidate) || candidate.hasPrefix($0) }) { return candidate }
+        }
+        return uniqueAbbreviation(candidate, in: context)
+    }
+
     static func uniqueAbbreviation(_ base: String, in context: NSManagedObjectContext) -> String {
         let existing = Set(((try? context.fetch(fetchRequest())) ?? []).map { $0.abbreviation.lowercased() })
         guard existing.contains(base.lowercased()) else { return base }
