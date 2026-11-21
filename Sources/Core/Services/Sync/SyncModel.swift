@@ -144,32 +144,47 @@ enum SyncMerge {
             .sorted { $0.key < $1.key }
     }
 
-    /// The same snippet set up on two Macs (the starter snippets, or one typed twice) arrives under two ids. Every
-    /// Mac keeps the copy with the smaller id and drops its own others, so they all agree, whatever order they sync
-    /// in. Copies count as the same only with the same abbreviation and text; a snippet whose text differs stays.
-    /// Groups with the same name fold the same way, into the smallest id. Only each key's newest record counts.
-    static func duplicates(local: [String: JSONValue], remote: [SyncRecord]) -> (dropSnippets: Set<String>, groupMap: [String: String]) {
-        var live: [String: JSONValue] = [:]
+    /// Run while a Mac joins a folder: the same snippet set up on two Macs (the starter snippets, or one typed on
+    /// both) arrives under two ids. Every Mac keeps the copy with the smaller id, so they agree whatever order they
+    /// join in. Copies count as the same only when everything matches (title, abbreviation, text, trigger, options,
+    /// app rules and the group's name). A group folds into another Mac's group of the same name. Only another Mac's
+    /// copy can replace one here; two of this Mac's own are never touched, and a record this Mac already deleted
+    /// does not count, however stale another Mac's file is.
+    static func duplicates(
+        local: [String: JSONValue], remote: [SyncRecord], ledger: [String: SyncLedgerEntry]
+    ) -> (dropSnippets: Set<String>, groupMap: [String: String]) {
+        // Another Mac's live copies, with the Mac each comes from; one this Mac already deleted does not count.
+        var remoteLive: [String: (payload: JSONValue, device: String)] = [:]
         for (key, record) in newest(remote) where !record.deleted {
-            if let payload = record.payload { live[key] = payload }
+            if let entry = ledger[key], entry.deleted, !isNewer(record, than: entry.modifiedAt, entry.device) { continue }
+            if let payload = record.payload { remoteLive[key] = (payload, record.device) }
         }
-        for (key, payload) in local { live[key] = payload }
+        func origin(_ key: String) -> String { remoteLive[key]?.device ?? "\u{0}this Mac" }
 
-        func signature(_ payload: JSONValue) -> String? {
-            guard let abbreviation = payload["abbreviation"]?.string?.lowercased() else { return nil }
-            return abbreviation + "\u{0}" + (payload["content"]?.string ?? "")
+        var groupNames: [String: String] = [:]
+        for (key, payload) in remoteLive.mapValues(\.payload).merging(local, uniquingKeysWith: { _, mine in mine })
+        where kind(of: key) == "group" {
+            groupNames[id(of: key)] = payload["name"]?.string
         }
-        var keeperBySignature: [String: String] = [:]
-        var keeperByGroupName: [String: String] = [:]
-        for (key, payload) in live {
+        func signature(_ payload: JSONValue) -> String? {
+            guard case .object(var fields) = payload else { return nil }
+            fields["group"] = payload["group"]?.string.flatMap { groupNames[$0] }.map(JSONValue.string) ?? .null
+            return JSONValue.object(fields).stableHash
+        }
+
+        var snippetCopies: [String: [(key: String, device: String)]] = [:]
+        var groupCopies: [String: [(key: String, device: String)]] = [:]
+        for (key, entry) in remoteLive {
             switch kind(of: key) {
-            case "snippet":
-                if let signature = signature(payload) { keeperBySignature[signature] = min(keeperBySignature[signature] ?? key, key) }
-            case "group":
-                if let name = payload["name"]?.string { keeperByGroupName[name] = min(keeperByGroupName[name] ?? key, key) }
-            default:
-                break
+            case "snippet": if let signature = signature(entry.payload) { snippetCopies[signature, default: []].append((key, entry.device)) }
+            case "group": if let name = entry.payload["name"]?.string { groupCopies[name, default: []].append((key, entry.device)) }
+            default: break
             }
+        }
+        /// The smallest key among copies from a Mac other than `key`'s own, if it is smaller than `key`.
+        func keeper(for key: String, among copies: [(key: String, device: String)]?) -> String? {
+            let mine = origin(key)
+            return copies?.filter { $0.device != mine && $0.key < key }.map(\.key).min()
         }
 
         var drop: Set<String> = []
@@ -177,10 +192,10 @@ enum SyncMerge {
         for (key, payload) in local {
             switch kind(of: key) {
             case "snippet":
-                if let signature = signature(payload), let keeper = keeperBySignature[signature], keeper != key { drop.insert(key) }
+                if let signature = signature(payload), keeper(for: key, among: snippetCopies[signature]) != nil { drop.insert(key) }
             case "group":
-                if let name = payload["name"]?.string, let keeper = keeperByGroupName[name], keeper != key {
-                    groupMap[id(of: key)] = id(of: keeper)
+                if let name = payload["name"]?.string, let keep = keeper(for: key, among: groupCopies[name]) {
+                    groupMap[id(of: key)] = id(of: keep)
                 }
             default:
                 break

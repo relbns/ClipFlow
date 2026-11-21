@@ -120,13 +120,25 @@ final class SyncStore {
         return save()
     }
 
-    func foldGroups(_ groupMap: [String: String]) -> Bool {
+    struct FoldResult {
+        let saved: Bool
+        let movedSnippets: Set<String>
+        let removedGroups: Set<String>
+    }
+
+    func foldGroups(_ groupMap: [String: String]) -> FoldResult {
+        var moved: Set<String> = []
+        var removed: Set<String> = []
         for (localID, remoteID) in groupMap {
             guard let local = group(id: localID), let remote = group(id: remoteID), local != remote else { continue }
-            for snippet in local.snippets { snippet.group = remote }
+            for snippet in local.snippets {
+                snippet.group = remote
+                moved.insert("snippet:\(snippet.id.uuidString)")
+            }
+            removed.insert("group:\(localID)")
             context.delete(local)
         }
-        return save()
+        return FoldResult(saved: save(), movedSnippets: moved, removedGroups: removed)
     }
 
     // MARK: - Apply
@@ -149,14 +161,19 @@ final class SyncStore {
             detached.formUnion(applyGroup(id: SyncMerge.id(of: record.key), record: record))
         }
         for record in records where record.kind == "snippet" {
+            // Filed under a group that was deleted: kept without it, which is not an edit made here either.
+            let groupID = record.payload?["group"]?.string
+            let orphaned = groupID.map { deletedGroups.contains($0) && group(id: $0) == nil } ?? false
             if !applySnippet(id: SyncMerge.id(of: record.key), record: record, deletedGroups: deletedGroups) {
                 deferred.insert(record.key)
+            } else if orphaned, !record.deleted {
+                detached.insert(record.key)
             }
         }
         guard save() else { return ApplyResult(saved: false, deferred: deferred, detached: detached) }
         for record in records where record.kind == "pin" { applyPin(record) }
         for record in records where record.kind == "setting" { applySetting(key: SyncMerge.id(of: record.key), record: record) }
-        return ApplyResult(saved: true, deferred: deferred, detached: detached.subtracting(records.map(\.key)))
+        return ApplyResult(saved: true, deferred: deferred, detached: detached)
     }
 
     /// Returns the keys of snippets a deleted group leaves without a group.

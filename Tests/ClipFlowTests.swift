@@ -708,21 +708,45 @@ final class SyncMergeTests: XCTestCase {
         XCTAssertTrue(SyncMerge.incoming(remote: [deletion], ledger: [:], kinds: ["snippet"]).isEmpty, "nothing to delete here")
     }
 
+    private func sig(_ group: String, title: String = ".sig") -> JSONValue {
+        .object(["abbreviation": .string(".sig"), "title": .string(title), "content": .string("Best"), "group": .string(group)])
+    }
+
     func testTheSameSnippetOnTwoMacsKeepsTheSmallerIdOnBoth() {
-        let a = SyncRecord(key: "snippet:a1", modifiedAt: t0, deleted: false, payload: .object(["abbreviation": .string(".sig")]), device: "m1")
+        let a = SyncRecord(key: "snippet:a1", modifiedAt: t0, deleted: false, payload: sig("A"), device: "m1")
         let groupA = SyncRecord(key: "group:A", modifiedAt: t0, deleted: false, payload: .object(["name": .string("Personal")]), device: "m1")
         let local: [String: JSONValue] = [
             "group:Z": .object(["name": .string("Personal")]),
-            "snippet:z1": .object(["abbreviation": .string(".SIG")]),
+            "snippet:z1": sig("Z"),
             "snippet:z2": .object(["abbreviation": .string(".mine")])
         ]
-        let onZ = SyncMerge.duplicates(local: local, remote: [a, groupA])
-        XCTAssertEqual(onZ.dropSnippets, ["snippet:z1"])
+        let onZ = SyncMerge.duplicates(local: local, remote: [a, groupA], ledger: [:])
+        XCTAssertEqual(onZ.dropSnippets, ["snippet:z1"], "the same snippet in a group of the same name, under another id")
         XCTAssertEqual(onZ.groupMap, ["Z": "A"])
 
-        let z = SyncRecord(key: "snippet:z1", modifiedAt: t1, deleted: false, payload: .object(["abbreviation": .string(".sig")]), device: "m2")
-        let onA = SyncMerge.duplicates(local: ["snippet:a1": .object(["abbreviation": .string(".sig")])], remote: [z])
+        let z = SyncRecord(key: "snippet:z1", modifiedAt: t1, deleted: false, payload: sig("Z"), device: "m2")
+        let groupZ = SyncRecord(key: "group:Z", modifiedAt: t1, deleted: false, payload: .object(["name": .string("Personal")]), device: "m2")
+        let onA = SyncMerge.duplicates(local: ["snippet:a1": sig("A"), "group:A": .object(["name": .string("Personal")])], remote: [z, groupZ], ledger: [:])
         XCTAssertTrue(onA.dropSnippets.isEmpty, "the Mac with the smaller id keeps its copy, whichever syncs first")
+        XCTAssertTrue(onA.groupMap.isEmpty)
+    }
+
+    func testOnlyAnotherMacsUntouchedCopyReplacesOneHere() {
+        let stale = SyncRecord(key: "snippet:a1", modifiedAt: t0, deleted: false, payload: sig("A"), device: "m1")
+        let groupA = SyncRecord(key: "group:A", modifiedAt: t0, deleted: false, payload: .object(["name": .string("P")]), device: "m1")
+        let deletedHere = ["snippet:a1": SyncLedgerEntry(hash: "", modifiedAt: t1, deleted: true, device: "me")]
+        let recreated: [String: JSONValue] = ["snippet:z1": sig("Z"), "group:Z": .object(["name": .string("P")])]
+        XCTAssertTrue(SyncMerge.duplicates(local: recreated, remote: [stale, groupA], ledger: deletedHere).dropSnippets.isEmpty,
+                      "a copy this Mac deleted does not count, however stale the other file")
+
+        let customised: [String: JSONValue] = ["snippet:z1": sig("Z", title: "My signature"), "group:Z": .object(["name": .string("P")])]
+        XCTAssertTrue(SyncMerge.duplicates(local: customised, remote: [stale, groupA], ledger: [:]).dropSnippets.isEmpty,
+                      "a copy that differs in anything, here the title, stays")
+
+        let twoLocal: [String: JSONValue] = [
+            "group:B": .object(["name": .string("New Group")]), "group:C": .object(["name": .string("New Group")])
+        ]
+        XCTAssertTrue(SyncMerge.duplicates(local: twoLocal, remote: [], ledger: [:]).groupMap.isEmpty, "two groups here are never folded")
     }
 
     func testAJoiningMacKeepsItsSnippetWhenTheTextDiffersOrTheOtherCopyWasDeleted() {
@@ -737,7 +761,7 @@ final class SyncMergeTests: XCTestCase {
             "snippet:z1": .object(["abbreviation": .string(";addr"), "content": .string("Work")]),
             "snippet:z2": .object(["abbreviation": .string(";sig"), "content": .string("Best")])
         ]
-        XCTAssertTrue(SyncMerge.duplicates(local: local, remote: remote).dropSnippets.isEmpty)
+        XCTAssertTrue(SyncMerge.duplicates(local: local, remote: remote, ledger: [:]).dropSnippets.isEmpty)
     }
 
     func testALocalEditIsNewerThanWhatItReplacesEvenWithAFastClockElsewhere() {
