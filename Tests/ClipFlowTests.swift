@@ -1348,10 +1348,12 @@ final class SensitiveClipTests: XCTestCase {
     }
 
     func testSwitchingToDontSaveRemovesWaitingCodesAtOnce() {
+        defaults.set(true, forKey: SensitiveText.clearClipboardKey)
         copy("482913")
         defaults.set(SensitiveHandling.skip.rawValue, forKey: SensitiveText.handlingKey)
         monitor.removeExpiredSensitiveClips()
         XCTAssertEqual(history, [])
+        XCTAssertEqual(pasteboard.string(forType: .string), "482913", "the clipboard option belongs to Remove later only")
     }
 
     func testAKindThatIsNotDetectedIsKept() {
@@ -1387,20 +1389,29 @@ final class SensitiveClipTests: XCTestCase {
         XCTAssertEqual(pasteboard.string(forType: .string), "later text")
     }
 
-    func testCodesLeftByAnEarlierRunAreRemovedOrScheduledAtLaunch() {
-        let snapshot = PasteboardSnapshot.text("482913", transient: false)
-        let fresh = PasteboardSnapshot.text("553311", transient: false)
-        monitor.record(ClipCapture.classify(snapshot)!, snapshot: snapshot, sourceName: nil, sourceBundleID: nil, at: Date().addingTimeInterval(-600))
-        monitor.record(ClipCapture.classify(fresh)!, snapshot: fresh, sourceName: nil, sourceBundleID: nil, at: Date().addingTimeInterval(-60))
-        XCTAssertEqual(
-            ClipboardMonitor(context: stack.viewContext, pasteboard: pasteboard, defaults: defaults).clipHistory.map(\.content),
-            ["553311", "482913"], "history copied before the feature arrived is left alone"
-        )
+    func testARelaunchRemovesOnlyTheClipsThatWereWaiting() {
+        let old = PasteboardSnapshot.text("482913", transient: false)
+        monitor.record(ClipCapture.classify(old)!, snapshot: old, sourceName: nil, sourceBundleID: nil, at: Date().addingTimeInterval(-600))
+        copy("553311")
+        monitor.scheduleRemoval(of: monitor.clipHistory.first { $0.content == "553311" }!.id, copiedAt: Date().addingTimeInterval(-600))
+        copy("661122")
 
-        defaults.set(Date.distantPast, forKey: SensitiveText.sinceKey)
         let relaunched = ClipboardMonitor(context: stack.viewContext, pasteboard: pasteboard, defaults: defaults)
-        XCTAssertEqual(relaunched.clipHistory.map(\.content), ["553311"])
-        relaunched.removeExpiredSensitiveClips(now: Date().addingTimeInterval(5 * 60))
-        XCTAssertEqual(relaunched.clipHistory.map(\.content), [])
+        XCTAssertEqual(relaunched.clipHistory.map(\.content), ["661122", "482913"], "history that was never scheduled stays")
+        relaunched.removeExpiredSensitiveClips(now: Date().addingTimeInterval(5 * 60 + 1))
+        XCTAssertEqual(relaunched.clipHistory.map(\.content), ["482913"])
+    }
+
+    func testAFreshCopyOfTheSameCodeKeepsTheClipboardUntilItsOwnTime() {
+        defaults.set(false, forKey: "removeDuplicates")
+        defaults.set(true, forKey: SensitiveText.clearClipboardKey)
+        copy("482913")
+        let first = monitor.clipHistory[0].id
+        monitor.scheduleRemoval(of: first, copiedAt: Date().addingTimeInterval(-290))
+        copy("482913")
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(15))
+        XCTAssertEqual(history, ["482913"])
+        XCTAssertNotEqual(monitor.clipHistory[0].id, first)
+        XCTAssertEqual(pasteboard.string(forType: .string), "482913")
     }
 }

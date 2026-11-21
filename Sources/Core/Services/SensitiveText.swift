@@ -17,8 +17,8 @@ enum SensitiveText {
     static let handlingKey = "sensitiveClips"
     static let minutesKey = "sensitiveClipsMinutes"
     static let clearClipboardKey = "sensitiveClipsClearClipboard"
-    /// This Mac's first launch with the feature; history copied before it is never removed.
-    static let sinceKey = "sensitiveClipsSince"
+    /// The clips waiting for removal on this Mac, so a relaunch removes them on time and nothing else.
+    static let pendingKey = "sensitiveClipsPending"
     static let minuteChoices = [1, 5, 15, 60]
 
     static func kind(of text: String) -> SensitiveKind? {
