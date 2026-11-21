@@ -8,8 +8,8 @@ extension KeyboardShortcuts.Name {
     static let pastePlainText = Self("pastePlainText", default: .init(.v, modifiers: [.command, .control, .shift]))
     static let captureScreenText = Self("captureScreenText", default: .init(.t, modifiers: [.command, .control, .shift]))
     static let captureScreenImage = Self("captureScreenImage", default: .init(.i, modifiers: [.command, .control, .shift]))
-    static let togglePasteStack = Self("togglePasteStack", default: .init(.c, modifiers: [.command, .control]))
-    static let pasteNextFromStack = Self("pasteNextFromStack", default: .init(.b, modifiers: [.command, .control]))
+    static let togglePasteStack = Self("togglePasteStack", default: .init(.k, modifiers: [.command, .control]))
+    static let pasteNextFromStack = Self("pasteNextFromStack", default: .init(.m, modifiers: [.command, .control]))
     static let showSnippetEditor = Self("showSnippetEditor")
     static let clearHistory = Self("clearHistory")
 }
