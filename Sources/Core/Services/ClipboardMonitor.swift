@@ -52,7 +52,7 @@ final class ClipboardMonitor: ObservableObject {
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else { return }
         lastChangeCount = changeCount
-        guard !OwnPasteboardWrites.shared.contains(changeCount) else { return }
+        guard !OwnPasteboardWrites.shared.contains(changeCount, on: pasteboard) else { return }
 
         let source = NSWorkspace.shared.frontmostApplication
         if let bundleID = source?.bundleIdentifier, AppExclusions.history.contains(bundleID) { return }
@@ -271,7 +271,7 @@ final class ClipboardMonitor: ObservableObject {
 
     private func copyOwn(_ snapshot: PasteboardSnapshot) {
         let changeCount = snapshot.write(to: pasteboard)
-        OwnPasteboardWrites.shared.record(changeCount)
+        OwnPasteboardWrites.shared.record(changeCount, on: pasteboard)
         lastChangeCount = changeCount
         guard isRecording, let capture = ClipCapture.classify(snapshot) else { return }
         recordCopy(capture, snapshot: snapshot, sourceName: "ClipFlow", sourceBundleID: Bundle.main.bundleIdentifier)
