@@ -398,7 +398,8 @@ private struct InspectorField<Content: View>: View {
 
 /// An NSTextView that shows `{variables}` as chips and inserts a clicked variable at the caret.
 struct SnippetTextEditor: NSViewRepresentable {
-    static let tokenPattern = try! NSRegularExpression(pattern: #"\{[^{}\n]+\}"#)
+    /// A variable, not one written with doubled braces (`{{date}}` is the literal text `{date}`).
+    static let tokenPattern = try! NSRegularExpression(pattern: #"(?<!\{)\{[^{}\n]+\}(?!\})"#)
 
     @Binding var text: String
     let insertions: PassthroughSubject<String, Never>

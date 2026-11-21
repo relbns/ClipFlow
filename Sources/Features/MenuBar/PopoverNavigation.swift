@@ -329,7 +329,8 @@ final class PopoverNavigation: ObservableObject {
         let title = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let snippet = Snippet.insert(
             title: title.isEmpty ? L("editor_new_snippet") : String(title.prefix(60)),
-            abbreviation: ".clip", content: clip.content, group: group, in: context
+            abbreviation: Snippet.freshAbbreviation(prefix: ".clip", in: context),
+            content: SnippetTemplate.escaped(clip.content), group: group, in: context
         )
         do {
             try context.save()

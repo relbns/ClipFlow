@@ -20,23 +20,40 @@ struct RenderedSnippet: Equatable {
 }
 
 /// Variables: {date}, {date:FORMAT}, {date:hebrew}, {time}, {time:FORMAT}, {clipboard}, {cursor},
-/// {year}, {month}, {day}, {prompt:Label}, and the legacy {name:prompt="Label"}.
+/// {year}, {month}, {day}, {prompt:Label}, and the legacy {name:prompt="Label"}. `{{` and `}}` are literal braces.
 enum SnippetTemplate {
     private static let tokenPattern = try! NSRegularExpression(pattern: #"\{([^{}:]+)(?::([^{}]*))?\}"#)
     private static let legacyPromptPattern = try! NSRegularExpression(pattern: #"^prompt="([^"]*)"$"#)
     private static let cursorMarker = "\u{E000}"
+    private static let openBrace = "\u{E001}"
+    private static let closeBrace = "\u{E002}"
+
+    /// Text that expands to itself: every brace doubled, so `{date}` in it stays `{date}`.
+    static func escaped(_ text: String) -> String {
+        text.replacingOccurrences(of: "{", with: "{{").replacingOccurrences(of: "}", with: "}}")
+    }
+
+    /// Doubled braces become placeholders before variables are read, so `{{date}}` is never a variable.
+    private static func shielded(_ content: String) -> String {
+        content.replacingOccurrences(of: "{{", with: openBrace).replacingOccurrences(of: "}}", with: closeBrace)
+    }
+
+    private static func unshielded(_ text: String) -> String {
+        text.replacingOccurrences(of: openBrace, with: "{").replacingOccurrences(of: closeBrace, with: "}")
+    }
 
     static func prompts(in content: String) -> [SnippetPrompt] {
         var seen = Set<String>()
         var result: [SnippetPrompt] = []
-        for token in tokens(in: content) {
+        for token in tokens(in: shielded(content)) {
             guard let prompt = prompt(for: token), seen.insert(prompt.key).inserted else { continue }
             result.append(prompt)
         }
         return result
     }
 
-    static func render(_ content: String, context: TemplateContext) -> RenderedSnippet {
+    static func render(_ original: String, context: TemplateContext) -> RenderedSnippet {
+        let content = shielded(original)
         var result = ""
         var cursor = content.startIndex
         for token in tokens(in: content) {
@@ -45,6 +62,7 @@ enum SnippetTemplate {
             cursor = token.range.upperBound
         }
         result += content[cursor...]
+        result = unshielded(result)
 
         guard let markerRange = result.range(of: cursorMarker) else {
             return RenderedSnippet(text: result, cursorOffsetFromEnd: 0)

@@ -558,7 +558,7 @@ final class PopoverNavigationTests: XCTestCase {
         let clip = try XCTUnwrap(monitor.clipHistory.first { $0.content == "clip 3" })
 
         let snippet = try XCTUnwrap(navigation.saveAsSnippet(clip, in: group.objectID))
-        XCTAssertEqual(snippet.abbreviation, ".clip2")
+        XCTAssertTrue(snippet.abbreviation.hasPrefix(".clip") && snippet.abbreviation != ".clip", snippet.abbreviation)
         XCTAssertEqual(snippet.content, "clip 3")
         XCTAssertEqual(snippet.group, group)
         XCTAssertEqual(SnippetEditorRequests.shared.pending, snippet.objectID)
@@ -626,6 +626,42 @@ final class LayoutConverterTests: XCTestCase {
         engine.handle(.shortcut)
         engine.handle(.shortcut)
         XCTAssertNil(engine.takeTextBeforeShortcut(), "another shortcut such as Cmd+Z between typing and the hotkey drops it")
+    }
+}
+
+final class SmallLimitsTests: XCTestCase {
+    private let context = TemplateContext(now: Date(timeIntervalSince1970: 0), timeZone: TimeZone(identifier: "UTC")!,
+                                          locale: Locale(identifier: "en_US_POSIX"), clipboard: "CLIP")
+
+    func testEscapedTextExpandsToItself() {
+        let clip = "Use {date} and {clipboard}, or {{literal}} braces"
+        XCTAssertEqual(SnippetTemplate.render(SnippetTemplate.escaped(clip), context: context).text, clip)
+        XCTAssertEqual(SnippetTemplate.render("{{date}} is {clipboard}", context: context).text, "{date} is CLIP")
+        XCTAssertTrue(SnippetTemplate.prompts(in: "{{prompt:Name}}").isEmpty, "an escaped prompt asks for nothing")
+    }
+
+    func testEveryItemOfAMultiItemClipIsItsPlainText() {
+        let snapshot = PasteboardSnapshot(items: [
+            [NSPasteboard.PasteboardType.string.rawValue: Data("first".utf8)],
+            [NSPasteboard.PasteboardType.string.rawValue: Data("second".utf8)]
+        ])
+        XCTAssertEqual(snapshot.allText, "first\nsecond")
+        XCTAssertEqual(snapshot.string, "first")
+    }
+
+    @MainActor
+    func testAFreshAbbreviationNeverStartsAnotherOrStartsWithOne() throws {
+        let stack = CoreDataStack(storeURL: nil)
+        let group = SnippetGroup.insert(named: "G", in: stack.viewContext)
+        _ = Snippet.insert(title: "a", abbreviation: ".clipabc", content: "", group: group, in: stack.viewContext)
+        try stack.viewContext.save()
+        for _ in 0..<20 {
+            let fresh = Snippet.freshAbbreviation(prefix: ".clip", in: stack.viewContext)
+            XCTAssertFalse(fresh.hasPrefix(".clipabc") || ".clipabc".hasPrefix(fresh), fresh)
+        }
+        _ = Snippet.insert(title: "b", abbreviation: ".clip", content: "", group: group, in: stack.viewContext)
+        try stack.viewContext.save()
+        XCTAssertNotEqual(Snippet.freshAbbreviation(prefix: ".clip", in: stack.viewContext), ".clip", "still unique when a prefix-free one is impossible")
     }
 }
 
