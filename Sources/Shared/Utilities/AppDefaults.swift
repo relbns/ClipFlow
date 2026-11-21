@@ -21,7 +21,13 @@ enum AppDefaults {
             "syncSettings": true,
             "syncPins": true,
             "ocrIndexImages": true,
-            "excludedApps": "[]"
+            "excludedApps": "[]",
+            SensitiveText.handlingKey: SensitiveHandling.expire.rawValue,
+            SensitiveText.minutesKey: 5,
+            SensitiveText.clearClipboardKey: false,
+            SensitiveKind.oneTimeCode.defaultsKey: true,
+            SensitiveKind.cardNumber.defaultsKey: true,
+            SensitiveKind.iban.defaultsKey: true
         ])
     }
 }

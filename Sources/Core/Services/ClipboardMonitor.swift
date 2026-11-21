@@ -15,12 +15,16 @@ final class ClipboardMonitor: ObservableObject {
     private var maxHistoryItems: Int { max(10, defaults.integer(forKey: "maxHistoryItems")) }
     private var removeDuplicates: Bool { defaults.bool(forKey: "removeDuplicates") }
     private var moveUsedToTop: Bool { defaults.bool(forKey: "moveUsedToTop") }
+    /// Sensitive clips waiting for removal: when they were copied, and the clipboard's change count at that copy.
+    private var expiring: [UUID: (copiedAt: Date, changeCount: Int)] = [:]
+    private var expiryTimer: Timer?
 
     init(context: NSManagedObjectContext, pasteboard: NSPasteboard = .general, defaults: UserDefaults = .standard) {
         self.context = context
         self.pasteboard = pasteboard
         self.defaults = defaults
         reload()
+        removeSensitiveClipsFromEarlierRuns()
     }
 
     func startMonitoring() {
@@ -52,24 +56,35 @@ final class ClipboardMonitor: ObservableObject {
         }
         guard !snapshot.isEmpty, !snapshot.isPrivate, let capture = ClipCapture.classify(snapshot) else { return }
 
-        record(capture, snapshot: snapshot, source: source)
+        let sensitive = SensitiveText.detectedKind(of: capture, defaults: defaults)
+        let handling = SensitiveText.handling(in: defaults)
+        if sensitive != nil, handling == .skip {
+            Log.clipboard.info("Skipped a sensitive clip")
+            return
+        }
+        let id = record(capture, snapshot: snapshot, source: source)
+        if sensitive != nil, handling == .expire, let id {
+            scheduleRemoval(of: id, copiedAt: Date(), changeCount: changeCount)
+        }
     }
 
-    func record(_ capture: ClipCapture, snapshot: PasteboardSnapshot, source: NSRunningApplication?) {
+    @discardableResult
+    func record(_ capture: ClipCapture, snapshot: PasteboardSnapshot, source: NSRunningApplication?) -> UUID? {
         record(capture, snapshot: snapshot, sourceName: source?.localizedName, sourceBundleID: source?.bundleIdentifier)
     }
 
+    @discardableResult
     func record(
         _ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?,
         at date: Date = Date(), recognizedText: String? = nil
-    ) {
+    ) -> UUID? {
         if removeDuplicates, let existing = fetchItem(hash: capture.hash) {
             existing.createdAt = date
             existing.sourceAppName = sourceName
             existing.sourceBundleID = sourceBundleID
             if let recognizedText { existing.recognizedText = recognizedText }
             saveAndReload()
-            return
+            return existing.id
         }
 
         let item = ClipItem(context: context)
@@ -92,6 +107,69 @@ final class ClipboardMonitor: ObservableObject {
 
         saveAndReload()
         trimHistory()
+        return item.id
+    }
+
+    // MARK: - Sensitive clips
+
+    func scheduleRemoval(of id: UUID, copiedAt: Date, changeCount: Int) {
+        expiring[id] = (copiedAt, changeCount)
+        guard expiryTimer == nil else { return }
+        expiryTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.removeExpiredSensitiveClips() }
+        }
+    }
+
+    /// Removes the sensitive clips whose time is up, unless pinned, and empties the clipboard when asked and it still
+    /// holds that copy.
+    func removeExpiredSensitiveClips(now: Date = Date()) {
+        defer {
+            if expiring.isEmpty {
+                expiryTimer?.invalidate()
+                expiryTimer = nil
+            }
+        }
+        guard SensitiveText.handling(in: defaults) == .expire else {
+            expiring.removeAll()
+            return
+        }
+        let lifetime = SensitiveText.lifetime(in: defaults)
+        let clearClipboard = defaults.bool(forKey: SensitiveText.clearClipboardKey)
+        var removed = false
+        for (id, entry) in expiring where entry.copiedAt.addingTimeInterval(lifetime) <= now {
+            expiring[id] = nil
+            guard let item = fetchItem(id: id), !item.isPinned else { continue }
+            context.delete(item)
+            removed = true
+            if clearClipboard, pasteboard.changeCount == entry.changeCount {
+                pasteboard.clearContents()
+                lastChangeCount = pasteboard.changeCount
+            }
+        }
+        if removed { saveAndReload() }
+    }
+
+    /// Sensitive clips left by an earlier run: removed when their time is up, scheduled otherwise.
+    func removeSensitiveClipsFromEarlierRuns(now: Date = Date()) {
+        guard SensitiveText.handling(in: defaults) != .keep else { return }
+        let request = ClipItem.fetchRequest()
+        request.predicate = NSPredicate(format: "isPinned != YES AND type IN %@", [ClipType.text, .rtf].map(\.rawValue))
+        let sensitive = ((try? context.fetch(request)) ?? []).filter { item in
+            guard let kind = SensitiveText.kind(of: item.content) else { return false }
+            return defaults.bool(forKey: kind.defaultsKey)
+        }
+        guard !sensitive.isEmpty else { return }
+        let lifetime = SensitiveText.lifetime(in: defaults)
+        var removed = false
+        for item in sensitive {
+            if SensitiveText.handling(in: defaults) == .skip || item.createdAt.addingTimeInterval(lifetime) <= now {
+                context.delete(item)
+                removed = true
+            } else {
+                scheduleRemoval(of: item.id, copiedAt: item.createdAt, changeCount: -1)
+            }
+        }
+        if removed { saveAndReload() }
     }
 
     /// The pasteboard contents to put back when the user picks this clip.

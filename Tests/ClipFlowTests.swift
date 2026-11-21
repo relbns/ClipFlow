@@ -1258,3 +1258,120 @@ final class PreviousBundleIDTests: XCTestCase {
         XCTAssertNil(defaults.persistentDomain(forName: previous))
     }
 }
+
+final class SensitiveTextTests: XCTestCase {
+    func testOneTimeCodes() {
+        for code in ["482913", "48291375", "482 913", "4829-1375", "G-482913", " 482913\n"] {
+            XCTAssertEqual(SensitiveText.kind(of: code), .oneTimeCode, code)
+        }
+        for text in ["2026", "12345", "123456789", "code 482913", "48 2913"] {
+            XCTAssertNil(SensitiveText.kind(of: text), text)
+        }
+    }
+
+    func testCardNumbersNeedTheLuhnCheckAndACardPrefix() {
+        XCTAssertEqual(SensitiveText.kind(of: "4242 4242 4242 4242"), .cardNumber)
+        XCTAssertEqual(SensitiveText.kind(of: "5555-5555-5555-4444"), .cardNumber)
+        XCTAssertEqual(SensitiveText.kind(of: "378282246310005"), .cardNumber)
+        XCTAssertNil(SensitiveText.kind(of: "4242424242424241"), "fails Luhn")
+        XCTAssertNil(SensitiveText.kind(of: "1234567812345670"), "passes Luhn, no card starts with 1")
+        XCTAssertNil(SensitiveText.kind(of: "4242  4242 4242 4242"), "two spaces in a row")
+    }
+
+    func testIBANsNeedTheMod97Check() {
+        XCTAssertEqual(SensitiveText.kind(of: "IL62 0108 0000 0009 9999 999"), .iban)
+        XCTAssertEqual(SensitiveText.kind(of: "gb82west12345698765432"), .iban)
+        XCTAssertNil(SensitiveText.kind(of: "GB82 WEST 1234 5698 7654 33"))
+        XCTAssertNil(SensitiveText.kind(of: "Pay to IL620108000000099999999"))
+    }
+}
+
+@MainActor
+final class SensitiveClipTests: XCTestCase {
+    private var stack: CoreDataStack!
+    private var defaults: UserDefaults!
+    private var pasteboard: NSPasteboard!
+    private var monitor: ClipboardMonitor!
+
+    override func setUp() async throws {
+        stack = CoreDataStack(storeURL: nil)
+        defaults = makeTestDefaults("clipflow-tests-sensitive")
+        AppDefaults.register(in: defaults)
+        pasteboard = NSPasteboard(name: .init("clipflow-tests-sensitive"))
+        monitor = ClipboardMonitor(context: stack.viewContext, pasteboard: pasteboard, defaults: defaults)
+        monitor.startMonitoring()
+    }
+
+    override func tearDown() async throws {
+        monitor.stopMonitoring()
+        pasteboard.releaseGlobally()
+    }
+
+    private func copy(_ text: String) {
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        monitor.checkPasteboard()
+    }
+
+    private var history: [String] { monitor.clipHistory.map(\.content) }
+
+    func testACodeIsRemovedOnceItsTimeIsUpAndOtherClipsStay() {
+        copy("hello")
+        copy("482913")
+        XCTAssertEqual(history, ["482913", "hello"])
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(4 * 60))
+        XCTAssertEqual(history, ["482913", "hello"])
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(5 * 60 + 1))
+        XCTAssertEqual(history, ["hello"])
+        XCTAssertEqual(pasteboard.string(forType: .string), "482913", "the clipboard is left alone by default")
+    }
+
+    func testDontSaveSkipsTheCopyAndKeepRecordsIt() {
+        defaults.set(SensitiveHandling.skip.rawValue, forKey: SensitiveText.handlingKey)
+        copy("4242 4242 4242 4242")
+        XCTAssertEqual(history, [])
+        defaults.set(SensitiveHandling.keep.rawValue, forKey: SensitiveText.handlingKey)
+        copy("IL62 0108 0000 0009 9999 999")
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(24 * 3600))
+        XCTAssertEqual(history, ["IL62 0108 0000 0009 9999 999"])
+    }
+
+    func testAKindThatIsNotDetectedIsKept() {
+        defaults.set(false, forKey: SensitiveKind.oneTimeCode.defaultsKey)
+        copy("482913")
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(3600))
+        XCTAssertEqual(history, ["482913"])
+    }
+
+    func testAPinnedCodeIsKept() {
+        copy("482913")
+        monitor.setPinned(monitor.clipHistory[0], true)
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(3600))
+        XCTAssertEqual(history, ["482913"])
+    }
+
+    func testTheClipboardIsEmptiedOnlyWhileItStillHoldsTheCode() {
+        defaults.set(true, forKey: SensitiveText.clearClipboardKey)
+        copy("482913")
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(3600))
+        XCTAssertNil(pasteboard.string(forType: .string))
+
+        copy("553311")
+        copy("later text")
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(3600))
+        XCTAssertEqual(history, ["later text"])
+        XCTAssertEqual(pasteboard.string(forType: .string), "later text")
+    }
+
+    func testCodesLeftByAnEarlierRunAreRemovedOrScheduledAtLaunch() {
+        let snapshot = PasteboardSnapshot.text("482913", transient: false)
+        let fresh = PasteboardSnapshot.text("553311", transient: false)
+        monitor.record(ClipCapture.classify(snapshot)!, snapshot: snapshot, sourceName: nil, sourceBundleID: nil, at: Date().addingTimeInterval(-600))
+        monitor.record(ClipCapture.classify(fresh)!, snapshot: fresh, sourceName: nil, sourceBundleID: nil, at: Date().addingTimeInterval(-60))
+
+        let relaunched = ClipboardMonitor(context: stack.viewContext, pasteboard: pasteboard, defaults: defaults)
+        XCTAssertEqual(relaunched.clipHistory.map(\.content), ["553311"])
+        relaunched.removeExpiredSensitiveClips(now: Date().addingTimeInterval(5 * 60))
+        XCTAssertEqual(relaunched.clipHistory.map(\.content), [])
+    }
+}
