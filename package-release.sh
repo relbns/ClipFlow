@@ -128,3 +128,10 @@ echo ""
 echo "✅ $RELEASE_DIR/ClipFlow.dmg"
 echo "   Add the changes under \"What's new\" in $RELEASE_DIR/RELEASE_NOTES.md, then:"
 echo "   gh release create v$VERSION $RELEASE_DIR/ClipFlow.dmg --title \"ClipFlow $VERSION\" --notes-file $RELEASE_DIR/RELEASE_NOTES.md"
+SHA256=$(shasum -a 256 "$RELEASE_DIR/ClipFlow.dmg" | awk '{print $1}')
+[ -n "$SHA256" ] || { echo "❌ Could not compute the sha256 of $RELEASE_DIR/ClipFlow.dmg"; exit 1; }
+echo ""
+echo "   Then update the Homebrew cask (relbns/homebrew-tap, Casks/clipflow.rb) to:"
+echo "     version \"$VERSION\""
+echo "     sha256 \"$SHA256\""
+echo "   Check the sha256 against the published download before merging the cask change."

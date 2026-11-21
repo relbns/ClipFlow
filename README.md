@@ -76,6 +76,14 @@
 
 ## 🚀 Getting Started
 
+### Homebrew
+
+```bash
+brew install --cask relbns/tap/clipflow
+```
+
+Then open ClipFlow and allow it once, as in step 3 below. Update with `brew upgrade --cask clipflow`; each new version is allowed and granted its permissions again, as described after the steps.
+
 ### Download
 
 1. Download `ClipFlow.dmg` from the [latest release](https://github.com/relbns/ClipFlow/releases/latest) and open it.
