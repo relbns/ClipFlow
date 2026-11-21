@@ -1414,4 +1414,16 @@ final class SensitiveClipTests: XCTestCase {
         XCTAssertNotEqual(monitor.clipHistory[0].id, first)
         XCTAssertEqual(pasteboard.string(forType: .string), "482913")
     }
+
+    func testAPinnedCopyDoesNotHoldTheClipboard() {
+        defaults.set(false, forKey: "removeDuplicates")
+        defaults.set(true, forKey: SensitiveText.clearClipboardKey)
+        copy("482913")
+        monitor.scheduleRemoval(of: monitor.clipHistory[0].id, copiedAt: Date().addingTimeInterval(-290))
+        copy("482913")
+        monitor.setPinned(monitor.clipHistory[0], true)
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(15))
+        XCTAssertNil(pasteboard.string(forType: .string))
+        XCTAssertEqual(history, ["482913"])
+    }
 }

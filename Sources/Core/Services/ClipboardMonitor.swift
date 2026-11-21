@@ -148,7 +148,7 @@ final class ClipboardMonitor: ObservableObject {
         let due = expiring.filter { handling == .skip || $0.value.addingTimeInterval(lifetime) <= now }
         guard !due.isEmpty else { return }
         for id in due.keys { expiring[id] = nil }
-        let waiting = Set(expiring.keys.compactMap { fetchItem(id: $0).map { Self.trimmed($0.content) } })
+        let waiting = Set(expiring.keys.compactMap { fetchItem(id: $0).flatMap { $0.isPinned ? nil : Self.trimmed($0.content) } })
         let clearClipboard = handling == .expire && defaults.bool(forKey: SensitiveText.clearClipboardKey)
         var removed = false
         for id in due.keys {
