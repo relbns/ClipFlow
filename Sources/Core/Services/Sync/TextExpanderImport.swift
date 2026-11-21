@@ -16,7 +16,7 @@ enum TextExpanderImport {
 
     struct Result: Equatable {
         var groups: [Group] = []
-        /// Abbreviations of AppleScript, shell and JavaScript snippets, which ClipFlow cannot run.
+        /// Abbreviations of script and picture snippets, which ClipFlow cannot import.
         var scriptSnippets: [String] = []
         /// Macros with no ClipFlow equivalent, kept as typed, such as `%snippet:` or `%key:`.
         var unsupportedMacros: Set<String> = []
@@ -144,7 +144,8 @@ enum TextExpanderImport {
     }
 
     private static func snippet(abbreviation: String, label: String, text: String, result: inout Result) -> Snippet {
-        let converted = convertMacros(text)
+        let lines = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        let converted = convertMacros(lines)
         result.unsupportedMacros.formUnion(converted.unsupported)
         let title = label.trimmingCharacters(in: .whitespacesAndNewlines)
         return Snippet(abbreviation: abbreviation, label: title.isEmpty ? abbreviation : title, content: converted.content)
@@ -158,6 +159,10 @@ enum TextExpanderImport {
         "Z": "zzz", "j": "DDD"
     ]
     private static let fillNames: Set<String> = ["fill", "filltext", "fillarea", "fillpopup"]
+    /// TextExpander's macros that take an argument, and the ones that take none.
+    private static let namedMacros: Set<String> = fillNames.union(["fillpart", "snippet", "key"])
+    private static let bareMacros: Set<String> = ["fillpartend", "fillclipboard"]
+    private static let dateMath = try! NSRegularExpression(pattern: "%@[+-]?[0-9]+[YMDhms]")
 
     /// TextExpander macros to ClipFlow variables. Literal text that looks like a ClipFlow variable is escaped first,
     /// so it still types as written.
@@ -165,6 +170,7 @@ enum TextExpanderImport {
         let source = Array(SnippetTemplate.escaped(text))
         var output = ""
         var unsupported = Set<String>()
+        let shiftsDates = dateMath.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
         var index = 0
         func rest(from start: Int) -> String { String(source[start...]) }
         while index < source.count {
@@ -191,11 +197,15 @@ enum TextExpanderImport {
                     output += "%" + macro.body
                 }
                 index += 1 + macro.body.count
+            } else if let name = bareMacros.first(where: { tail.hasPrefix($0 + "%") }) {
+                unsupported.insert("%" + name)
+                output += "%" + name + "%"
+                index += name.count + 2
             } else if tail.hasPrefix("@") {
                 unsupported.insert("%@")
                 output += "%"
                 index += 1
-            } else if let (token, pattern) = dateToken(tail) {
+            } else if !shiftsDates, let (token, pattern) = dateToken(tail) {
                 output += "{date:\(pattern)}"
                 index += 1 + token.count
             } else {
@@ -206,12 +216,12 @@ enum TextExpanderImport {
         return (output, unsupported)
     }
 
-    /// `name:argument%`, as in `%key:tab%` or `%filltext:name=First name:default=Ann%`. Names are words, so `%H:%M`
-    /// stays two date macros.
+    /// `name:argument%`, as in `%key:tab%` or `%filltext:name=First name:default=Ann%`. Only TextExpander's own names
+    /// count, so `%H:%M` stays two date macros and `50%off:` stays text.
     private static func namedMacro(_ text: String) -> (name: String, argument: String, body: String)? {
         guard let colon = text.firstIndex(of: ":"), let end = text[colon...].firstIndex(of: "%") else { return nil }
         let name = String(text[..<colon])
-        guard name.count >= 3, name.allSatisfy({ $0.isLetter }), !text[colon..<end].contains("\n") else { return nil }
+        guard namedMacros.contains(name), name.hasPrefix("fill") || !text[colon..<end].contains("\n") else { return nil }
         return (name, String(text[text.index(after: colon)..<end]), String(text[...end]))
     }
 

@@ -140,6 +140,11 @@ struct BackupSettingsView: View {
                 if !parsed.scriptSnippets.isEmpty {
                     lines.append(L("import_scripts_skipped", count: parsed.scriptSnippets.count) + " " + parsed.scriptSnippets.joined(separator: ", "))
                 }
+                let offRule = parsed.groups.flatMap(\.snippets).map(\.abbreviation)
+                    .filter { SnippetEditorModel.abbreviationError($0) != nil }
+                if !offRule.isEmpty {
+                    lines.append(L("import_abbreviations_off_rule", offRule.joined(separator: ", ")))
+                }
                 if !parsed.unsupportedMacros.isEmpty {
                     lines.append(L("import_unsupported_macros", parsed.unsupportedMacros.sorted().joined(separator: ", ")))
                 }

@@ -84,7 +84,7 @@ final class SnippetExporter {
     /// Adds TextExpander groups with the trigger chosen in Preferences; abbreviations already in use are skipped.
     func importTextExpander(_ parsed: TextExpanderImport.Result, defaults: UserDefaults = .standard) throws -> ImportResult {
         let trigger = defaults.string(forKey: "expandAfter") ?? ExpandTrigger.delimiter.rawValue
-        let groups = parsed.groups.map { group in
+        let groups = parsed.groups.filter { !$0.snippets.isEmpty }.map { group in
             ExportedGroup(name: group.name, snippets: group.snippets.map {
                 ExportedSnippet(
                     title: $0.label, abbreviation: $0.abbreviation, content: $0.content, expandTrigger: trigger,
@@ -123,7 +123,7 @@ final class SnippetExporter {
             for exportedSnippet in exportedGroup.snippets {
                 // Check for duplicates
                 let snippetRequest: NSFetchRequest<Snippet> = Snippet.fetchRequest()
-                snippetRequest.predicate = NSPredicate(format: "abbreviation == %@", exportedSnippet.abbreviation)
+                snippetRequest.predicate = NSPredicate(format: "abbreviation ==[c] %@", exportedSnippet.abbreviation)
 
                 if let existing = try? context.fetch(snippetRequest).first {
                     conflicts.append(exportedSnippet.abbreviation)

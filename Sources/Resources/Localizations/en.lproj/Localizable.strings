@@ -327,8 +327,9 @@
 "pref_export_button" = "Export…";
 "pref_import" = "Import snippets";
 "pref_import_hint" = "Add snippets from a ClipFlow JSON file, a TextExpander CSV export or a .textexpander group. Abbreviations you already have are skipped.";
-"import_scripts_skipped_one" = "%d script snippet was not imported, since ClipFlow does not run scripts:";
-"import_scripts_skipped_other" = "%d script snippets were not imported, since ClipFlow does not run scripts:";
+"import_scripts_skipped_one" = "%d script or picture snippet was not imported:";
+"import_scripts_skipped_other" = "%d script or picture snippets were not imported:";
+"import_abbreviations_off_rule" = "These expand, but do not start with . ; or / as the editor asks: %@";
 "import_unsupported_macros" = "Kept as typed, since ClipFlow has no equivalent: %@";
 "pref_import_button" = "Import…";
 "import_complete" = "Import complete";
