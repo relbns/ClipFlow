@@ -82,19 +82,44 @@ struct SyncLedgerEntry: Codable, Equatable {
 enum SyncMerge {
     /// Stamps local edits and deletions with `now`. Only records of `kinds` can be deleted, so turning off a
     /// kind (say settings) does not delete it on the other Macs.
+    /// `skip` holds keys whose remote change could not be applied yet; they are left for the next pass.
     static func stamp(
-        local: [String: JSONValue], ledger: [String: SyncLedgerEntry], kinds: Set<String>, now: Date, device: String
+        local: [String: JSONValue], ledger: [String: SyncLedgerEntry], kinds: Set<String>, now: Date, device: String,
+        skip: Set<String> = []
     ) -> [String: SyncLedgerEntry] {
         var result = ledger
-        for (key, payload) in local {
+        for (key, payload) in local where !skip.contains(key) {
             let hash = payload.stableHash
             if let entry = ledger[key], !entry.deleted, entry.hash == hash { continue }
             result[key] = SyncLedgerEntry(hash: hash, modifiedAt: after(ledger[key], now), deleted: false, device: device)
         }
-        for (key, entry) in ledger where !entry.deleted && local[key] == nil && kinds.contains(kind(of: key)) {
+        for (key, entry) in ledger where !entry.deleted && local[key] == nil && kinds.contains(kind(of: key)) && !skip.contains(key) {
             result[key] = SyncLedgerEntry(hash: "", modifiedAt: after(entry, now), deleted: true, device: device)
         }
         return result
+    }
+
+    /// Each key's newest record across the other Macs' files.
+    static func newest(_ remote: [SyncRecord]) -> [String: SyncRecord] {
+        var newest: [String: SyncRecord] = [:]
+        for record in remote {
+            if let current = newest[record.key], !isNewer(record, than: current.modifiedAt, current.device) { continue }
+            newest[record.key] = record
+        }
+        return newest
+    }
+
+    /// Groups whose latest known state, here or on another Mac, is deleted.
+    static func deletedGroups(remote: [SyncRecord], ledger: [String: SyncLedgerEntry]) -> Set<String> {
+        var deleted: Set<String> = []
+        for (key, record) in newest(remote) where kind(of: key) == "group" && record.deleted {
+            if let entry = ledger[key], !isNewer(record, than: entry.modifiedAt, entry.device) { continue }
+            deleted.insert(id(of: key))
+        }
+        for (key, entry) in ledger where kind(of: key) == "group" && entry.deleted {
+            deleted.insert(id(of: key))
+        }
+        return deleted
     }
 
     /// A local change is always newer than the version it replaces, even when another Mac's clock runs ahead.
@@ -119,37 +144,43 @@ enum SyncMerge {
             .sorted { $0.key < $1.key }
     }
 
-    /// When a Mac syncs for the first time, its own snippets that another Mac already has, with the same
-    /// abbreviation and the same text (the starter snippets, or a snippet set up twice), are the same snippets and
-    /// are dropped here; a snippet with the same abbreviation but other text is kept. Groups with the same name fold
-    /// into the other Mac's group. Only each key's newest remote record counts, so a stale file cannot match.
-    static func firstJoin(local: [String: JSONValue], remote: [SyncRecord]) -> (dropSnippets: Set<String>, groupMap: [String: String]) {
-        var newest: [String: SyncRecord] = [:]
-        for record in remote {
-            if let current = newest[record.key], !isNewer(record, than: current.modifiedAt, current.device) { continue }
-            newest[record.key] = record
+    /// The same snippet set up on two Macs (the starter snippets, or one typed twice) arrives under two ids. Every
+    /// Mac keeps the copy with the smaller id and drops its own others, so they all agree, whatever order they sync
+    /// in. Copies count as the same only with the same abbreviation and text; a snippet whose text differs stays.
+    /// Groups with the same name fold the same way, into the smallest id. Only each key's newest record counts.
+    static func duplicates(local: [String: JSONValue], remote: [SyncRecord]) -> (dropSnippets: Set<String>, groupMap: [String: String]) {
+        var live: [String: JSONValue] = [:]
+        for (key, record) in newest(remote) where !record.deleted {
+            if let payload = record.payload { live[key] = payload }
         }
-        let live = newest.values.filter { !$0.deleted }
-        func signature(_ payload: JSONValue?) -> String? {
-            guard let abbreviation = payload?["abbreviation"]?.string?.lowercased() else { return nil }
-            return abbreviation + "\u{0}" + (payload?["content"]?.string ?? "")
+        for (key, payload) in local { live[key] = payload }
+
+        func signature(_ payload: JSONValue) -> String? {
+            guard let abbreviation = payload["abbreviation"]?.string?.lowercased() else { return nil }
+            return abbreviation + "\u{0}" + (payload["content"]?.string ?? "")
         }
-        let remoteSnippets = Set(live.filter { $0.kind == "snippet" }.compactMap { signature($0.payload) })
-        var remoteGroups: [String: String] = [:]
-        for record in live where record.kind == "group" {
-            if let name = record.payload?["name"]?.string { remoteGroups[name] = id(of: record.key) }
-        }
-        var drop: Set<String> = []
-        var groupMap: [String: String] = [:]
-        for (key, payload) in local where newest[key] == nil {
+        var keeperBySignature: [String: String] = [:]
+        var keeperByGroupName: [String: String] = [:]
+        for (key, payload) in live {
             switch kind(of: key) {
             case "snippet":
-                if let signature = signature(payload), remoteSnippets.contains(signature) {
-                    drop.insert(key)
-                }
+                if let signature = signature(payload) { keeperBySignature[signature] = min(keeperBySignature[signature] ?? key, key) }
             case "group":
-                if let name = payload["name"]?.string, let remoteID = remoteGroups[name], remoteID != id(of: key) {
-                    groupMap[id(of: key)] = remoteID
+                if let name = payload["name"]?.string { keeperByGroupName[name] = min(keeperByGroupName[name] ?? key, key) }
+            default:
+                break
+            }
+        }
+
+        var drop: Set<String> = []
+        var groupMap: [String: String] = [:]
+        for (key, payload) in local {
+            switch kind(of: key) {
+            case "snippet":
+                if let signature = signature(payload), let keeper = keeperBySignature[signature], keeper != key { drop.insert(key) }
+            case "group":
+                if let name = payload["name"]?.string, let keeper = keeperByGroupName[name], keeper != key {
+                    groupMap[id(of: key)] = id(of: keeper)
                 }
             default:
                 break

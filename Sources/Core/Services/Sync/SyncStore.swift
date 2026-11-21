@@ -48,7 +48,8 @@ final class SyncStore {
         }
         if kinds.contains("pin"), let monitor {
             for pin in monitor.pinnedTexts() {
-                records["pin:\(Self.pinID(pin.content))"] = .object(["content": .string(pin.content), "type": .string(pin.kind.rawValue)])
+                // The text alone: another Mac records the pin as plain text, so a type here would never match there.
+                records["pin:\(Self.pinID(pin.content))"] = .object(["content": .string(pin.content)])
             }
         }
         if kinds.contains("setting") {
@@ -99,10 +100,19 @@ final class SyncStore {
         }
     }
 
-    // MARK: - First join
+    // MARK: - Duplicates
 
-    /// Drops this Mac's copies of snippets another Mac already has, and moves the snippets of a group another Mac
-    /// has under the same name into that group once it arrives.
+    /// The snippets' edit times, so a Mac joining a folder again keeps edits made since it last synced.
+    func snippetEditTimes() -> [String: Date] {
+        var times: [String: Date] = [:]
+        for snippet in (try? context.fetch(Snippet.fetchRequest())) ?? [] {
+            times["snippet:\(snippet.id.uuidString)"] = snippet.updatedAt
+        }
+        return times
+    }
+
+    /// Drops this Mac's copies of snippets another Mac has under a smaller id, and moves the snippets of a group
+    /// that has a same-named twin into the twin once it is here.
     func dropSnippets(_ keys: Set<String>) -> Bool {
         for key in keys {
             if let snippet = snippet(id: SyncMerge.id(of: key)) { context.delete(snippet) }
@@ -125,37 +135,42 @@ final class SyncStore {
         let saved: Bool
         /// Snippets whose group has not arrived yet (its Mac's file is still downloading); tried again next time.
         let deferred: Set<String>
+        /// Snippets taken out of a group another Mac deleted. That is not an edit made here, so it must not be
+        /// published as one, or this Mac's older copy could beat a later edit on a third Mac.
+        let detached: Set<String>
     }
 
-    func apply(_ records: [SyncRecord]) -> ApplyResult {
-        let ordered = records.sorted { order($0.kind) < order($1.kind) }
+    /// Snippets and groups are saved first; pins and settings, which are written elsewhere, only after that save
+    /// succeeds, so a failed sync leaves nothing half applied.
+    func apply(_ records: [SyncRecord], deletedGroups: Set<String>) -> ApplyResult {
         var deferred: Set<String> = []
-        for record in ordered {
-            let id = SyncMerge.id(of: record.key)
-            switch record.kind {
-            case "group": applyGroup(id: id, record: record)
-            case "snippet": if !applySnippet(id: id, record: record) { deferred.insert(record.key) }
-            case "pin": applyPin(record)
-            case "setting": applySetting(key: id, record: record)
-            default: break
+        var detached: Set<String> = []
+        for record in records where record.kind == "group" {
+            detached.formUnion(applyGroup(id: SyncMerge.id(of: record.key), record: record))
+        }
+        for record in records where record.kind == "snippet" {
+            if !applySnippet(id: SyncMerge.id(of: record.key), record: record, deletedGroups: deletedGroups) {
+                deferred.insert(record.key)
             }
         }
-        return ApplyResult(saved: save(), deferred: deferred)
+        guard save() else { return ApplyResult(saved: false, deferred: deferred, detached: detached) }
+        for record in records where record.kind == "pin" { applyPin(record) }
+        for record in records where record.kind == "setting" { applySetting(key: SyncMerge.id(of: record.key), record: record) }
+        return ApplyResult(saved: true, deferred: deferred, detached: detached.subtracting(records.map(\.key)))
     }
 
-    private func order(_ kind: String) -> Int { ["group": 0, "snippet": 1, "pin": 2, "setting": 3][kind] ?? 4 }
-
-    private func applyGroup(id: String, record: SyncRecord) {
+    /// Returns the keys of snippets a deleted group leaves without a group.
+    private func applyGroup(id: String, record: SyncRecord) -> Set<String> {
         if record.deleted {
             // Snippets carry their own records: one deleted with the group arrives as its own deletion, and one
             // edited here since stays, out of the group.
-            if let group = group(id: id) {
-                for snippet in group.snippets { snippet.group = nil }
-                context.delete(group)
-            }
-            return
+            guard let group = group(id: id) else { return [] }
+            let keys = Set(group.snippets.map { "snippet:\($0.id.uuidString)" })
+            for snippet in group.snippets { snippet.group = nil }
+            context.delete(group)
+            return keys
         }
-        guard let payload = record.payload, let uuid = UUID(uuidString: id) else { return }
+        guard let payload = record.payload, let uuid = UUID(uuidString: id) else { return [] }
         let group = group(id: id) ?? {
             let created = SnippetGroup(context: context)
             created.id = uuid
@@ -165,10 +180,12 @@ final class SyncStore {
         group.name = payload["name"]?.string ?? group.name
         group.isEnabled = payload["isEnabled"]?.bool ?? true
         group.sortOrder = Int32(payload["sortOrder"]?.number ?? Double(group.sortOrder))
+        return []
     }
 
-    /// False when the snippet's group is not here yet, so it is not filed under no group by mistake.
-    private func applySnippet(id: String, record: SyncRecord) -> Bool {
+    /// False when the snippet's group is not here yet, so it is not filed under no group by mistake. A group that
+    /// was deleted is not coming, so such a snippet is kept without a group.
+    private func applySnippet(id: String, record: SyncRecord, deletedGroups: Set<String>) -> Bool {
         if record.deleted {
             if let snippet = snippet(id: id) { context.delete(snippet) }
             return true
@@ -176,7 +193,7 @@ final class SyncStore {
         guard let payload = record.payload, let uuid = UUID(uuidString: id) else { return true }
         let groupID = payload["group"]?.string
         let targetGroup = groupID.flatMap { group(id: $0) }
-        if groupID != nil, targetGroup == nil { return false }
+        if let groupID, targetGroup == nil, !deletedGroups.contains(groupID) { return false }
         let snippet = snippet(id: id) ?? {
             let created = Snippet(context: context)
             created.id = uuid

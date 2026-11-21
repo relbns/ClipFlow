@@ -156,6 +156,7 @@ final class ClipboardMonitor: ObservableObject {
         guard let item = fetchItem(id: clip.id) else { return }
         item.isPinned = pinned
         saveAndReload()
+        NotificationCenter.default.post(name: .clipPinsChanged, object: self)
     }
 
     /// Whether ClipFlow records history at all ("Record clipboard history" in Preferences).
@@ -210,8 +211,10 @@ final class ClipboardMonitor: ObservableObject {
 
     func delete(_ clip: SimpleClipItem) {
         guard let item = fetchItem(id: clip.id) else { return }
+        let wasPinned = item.isPinned
         context.delete(item)
         saveAndReload()
+        if wasPinned { NotificationCenter.default.post(name: .clipPinsChanged, object: self) }
     }
 
     /// Pinned clips survive a clear.

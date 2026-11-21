@@ -98,7 +98,14 @@ final class CoreDataStack {
         }
     }
 
-    private lazy var statsContext = makeServiceContext()
+    /// Saves from here only count uses, which sync ignores.
+    nonisolated static let statsContextName = "stats"
+
+    private lazy var statsContext: NSManagedObjectContext = {
+        let context = makeServiceContext()
+        context.name = Self.statsContextName
+        return context
+    }()
 
     func save() {
         guard viewContext.hasChanges else { return }

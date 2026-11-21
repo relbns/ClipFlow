@@ -32,6 +32,7 @@ final class FolderSync: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var isSyncing = false
     private var pending = false
+    private var joinWaitStarted: Date?
 
     static var defaultFolder: URL {
         FileManager.default.homeDirectoryForCurrentUser
@@ -43,6 +44,9 @@ final class FolderSync: ObservableObject {
     }
 
     var isEnabled: Bool { defaults.bool(forKey: Self.enabledKey) }
+
+    /// This Mac's file in `devices/`, once it has an id.
+    var deviceFileName: String? { defaults.string(forKey: Self.deviceIDKey).map { "\($0).json" } }
 
     private var kinds: Set<String> {
         var kinds: Set<String> = ["group", "snippet"]
@@ -57,8 +61,15 @@ final class FolderSync: ObservableObject {
     /// hardware: on another Mac it is replaced, and the copied ledger is dropped with it.
     private var deviceID: String {
         let hardware = hardwareID
-        if let id = defaults.string(forKey: Self.deviceIDKey), defaults.string(forKey: Self.deviceHardwareKey) == hardware {
-            return id
+        if let id = defaults.string(forKey: Self.deviceIDKey) {
+            switch defaults.string(forKey: Self.deviceHardwareKey) {
+            case hardware?: return id
+            case nil:
+                // Written before the hardware check existed: this is the same Mac.
+                defaults.set(hardware, forKey: Self.deviceHardwareKey)
+                return id
+            default: break
+            }
         }
         if defaults.string(forKey: Self.deviceIDKey) != nil { try? FileManager.default.removeItem(at: ledgerURL) }
         let id = UUID().uuidString
@@ -103,6 +114,7 @@ final class FolderSync: ObservableObject {
             .sink { [weak self] _ in self?.syncSoon() }
             .store(in: &cancellables)
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .merge(with: NotificationCenter.default.publisher(for: .clipPinsChanged))
             .sink { [weak self] _ in self?.syncSoon() }
             .store(in: &cancellables)
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
@@ -144,20 +156,33 @@ final class FolderSync: ObservableObject {
             var ledger = readLedger()
 
             if ledger.isEmpty {
-                // Joining: wait until the other Macs' files are here, or this Mac's copies would spread as new items.
-                guard downloading == 0 else { return }
-                if !remote.isEmpty {
-                    let join = SyncMerge.firstJoin(local: store.export(kinds: kinds), remote: remote)
-                    guard store.dropSnippets(join.dropSnippets) else { throw SyncError.saveFailed }
-                    ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: [:], kinds: kinds, now: .distantPast, device: deviceID)
-                    try apply(SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store)
-                    guard store.foldGroups(join.groupMap) else { throw SyncError.saveFailed }
+                // Joining: give the other Macs' files up to two minutes to download before this Mac's state counts.
+                if downloading > 0 {
+                    let started = joinWaitStarted ?? Date()
+                    joinWaitStarted = started
+                    if Date().timeIntervalSince(started) < 120 { return }
                 }
+                // What this Mac has counts as old, except snippet edits, which keep their own time, so joining a
+                // folder again neither spreads stale copies nor reverts edits made since.
+                ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: [:], kinds: kinds, now: .distantPast, device: deviceID)
+                for (key, time) in store.snippetEditTimes() where ledger[key] != nil { ledger[key]?.modifiedAt = time }
             } else {
                 ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: ledger, kinds: kinds, now: Date(), device: deviceID)
-                try apply(SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store)
             }
-            ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: ledger, kinds: kinds, now: Date(), device: deviceID)
+            joinWaitStarted = nil
+
+            let result = try apply(
+                SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store,
+                deletedGroups: SyncMerge.deletedGroups(remote: remote, ledger: ledger)
+            )
+            let duplicates = SyncMerge.duplicates(local: store.export(kinds: kinds), remote: remote)
+            guard store.dropSnippets(duplicates.dropSnippets), store.foldGroups(duplicates.groupMap) else { throw SyncError.saveFailed }
+
+            let local = store.export(kinds: kinds)
+            for key in result.detached {
+                if let payload = local[key] { ledger[key]?.hash = payload.stableHash }
+            }
+            ledger = SyncMerge.stamp(local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, skip: result.deferred)
 
             let file = SyncDeviceFile(
                 deviceID: deviceID, deviceName: computerName, writtenAt: Date(),
@@ -179,9 +204,11 @@ final class FolderSync: ObservableObject {
 
     /// Applies remote winners and records them in the ledger as already seen, so they are not echoed as local edits.
     /// A failed save stops the sync before anything is written, so a rolled-back state is never published.
-    private func apply(_ incoming: [SyncRecord], to ledger: inout [String: SyncLedgerEntry], store: SyncStore) throws {
-        guard !incoming.isEmpty else { return }
-        let result = store.apply(incoming)
+    private func apply(
+        _ incoming: [SyncRecord], to ledger: inout [String: SyncLedgerEntry], store: SyncStore, deletedGroups: Set<String>
+    ) throws -> SyncStore.ApplyResult {
+        guard !incoming.isEmpty else { return SyncStore.ApplyResult(saved: true, deferred: [], detached: []) }
+        let result = store.apply(incoming, deletedGroups: deletedGroups)
         guard result.saved else { throw SyncError.saveFailed }
         for record in incoming where !result.deferred.contains(record.key) {
             ledger[record.key] = SyncLedgerEntry(
@@ -189,18 +216,18 @@ final class FolderSync: ObservableObject {
             )
         }
         Log.storage.info("Sync applied \(incoming.count - result.deferred.count, privacy: .public) changes from other Macs")
+        return result
     }
 
-    /// Changes to snippets, groups, app rules or a clip (a pin) can need a sync; a new clip in history cannot.
+    /// Changes to snippets, groups or app rules can need a sync; a snippet's use count (the stats context) cannot.
+    /// Pins announce themselves with `.clipPinsChanged`, so history saves do not start a sync.
     nonisolated private static func touchesSyncedData(_ notification: Notification) -> Bool {
+        if (notification.object as? NSManagedObjectContext)?.name == CoreDataStack.statsContextName { return false }
         let synced: Set<String> = ["Snippet", "SnippetGroup", "AppRule"]
         let info = notification.userInfo ?? [:]
         for key in [NSInsertedObjectsKey, NSUpdatedObjectsKey, NSDeletedObjectsKey] {
             guard let objects = info[key] as? Set<NSManagedObject> else { continue }
-            if objects.contains(where: { object in
-                let name = object.entity.name ?? ""
-                return synced.contains(name) || (name == "ClipItem" && key == NSUpdatedObjectsKey)
-            }) { return true }
+            if objects.contains(where: { synced.contains($0.entity.name ?? "") }) { return true }
         }
         return false
     }

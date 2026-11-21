@@ -708,19 +708,21 @@ final class SyncMergeTests: XCTestCase {
         XCTAssertTrue(SyncMerge.incoming(remote: [deletion], ledger: [:], kinds: ["snippet"]).isEmpty, "nothing to delete here")
     }
 
-    func testAJoiningMacFoldsItsCopiesIntoTheOtherMacs() {
-        let remote = [
-            SyncRecord(key: "group:R", modifiedAt: t0, deleted: false, payload: .object(["name": .string("Personal")]), device: "m1"),
-            SyncRecord(key: "snippet:r1", modifiedAt: t0, deleted: false, payload: .object(["abbreviation": .string(".sig")]), device: "m1")
-        ]
+    func testTheSameSnippetOnTwoMacsKeepsTheSmallerIdOnBoth() {
+        let a = SyncRecord(key: "snippet:a1", modifiedAt: t0, deleted: false, payload: .object(["abbreviation": .string(".sig")]), device: "m1")
+        let groupA = SyncRecord(key: "group:A", modifiedAt: t0, deleted: false, payload: .object(["name": .string("Personal")]), device: "m1")
         let local: [String: JSONValue] = [
-            "group:L": .object(["name": .string("Personal")]),
-            "snippet:l1": .object(["abbreviation": .string(".SIG")]),
-            "snippet:l2": .object(["abbreviation": .string(".mine")])
+            "group:Z": .object(["name": .string("Personal")]),
+            "snippet:z1": .object(["abbreviation": .string(".SIG")]),
+            "snippet:z2": .object(["abbreviation": .string(".mine")])
         ]
-        let join = SyncMerge.firstJoin(local: local, remote: remote)
-        XCTAssertEqual(join.dropSnippets, ["snippet:l1"])
-        XCTAssertEqual(join.groupMap, ["L": "R"])
+        let onZ = SyncMerge.duplicates(local: local, remote: [a, groupA])
+        XCTAssertEqual(onZ.dropSnippets, ["snippet:z1"])
+        XCTAssertEqual(onZ.groupMap, ["Z": "A"])
+
+        let z = SyncRecord(key: "snippet:z1", modifiedAt: t1, deleted: false, payload: .object(["abbreviation": .string(".sig")]), device: "m2")
+        let onA = SyncMerge.duplicates(local: ["snippet:a1": .object(["abbreviation": .string(".sig")])], remote: [z])
+        XCTAssertTrue(onA.dropSnippets.isEmpty, "the Mac with the smaller id keeps its copy, whichever syncs first")
     }
 
     func testAJoiningMacKeepsItsSnippetWhenTheTextDiffersOrTheOtherCopyWasDeleted() {
@@ -732,10 +734,10 @@ final class SyncMergeTests: XCTestCase {
             SyncRecord(key: "snippet:r2", modifiedAt: t1, deleted: true, payload: nil, device: "m2")
         ]
         let local: [String: JSONValue] = [
-            "snippet:l1": .object(["abbreviation": .string(";addr"), "content": .string("Work")]),
-            "snippet:l2": .object(["abbreviation": .string(";sig"), "content": .string("Best")])
+            "snippet:z1": .object(["abbreviation": .string(";addr"), "content": .string("Work")]),
+            "snippet:z2": .object(["abbreviation": .string(";sig"), "content": .string("Best")])
         ]
-        XCTAssertTrue(SyncMerge.firstJoin(local: local, remote: remote).dropSnippets.isEmpty)
+        XCTAssertTrue(SyncMerge.duplicates(local: local, remote: remote).dropSnippets.isEmpty)
     }
 
     func testALocalEditIsNewerThanWhatItReplacesEvenWithAFastClockElsewhere() {
@@ -761,7 +763,7 @@ final class FolderSyncTests: XCTestCase {
         folder = FileManager.default.temporaryDirectory.appendingPathComponent("clipflow-sync-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         macs = []
-        for index in 0..<2 {
+        for index in 0..<3 {
             let stack = CoreDataStack(storeURL: nil)
             let suite = "clipflow-tests-sync-mac\(index)-\(name.filter { $0.isLetter || $0.isNumber })"
             let defaults = makeTestDefaults(suite)
@@ -831,7 +833,81 @@ final class FolderSyncTests: XCTestCase {
         XCTAssertEqual(macs[1].defaults.string(forKey: "viewMode"), "simple")
 
         guard case .synced(_, let otherMacs) = macs[0].sync.status else { return XCTFail("expected a synced status") }
-        XCTAssertEqual(otherMacs, 1)
+        XCTAssertEqual(otherMacs, 2)
+    }
+
+    private func deviceFiles() throws -> [String: Data] {
+        let devices = folder.appendingPathComponent("shared/devices")
+        var files: [String: Data] = [:]
+        for name in try FileManager.default.contentsOfDirectory(atPath: devices.path) {
+            files[name] = try Data(contentsOf: devices.appendingPathComponent(name))
+        }
+        return files
+    }
+
+    func testOnceInStepNothingIsRewrittenEvenForAPinnedRichTextClip() async throws {
+        try addSnippet(".a", content: "A", group: "Work", on: 0)
+        let rich = PasteboardSnapshot(items: [[
+            NSPasteboard.PasteboardType.string.rawValue: Data("Bold note".utf8),
+            NSPasteboard.PasteboardType.rtf.rawValue: Data("{\\rtf1 Bold note}".utf8)
+        ]])
+        macs[0].monitor.record(try XCTUnwrap(ClipCapture.classify(rich)), snapshot: rich, sourceName: nil, sourceBundleID: nil)
+        let clip = try XCTUnwrap(macs[0].monitor.clipHistory.first { $0.content == "Bold note" })
+        XCTAssertEqual(clip.kind, .rtf)
+        macs[0].monitor.setPinned(clip, true)
+        await syncAll()
+        XCTAssertEqual(macs[1].monitor.pinnedTexts().map(\.content), ["Bold note"])
+
+        let settled = try deviceFiles()
+        await syncAll()
+        await syncAll()
+        XCTAssertEqual(try deviceFiles(), settled, "a pin stored as rich text on one Mac and plain on another is the same pin")
+    }
+
+    func testAnEditOnAThirdMacSurvivesAGroupDeletionItHasNotSeen() async throws {
+        try addSnippet(".s", content: "v1", group: "G", on: 0)
+        await syncAll()
+
+        let contextA = macs[0].stack.viewContext
+        let group = try XCTUnwrap(SnippetGroup.ordered(in: contextA).first { $0.name == "G" })
+        for snippet in group.snippets { contextA.delete(snippet) }
+        contextA.delete(group)
+        try contextA.save()
+        await macs[0].sync.sync()
+
+        // C edits before the cloud has brought it A's deletion: A's file is out of the folder while C syncs.
+        let devices = folder.appendingPathComponent("shared/devices")
+        let aside = folder.appendingPathComponent("aside")
+        try FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
+        let fileA = try XCTUnwrap(macs[0].sync.deviceFileName)
+        try FileManager.default.moveItem(at: devices.appendingPathComponent(fileA), to: aside.appendingPathComponent(fileA))
+        try await Task.sleep(nanoseconds: 5_000_000)
+        let onC = try XCTUnwrap(try macs[2].stack.viewContext.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".s" })
+        onC.content = "v2"
+        try macs[2].stack.viewContext.save()
+        await macs[2].sync.sync()
+        try FileManager.default.moveItem(at: aside.appendingPathComponent(fileA), to: devices.appendingPathComponent(fileA))
+
+        // B now sees A's deletion of the group and C's later edit of a snippet in it, at once.
+        await macs[1].sync.sync()
+        await syncAll()
+
+        for mac in 0..<3 {
+            XCTAssertEqual(try snippets(on: mac), [".s": "v2"], "Mac \(mac) keeps the later edit")
+        }
+    }
+
+    func testJoiningAFolderAgainKeepsAnEditMadeSince() async throws {
+        let snippet = try addSnippet(".s", content: "old", group: "G", on: 0)
+        await syncAll()
+        try await Task.sleep(nanoseconds: 5_000_000)
+        snippet.content = "edited while away"
+        snippet.updatedAt = Date()
+        try macs[0].stack.viewContext.save()
+        macs[0].sync.reset()
+        await syncAll()
+        XCTAssertEqual(try snippets(on: 1)[".s"], "edited while away")
+        XCTAssertEqual(try snippets(on: 0)[".s"], "edited while away")
     }
 
     func testDeletingAGroupKeepsASnippetEditedSinceOnTheOtherMac() async throws {
