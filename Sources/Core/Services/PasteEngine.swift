@@ -1,18 +1,19 @@
 import AppKit
 
-/// Pasteboard change counts written by ClipFlow itself, so history does not record them.
+/// Pasteboard change counts written by ClipFlow itself, so history does not record them. Each pasteboard counts
+/// on its own, so a count is kept with the pasteboard it belongs to.
 @MainActor
 final class OwnPasteboardWrites {
     static let shared = OwnPasteboardWrites()
-    private var counts: [Int] = []
+    private var writes: [(pasteboard: String, count: Int)] = []
 
-    func record(_ changeCount: Int) {
-        counts.append(changeCount)
-        if counts.count > 32 { counts.removeFirst(counts.count - 32) }
+    func record(_ changeCount: Int, on pasteboard: NSPasteboard) {
+        writes.append((pasteboard.name.rawValue, changeCount))
+        if writes.count > 32 { writes.removeFirst(writes.count - 32) }
     }
 
-    func contains(_ changeCount: Int) -> Bool {
-        counts.contains(changeCount)
+    func contains(_ changeCount: Int, on pasteboard: NSPasteboard) -> Bool {
+        writes.contains { $0.pasteboard == pasteboard.name.rawValue && $0.count == changeCount }
     }
 }
 
@@ -79,7 +80,7 @@ final class PasteEngine {
     private func write(_ snapshot: PasteboardSnapshot) -> Int {
         beforeWrite()
         let count = snapshot.write(to: pasteboard)
-        OwnPasteboardWrites.shared.record(count)
+        OwnPasteboardWrites.shared.record(count, on: pasteboard)
         return count
     }
 

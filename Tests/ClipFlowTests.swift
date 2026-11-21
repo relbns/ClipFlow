@@ -1505,3 +1505,27 @@ final class PasteStackTests: XCTestCase {
         XCTAssertEqual(stack.takeNextIncludingRecentCopy()?.preview, "copied a moment ago")
     }
 }
+
+@MainActor
+final class OwnPasteboardWritesTests: XCTestCase {
+    func testAWriteOnAnotherPasteboardDoesNotHideACopy() {
+        let mine = NSPasteboard.withUniqueName()
+        let other = NSPasteboard.withUniqueName()
+        let monitor = ClipboardMonitor(
+            context: CoreDataStack(storeURL: nil).viewContext, pasteboard: mine, defaults: makeTestDefaults("clipflow-tests-own")
+        )
+        monitor.startMonitoring()
+        defer {
+            monitor.stopMonitoring()
+            mine.releaseGlobally()
+            other.releaseGlobally()
+        }
+        for count in mine.changeCount...(mine.changeCount + 3) {
+            OwnPasteboardWrites.shared.record(count, on: other)
+        }
+        mine.clearContents()
+        mine.setString("a real copy", forType: .string)
+        monitor.checkPasteboard()
+        XCTAssertEqual(monitor.clipHistory.map(\.content), ["a real copy"])
+    }
+}
