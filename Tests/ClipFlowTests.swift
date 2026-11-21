@@ -931,6 +931,27 @@ final class FolderSyncTests: XCTestCase {
         }
     }
 
+    func testAnOldInstallWithItsOwnSnippetsInPersonalDoesNotUndoAStarterEdit() async throws {
+        macs[1].stack.prepareDefaultData(defaults: macs[1].defaults)
+        await macs[1].sync.sync()
+        let contextB = macs[1].stack.viewContext
+        let sig = try XCTUnwrap(try contextB.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".sig" })
+        sig.content = "Cheers"
+        sig.updatedAt = Date()
+        try contextB.save()
+        await macs[1].sync.sync()
+
+        try await Task.sleep(nanoseconds: 5_000_000)
+        try addLegacyStarters(on: 0)
+        try addSnippet(".mine", content: "mine", group: SnippetLibraryRepair.starterGroupName, on: 0)
+        await syncAll()
+
+        for mac in 0..<2 {
+            XCTAssertEqual(try snippets(on: mac)[".sig"], "Cheers", "Mac \(mac) keeps the earlier edit")
+            XCTAssertEqual(try snippets(on: mac)[".mine"], "mine")
+        }
+    }
+
     func testTheUsersOwnPersonalGroupIsNotTiedToTheStarterGroup() async throws {
         try addLegacyStarters(on: 1)
         try addSnippet(".mine", content: "mine", group: SnippetLibraryRepair.starterGroupName, on: 1)

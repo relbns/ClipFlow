@@ -290,10 +290,10 @@ enum StarterSnippets {
     }
 
     /// A starter with its fixed id, still exactly as created: it carries nothing of the user's, so when a Mac
-    /// joins sync it counts as older than any edit or deletion made on another Mac.
+    /// joins sync it counts as older than any edit or deletion made on another Mac. Which "Personal" group holds it
+    /// does not matter: an old install's group may hold the user's own snippets and keep its own id.
     static func isPristine(_ snippet: Snippet) -> Bool {
-        guard let starter = unchangedStarter(snippet) else { return false }
-        return snippet.id == starter.id && snippet.group?.id == groupID
+        unchangedStarter(snippet)?.id == snippet.id
     }
 
     /// Installs from before the fixed ids created the starters with random ones. Before a Mac first syncs, each
