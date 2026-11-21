@@ -1497,5 +1497,11 @@ final class PasteStackTests: XCTestCase {
         monitor.copy("screen text")
         XCTAssertEqual(stack.items.map(\.preview), ["first", "482913", "screen text"])
         XCTAssertEqual(monitor.clipHistory.map(\.content), ["screen text", "first"])
+
+        defaults.set(PasteStack.Order.reversed.rawValue, forKey: PasteStack.orderKey)
+        stack.catchUpOnCopies = { monitor.checkPasteboard() }
+        pasteboard.clearContents()
+        pasteboard.setString("copied a moment ago", forType: .string)
+        XCTAssertEqual(stack.takeNextIncludingRecentCopy()?.preview, "copied a moment ago")
     }
 }

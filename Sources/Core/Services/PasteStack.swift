@@ -26,6 +26,8 @@ final class PasteStack: ObservableObject {
     @Published private(set) var items: [Item] = []
 
     private let defaults: UserDefaults
+    /// Records a copy made a moment ago, which the half-second clipboard check has not seen yet.
+    var catchUpOnCopies: () -> Void = { PasteEngine.shared.beforeWrite() }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -65,12 +67,21 @@ final class PasteStack: ObservableObject {
         return item
     }
 
+    func takeNextIncludingRecentCopy() -> Item? {
+        catchUpOnCopies()
+        return takeNext()
+    }
+
     /// The item "Paste next" would paste.
     var upNext: Item? { order == .copied ? items.first : items.last }
 
     /// Pastes the next item into the frontmost app; it stays on the clipboard, as if just copied.
     func pasteNext() async {
-        guard await SyntheticKeyboard.modifiersReleased(), let item = takeNext() else {
+        guard await SyntheticKeyboard.modifiersReleased() else {
+            NSSound.beep()
+            return
+        }
+        guard let item = takeNextIncludingRecentCopy() else {
             NSSound.beep()
             return
         }

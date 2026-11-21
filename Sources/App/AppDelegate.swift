@@ -178,7 +178,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onPastePlainText: { Task { await PasteCoordinator.shared.pasteClipboardAsPlainText() } },
             onCaptureScreenText: { [weak self] in self?.captureScreen(.text) },
             onCaptureScreenImage: { [weak self] in self?.captureScreen(.image) },
-            onTogglePasteStack: { PasteStack.shared.toggle() },
+            onTogglePasteStack: { [weak self] in
+                guard PasteStack.shared.isOn || self?.clipboardMonitor.isRecording == true else {
+                    NSSound.beep()
+                    return
+                }
+                PasteStack.shared.toggle()
+            },
             onPasteNextFromStack: { Task { await PasteStack.shared.pasteNext() } }
         )
     }

@@ -68,7 +68,7 @@ final class ClipboardMonitor: ObservableObject {
 
     /// Records a copy, unless it is a sensitive clip the user does not save, and schedules its removal when asked.
     private func recordCopy(_ capture: ClipCapture, snapshot: PasteboardSnapshot, sourceName: String?, sourceBundleID: String?) {
-        pasteStack?.add(snapshot, preview: capture.text)
+        pasteStack?.add(snapshot, preview: capture.kind == .image ? L("clip_image") : capture.text)
         let sensitive = SensitiveText.detectedKind(of: capture, defaults: defaults) != nil
         let handling = SensitiveText.handling(in: defaults)
         if sensitive, handling == .skip {
