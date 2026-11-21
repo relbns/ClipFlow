@@ -9,6 +9,7 @@ enum SyntheticKeyboard {
         static let delete: CGKeyCode = 0x33
         static let v: CGKeyCode = 0x09
         static let leftArrow: CGKeyCode = 0x7B
+        static let command: CGKeyCode = 0x37
     }
 
     static func isSynthetic(_ event: CGEvent) -> Bool {
@@ -62,12 +63,20 @@ enum SyntheticKeyboard {
         for _ in 0..<max(0, count) { tap(Key.leftArrow) }
     }
 
+    /// Command is pressed and released around the key like on a keyboard; a key that only carries the flag leaves
+    /// the system thinking Command is still held, and the next hotkey then waits for it in `modifiersReleased`.
     private static func tap(_ key: CGKeyCode, flags: CGEventFlags = []) {
         let source = CGEventSource(stateID: .privateState)
         source?.userData = marker
-        for isDown in [true, false] {
-            guard let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: isDown) else { continue }
-            event.flags = flags
+        let withCommand = flags.contains(.maskCommand)
+        var events: [(key: CGKeyCode, isDown: Bool, flags: CGEventFlags)] = [(key, true, flags), (key, false, flags)]
+        if withCommand {
+            events.insert((Key.command, true, flags), at: 0)
+            events.append((Key.command, false, flags.subtracting(.maskCommand)))
+        }
+        for entry in events {
+            guard let event = CGEvent(keyboardEventSource: source, virtualKey: entry.key, keyDown: entry.isDown) else { continue }
+            event.flags = entry.flags
             event.setIntegerValueField(.eventSourceUserData, value: marker)
             event.post(tap: .cghidEventTap)
         }
