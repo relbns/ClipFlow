@@ -708,60 +708,24 @@ final class SyncMergeTests: XCTestCase {
         XCTAssertTrue(SyncMerge.incoming(remote: [deletion], ledger: [:], kinds: ["snippet"]).isEmpty, "nothing to delete here")
     }
 
-    private func sig(_ group: String, title: String = ".sig") -> JSONValue {
-        .object(["abbreviation": .string(".sig"), "title": .string(title), "content": .string("Best"), "group": .string(group)])
-    }
+    func testUntouchedStartersFromAnOldInstallTakeTheFixedIds() throws {
+        let context = CoreDataStack(storeURL: nil).viewContext
+        let group = SnippetGroup.insert(named: SnippetLibraryRepair.starterGroupName, in: context)
+        for starter in StarterSnippets.all {
+            _ = Snippet.insert(title: starter.title, abbreviation: starter.abbreviation, content: starter.content, group: group, in: context)
+        }
+        let edited = try XCTUnwrap(try context.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".sig" })
+        edited.content = "Cheers,\nAriel"
+        try context.save()
 
-    func testTheSameSnippetOnTwoMacsKeepsTheSmallerIdOnBoth() {
-        let a = SyncRecord(key: "snippet:a1", modifiedAt: t0, deleted: false, payload: sig("A"), device: "m1")
-        let groupA = SyncRecord(key: "group:A", modifiedAt: t0, deleted: false, payload: .object(["name": .string("Personal")]), device: "m1")
-        let local: [String: JSONValue] = [
-            "group:Z": .object(["name": .string("Personal")]),
-            "snippet:z1": sig("Z"),
-            "snippet:z2": .object(["abbreviation": .string(".mine")])
-        ]
-        let onZ = SyncMerge.duplicates(local: local, remote: [a, groupA], ledger: [:])
-        XCTAssertEqual(onZ.dropSnippets, ["snippet:z1"], "the same snippet in a group of the same name, under another id")
-        XCTAssertEqual(onZ.groupMap, ["Z": "A"])
-
-        let z = SyncRecord(key: "snippet:z1", modifiedAt: t1, deleted: false, payload: sig("Z"), device: "m2")
-        let groupZ = SyncRecord(key: "group:Z", modifiedAt: t1, deleted: false, payload: .object(["name": .string("Personal")]), device: "m2")
-        let onA = SyncMerge.duplicates(local: ["snippet:a1": sig("A"), "group:A": .object(["name": .string("Personal")])], remote: [z, groupZ], ledger: [:])
-        XCTAssertTrue(onA.dropSnippets.isEmpty, "the Mac with the smaller id keeps its copy, whichever syncs first")
-        XCTAssertTrue(onA.groupMap.isEmpty)
-    }
-
-    func testOnlyAnotherMacsUntouchedCopyReplacesOneHere() {
-        let stale = SyncRecord(key: "snippet:a1", modifiedAt: t0, deleted: false, payload: sig("A"), device: "m1")
-        let groupA = SyncRecord(key: "group:A", modifiedAt: t0, deleted: false, payload: .object(["name": .string("P")]), device: "m1")
-        let deletedHere = ["snippet:a1": SyncLedgerEntry(hash: "", modifiedAt: t1, deleted: true, device: "me")]
-        let recreated: [String: JSONValue] = ["snippet:z1": sig("Z"), "group:Z": .object(["name": .string("P")])]
-        XCTAssertTrue(SyncMerge.duplicates(local: recreated, remote: [stale, groupA], ledger: deletedHere).dropSnippets.isEmpty,
-                      "a copy this Mac deleted does not count, however stale the other file")
-
-        let customised: [String: JSONValue] = ["snippet:z1": sig("Z", title: "My signature"), "group:Z": .object(["name": .string("P")])]
-        XCTAssertTrue(SyncMerge.duplicates(local: customised, remote: [stale, groupA], ledger: [:]).dropSnippets.isEmpty,
-                      "a copy that differs in anything, here the title, stays")
-
-        let twoLocal: [String: JSONValue] = [
-            "group:B": .object(["name": .string("New Group")]), "group:C": .object(["name": .string("New Group")])
-        ]
-        XCTAssertTrue(SyncMerge.duplicates(local: twoLocal, remote: [], ledger: [:]).groupMap.isEmpty, "two groups here are never folded")
-    }
-
-    func testAJoiningMacKeepsItsSnippetWhenTheTextDiffersOrTheOtherCopyWasDeleted() {
-        let remote = [
-            SyncRecord(key: "snippet:r1", modifiedAt: t0, deleted: false,
-                       payload: .object(["abbreviation": .string(";addr"), "content": .string("Home")]), device: "m1"),
-            SyncRecord(key: "snippet:r2", modifiedAt: t0, deleted: false,
-                       payload: .object(["abbreviation": .string(";sig"), "content": .string("Best")]), device: "m1"),
-            SyncRecord(key: "snippet:r2", modifiedAt: t1, deleted: true, payload: nil, device: "m2")
-        ]
-        let local: [String: JSONValue] = [
-            "snippet:z1": .object(["abbreviation": .string(";addr"), "content": .string("Work")]),
-            "snippet:z2": .object(["abbreviation": .string(";sig"), "content": .string("Best")])
-        ]
-        XCTAssertTrue(SyncMerge.duplicates(local: local, remote: remote, ledger: [:]).dropSnippets.isEmpty)
+        XCTAssertTrue(StarterSnippets.adoptFixedIDs(in: context))
+        let ids = Dictionary(uniqueKeysWithValues: try context.fetch(Snippet.fetchRequest()).map { ($0.abbreviation, $0.id) })
+        for starter in StarterSnippets.all where starter.abbreviation != ".sig" {
+            XCTAssertEqual(ids[starter.abbreviation], starter.id)
+        }
+        XCTAssertNotEqual(ids[".sig"], StarterSnippets.all.last?.id, "an edited starter keeps its own id")
+        XCTAssertEqual(group.id, StarterSnippets.groupID)
+        XCTAssertFalse(StarterSnippets.adoptFixedIDs(in: context), "nothing left to adopt")
     }
 
     func testALocalEditIsNewerThanWhatItReplacesEvenWithAFastClockElsewhere() {
@@ -829,14 +793,15 @@ final class FolderSyncTests: XCTestCase {
     }
 
     func testTwoMacsShareSnippetsEditsDeletionsAndPinsWithoutDuplicatingTheStarters() async throws {
-        try addSnippet(".sig", content: "Best", group: "Personal", on: 0)
+        try addLegacyStarters(on: 0)
         try addSnippet(".hi", content: "Hello", group: "Personal", on: 0)
-        try addSnippet(".sig", content: "Best", group: "Personal", on: 1)
+        try addLegacyStarters(on: 1)
         await syncAll()
 
-        XCTAssertEqual(try snippets(on: 1), [".sig": "Best", ".hi": "Hello"], "the joining Mac's identical .sig folds into the first Mac's")
+        let expected = starterContents.merging([".hi": "Hello"]) { $1 }
+        XCTAssertEqual(try snippets(on: 1), expected, "the starters of two old installs meet as the same snippets")
         XCTAssertEqual(SnippetGroup.ordered(in: macs[1].stack.viewContext).map(\.name), ["Personal"])
-        XCTAssertEqual(try snippets(on: 0), [".sig": "Best", ".hi": "Hello"])
+        XCTAssertEqual(try snippets(on: 0), expected)
 
         let hi = try XCTUnwrap(try macs[1].stack.viewContext.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".hi" })
         hi.content = "Hello there"
@@ -927,36 +892,37 @@ final class FolderSyncTests: XCTestCase {
             .sorted()
     }
 
-    func testAMacJoiningLaterFoldsIntoWhatTheOthersSettledOn() async throws {
-        for mac in 0..<2 {
-            try addSnippet(".sig", content: "Best", group: "Personal", on: mac)
-            try addSnippet(".dd", content: "{date}", group: "Personal", on: mac)
+    private let starterContents = Dictionary(uniqueKeysWithValues: StarterSnippets.all.map { ($0.abbreviation, $0.content) })
+
+    /// The starters as an install from before the fixed ids created them: random ids.
+    private func addLegacyStarters(on mac: Int) throws {
+        let context = macs[mac].stack.viewContext
+        let group = SnippetGroup.insert(named: SnippetLibraryRepair.starterGroupName, in: context)
+        for starter in StarterSnippets.all {
+            _ = Snippet.insert(title: starter.title, abbreviation: starter.abbreviation, content: starter.content, group: group, in: context)
         }
+        try context.save()
+    }
+
+    func testAMacJoiningLaterMeetsTheSameStarters() async throws {
+        try addLegacyStarters(on: 0)
+        try addLegacyStarters(on: 1)
         for _ in 0..<2 { for mac in 0..<2 { await macs[mac].sync.sync() } }
-
-        try addSnippet(".sig", content: "Best", group: "Personal", on: 2)
-        try addSnippet(".dd", content: "{date}", group: "Personal", on: 2)
-        await syncAll()
+        try addLegacyStarters(on: 2)
         await syncAll()
 
+        let expected = StarterSnippets.all.map { "\($0.abbreviation) in Personal" }.sorted()
         for mac in 0..<3 {
-            XCTAssertEqual(try layout(on: mac), [".dd in Personal", ".sig in Personal"], "Mac \(mac)")
+            XCTAssertEqual(try layout(on: mac), expected, "Mac \(mac)")
             XCTAssertEqual(SnippetGroup.ordered(in: macs[mac].stack.viewContext).map(\.name), ["Personal"], "Mac \(mac)")
         }
     }
 
-    func testTwoNewMacsEndWithEverySnippetInTheSameGroup() async throws {
-        for mac in 0..<2 {
-            try addSnippet(".sig", content: "Best", group: "Personal", on: mac)
-        }
-        try addSnippet(".mine", content: "only on A", group: "Personal", on: 0)
-        await macs[0].sync.sync()
-        for _ in 0..<3 { for mac in 0..<2 { await macs[mac].sync.sync() } }
-
-        for mac in 0..<2 {
-            XCTAssertEqual(try layout(on: mac), [".mine in Personal", ".sig in Personal"], "Mac \(mac)")
-            XCTAssertEqual(SnippetGroup.ordered(in: macs[mac].stack.viewContext).count, 1, "Mac \(mac)")
-        }
+    func testTwoSnippetsMadeAlikeOnTwoMacsAreBothKept() async throws {
+        try addSnippet(".addr", content: "Home", group: "Mine", on: 0)
+        try addSnippet(".addr", content: "Home", group: "Mine", on: 1)
+        await syncAll()
+        XCTAssertEqual(try snippets(on: 0), [".addr": "Home | Home"], "nothing is merged by guess; the user removes the copy they do not want")
     }
 
     func testJoiningAFolderAgainKeepsAnEditMadeSince() async throws {

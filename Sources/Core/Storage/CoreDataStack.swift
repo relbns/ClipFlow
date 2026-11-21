@@ -131,21 +131,15 @@ final class CoreDataStack {
         guard groupCount == 0, snippetCount == 0, !defaults.bool(forKey: "hasCreatedDefaultSnippets") else { return }
 
         let group = SnippetGroup(context: viewContext)
-        group.id = UUID()
+        group.id = StarterSnippets.groupID
         group.name = SnippetLibraryRepair.starterGroupName
         group.isEnabled = true
         group.createdAt = Date()
         group.sortOrder = 0
 
-        let starters: [(title: String, abbreviation: String, content: String)] = [
-            ("Today's Date", ".dd", "{date:EEEE, MMM d}"),
-            ("Current Time", ".time", "{time:HH:mm}"),
-            ("Date and Time", ".now", "{date:EEEE, MMM d} at {time:HH:mm}"),
-            ("Email Signature", ".sig", "Best regards,\n{cursor}")
-        ]
-        for starter in starters {
+        for starter in StarterSnippets.all {
             let snippet = Snippet(context: viewContext)
-            snippet.id = UUID()
+            snippet.id = starter.id
             snippet.title = starter.title
             snippet.abbreviation = starter.abbreviation
             snippet.content = starter.content
@@ -259,6 +253,54 @@ enum StoreMigrator {
         for extensionSuffix in ["", "-wal", "-shm"] {
             try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + extensionSuffix))
         }
+    }
+}
+
+/// The snippets every Mac starts with. Their ids are fixed, so on Macs that sync they are the same snippets,
+/// not copies to reconcile.
+enum StarterSnippets {
+    struct Starter {
+        let id: UUID
+        let title: String
+        let abbreviation: String
+        let content: String
+    }
+
+    static let groupID = UUID(uuidString: "C1F10A00-0000-4000-8000-000000000001")!
+    static let all = [
+        Starter(id: UUID(uuidString: "C1F10A00-0000-4000-8000-000000000011")!, title: "Today's Date", abbreviation: ".dd",
+                content: "{date:EEEE, MMM d}"),
+        Starter(id: UUID(uuidString: "C1F10A00-0000-4000-8000-000000000012")!, title: "Current Time", abbreviation: ".time",
+                content: "{time:HH:mm}"),
+        Starter(id: UUID(uuidString: "C1F10A00-0000-4000-8000-000000000013")!, title: "Date and Time", abbreviation: ".now",
+                content: "{date:EEEE, MMM d} at {time:HH:mm}"),
+        Starter(id: UUID(uuidString: "C1F10A00-0000-4000-8000-000000000014")!, title: "Email Signature", abbreviation: ".sig",
+                content: "Best regards,\n{cursor}")
+    ]
+
+    /// Installs from before the fixed ids created the starters with random ones. Before a Mac first syncs, each
+    /// starter it still has exactly as created (title, abbreviation and text) takes the fixed id, and the starter
+    /// group the fixed group id, so they meet the other Macs' starters as the same snippets. Changed or missing
+    /// starters keep their ids. Returns whether anything changed.
+    @discardableResult
+    static func adoptFixedIDs(in context: NSManagedObjectContext) -> Bool {
+        let snippets = (try? context.fetch(Snippet.fetchRequest())) ?? []
+        let groups = (try? context.fetch(SnippetGroup.fetchRequest())) ?? []
+        let takenSnippetIDs = Set(snippets.map(\.id))
+        var changed = false
+        for starter in all where !takenSnippetIDs.contains(starter.id) {
+            guard let snippet = snippets.first(where: {
+                $0.title == starter.title && $0.abbreviation == starter.abbreviation && $0.content == starter.content
+            }) else { continue }
+            snippet.id = starter.id
+            changed = true
+        }
+        if !groups.contains(where: { $0.id == groupID }),
+           let group = groups.first(where: { $0.name == SnippetLibraryRepair.starterGroupName && $0.snippets.contains { s in all.contains { $0.id == s.id } } }) {
+            group.id = groupID
+            changed = true
+        }
+        return changed
     }
 }
 

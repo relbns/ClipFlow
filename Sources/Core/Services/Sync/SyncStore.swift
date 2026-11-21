@@ -100,7 +100,7 @@ final class SyncStore {
         }
     }
 
-    // MARK: - Duplicates
+    // MARK: - Joining
 
     /// The snippets' edit times, so a Mac joining a folder again keeps edits made since it last synced.
     func snippetEditTimes() -> [String: Date] {
@@ -111,34 +111,10 @@ final class SyncStore {
         return times
     }
 
-    /// Drops this Mac's copies of snippets another Mac has under a smaller id, and moves the snippets of a group
-    /// that has a same-named twin into the twin once it is here.
-    func dropSnippets(_ keys: Set<String>) -> Bool {
-        for key in keys {
-            if let snippet = snippet(id: SyncMerge.id(of: key)) { context.delete(snippet) }
-        }
+    /// Gives untouched starter snippets from an older install their fixed ids; see `StarterSnippets.adoptFixedIDs`.
+    func adoptStarterIDs() -> Bool {
+        StarterSnippets.adoptFixedIDs(in: context)
         return save()
-    }
-
-    struct FoldResult {
-        let saved: Bool
-        let movedSnippets: Set<String>
-        let removedGroups: Set<String>
-    }
-
-    func foldGroups(_ groupMap: [String: String]) -> FoldResult {
-        var moved: Set<String> = []
-        var removed: Set<String> = []
-        for (localID, remoteID) in groupMap {
-            guard let local = group(id: localID), let remote = group(id: remoteID), local != remote else { continue }
-            for snippet in local.snippets {
-                snippet.group = remote
-                moved.insert("snippet:\(snippet.id.uuidString)")
-            }
-            removed.insert("group:\(localID)")
-            context.delete(local)
-        }
-        return FoldResult(saved: save(), movedSnippets: moved, removedGroups: removed)
     }
 
     // MARK: - Apply

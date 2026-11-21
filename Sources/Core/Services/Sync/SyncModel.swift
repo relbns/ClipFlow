@@ -68,8 +68,6 @@ struct SyncDeviceFile: Codable {
     var deviceID: String
     var deviceName: String
     var writtenAt: Date
-    /// The Mac has once synced with the other Macs' files present; a Mac joining later yields to its copies.
-    var joined: Bool?
     var records: [SyncRecord]
 }
 
@@ -144,74 +142,6 @@ enum SyncMerge {
                 return record.deleted ? !entry.deleted : record.payload?.stableHash != entry.hash || entry.deleted
             }
             .sorted { $0.key < $1.key }
-    }
-
-    /// Run while a Mac joins a folder: the same snippet set up on two Macs (the starter snippets, or one typed on
-    /// both) arrives under two ids. Every Mac keeps the copy with the smaller id, so they agree whatever order they
-    /// join in. Copies count as the same only when everything matches (title, abbreviation, text, trigger, options,
-    /// app rules and the group's name). A group folds into another Mac's group of the same name. Only another Mac's
-    /// copy can replace one here; two of this Mac's own are never touched, and a record this Mac already deleted
-    /// does not count, however stale another Mac's file is.
-    /// `joinedDevices` are Macs that have joined already: a joining Mac yields to their copies whatever the ids, so
-    /// a Mac joining late folds into what the others settled on; between Macs still joining, the smaller id wins.
-    static func duplicates(
-        local: [String: JSONValue], remote: [SyncRecord], ledger: [String: SyncLedgerEntry], joinedDevices: Set<String> = []
-    ) -> (dropSnippets: Set<String>, groupMap: [String: String]) {
-        // Another Mac's live copies, with the Mac each comes from; one this Mac already deleted does not count.
-        var remoteLive: [String: (payload: JSONValue, device: String)] = [:]
-        for (key, record) in newest(remote) where !record.deleted {
-            if let entry = ledger[key], entry.deleted, !isNewer(record, than: entry.modifiedAt, entry.device) { continue }
-            if let payload = record.payload { remoteLive[key] = (payload, record.device) }
-        }
-        func origin(_ key: String) -> String { remoteLive[key]?.device ?? "\u{0}this Mac" }
-
-        var groupNames: [String: String] = [:]
-        for (key, payload) in remoteLive.mapValues(\.payload).merging(local, uniquingKeysWith: { _, mine in mine })
-        where kind(of: key) == "group" {
-            groupNames[id(of: key)] = payload["name"]?.string
-        }
-        func signature(_ payload: JSONValue) -> String? {
-            guard case .object(var fields) = payload else { return nil }
-            fields["group"] = payload["group"]?.string.flatMap { groupNames[$0] }.map(JSONValue.string) ?? .null
-            return JSONValue.object(fields).stableHash
-        }
-
-        var snippetCopies: [String: [(key: String, device: String)]] = [:]
-        var groupCopies: [String: [(key: String, device: String)]] = [:]
-        for (key, entry) in remoteLive {
-            switch kind(of: key) {
-            case "snippet": if let signature = signature(entry.payload) { snippetCopies[signature, default: []].append((key, entry.device)) }
-            case "group": if let name = entry.payload["name"]?.string { groupCopies[name, default: []].append((key, entry.device)) }
-            default: break
-            }
-        }
-        /// The copy `key` yields to, among copies from a Mac other than `key`'s own: one from a joined Mac when `key`'s
-        /// own Mac has not joined, else the smallest key when it is smaller than `key` and as settled.
-        func keeper(for key: String, among copies: [(key: String, device: String)]?) -> String? {
-            let mine = origin(key)
-            let mineJoined = joinedDevices.contains(mine)
-            let others = copies?.filter { $0.device != mine } ?? []
-            if !mineJoined, let settled = others.filter({ joinedDevices.contains($0.device) }).map(\.key).min() {
-                return settled
-            }
-            return others.filter { joinedDevices.contains($0.device) == mineJoined && $0.key < key }.map(\.key).min()
-        }
-
-        var drop: Set<String> = []
-        var groupMap: [String: String] = [:]
-        for (key, payload) in local {
-            switch kind(of: key) {
-            case "snippet":
-                if let signature = signature(payload), keeper(for: key, among: snippetCopies[signature]) != nil { drop.insert(key) }
-            case "group":
-                if let name = payload["name"]?.string, let keep = keeper(for: key, among: groupCopies[name]) {
-                    groupMap[id(of: key)] = id(of: keep)
-                }
-            default:
-                break
-            }
-        }
-        return (drop, groupMap)
     }
 
     /// The records this Mac publishes: every ledger entry, with the current payload for live ones.

@@ -45,12 +45,6 @@ final class FolderSync: ObservableObject {
 
     var isEnabled: Bool { defaults.bool(forKey: Self.enabledKey) }
 
-    private static let joinedKey = "syncJoined"
-
-    /// Whether this Mac has once synced with the other Macs' files present; until then its copies of their snippets
-    /// fold into theirs.
-    private var hasJoined: Bool { defaults.bool(forKey: Self.joinedKey) }
-
     /// This Mac's file in `devices/`, once it has an id.
     var deviceFileName: String? { defaults.string(forKey: Self.deviceIDKey).map { "\($0).json" } }
 
@@ -79,7 +73,6 @@ final class FolderSync: ObservableObject {
         }
         if defaults.string(forKey: Self.deviceIDKey) != nil {
             try? FileManager.default.removeItem(at: ledgerURL)
-            defaults.removeObject(forKey: Self.joinedKey)
         }
         let id = UUID().uuidString
         defaults.set(id, forKey: Self.deviceIDKey)
@@ -172,6 +165,9 @@ final class FolderSync: ObservableObject {
                     joinWaitStarted = started
                     if Date().timeIntervalSince(started) < 120 { return }
                 }
+                // Starters from an install before their ids were fixed take the fixed ids, so they meet the other
+                // Macs' starters as the same snippets.
+                guard store.adoptStarterIDs() else { throw SyncError.saveFailed }
                 // What this Mac has counts as old, except snippet edits, which keep their own time, so joining a
                 // folder again neither spreads stale copies nor reverts edits made since.
                 ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: [:], kinds: kinds, now: .distantPast, device: deviceID)
@@ -185,42 +181,14 @@ final class FolderSync: ObservableObject {
                 SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store,
                 deletedGroups: SyncMerge.deletedGroups(remote: remote, ledger: ledger)
             )
-            var keepTime = result.detached
-            // Until this Mac has seen the other Macs' files once, its copies of their snippets and groups fold into
-            // theirs. The fold is not an edit: it is stamped just after the version it replaces, so a newer edit made
-            // on another Mac still wins.
-            var movedByFold: Set<String> = []
-            if !hasJoined, !remoteFiles.isEmpty {
-                let joinedDevices = Set(remoteFiles.filter { $0.joined == true }.map(\.deviceID))
-                let duplicates = SyncMerge.duplicates(local: store.export(kinds: kinds), remote: remote, ledger: ledger, joinedDevices: joinedDevices)
-                guard store.dropSnippets(duplicates.dropSnippets) else { throw SyncError.saveFailed }
-                let fold = store.foldGroups(duplicates.groupMap)
-                guard fold.saved else { throw SyncError.saveFailed }
-                for key in duplicates.dropSnippets.union(fold.removedGroups) {
-                    guard let entry = ledger[key], !entry.deleted else { continue }
-                    ledger[key] = SyncLedgerEntry(hash: "", modifiedAt: entry.modifiedAt.addingTimeInterval(0.001), deleted: true, device: deviceID)
-                }
-                movedByFold = fold.movedSnippets
-                // Joined only once every other Mac's file was here; a file still downloading may hold more copies.
-                if downloading == 0 { defaults.set(true, forKey: Self.joinedKey) }
-            }
-
             let local = store.export(kinds: kinds)
-            for key in keepTime.subtracting(movedByFold) {
+            for key in result.detached {
                 if let payload = local[key] { ledger[key]?.hash = payload.stableHash }
-            }
-            // A snippet the fold moved into the other Mac's group is published just after its previous version, so
-            // every Mac takes the move, while a real edit made elsewhere since still wins.
-            for key in movedByFold {
-                guard let payload = local[key], let entry = ledger[key] else { continue }
-                ledger[key] = SyncLedgerEntry(
-                    hash: payload.stableHash, modifiedAt: entry.modifiedAt.addingTimeInterval(0.001), deleted: false, device: deviceID
-                )
             }
             ledger = SyncMerge.stamp(local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, skip: result.deferred)
 
             let file = SyncDeviceFile(
-                deviceID: deviceID, deviceName: computerName, writtenAt: Date(), joined: hasJoined,
+                deviceID: deviceID, deviceName: computerName, writtenAt: Date(),
                 records: SyncMerge.records(ledger: ledger, local: store.export(kinds: kinds))
             )
             try write(file, to: devices.appendingPathComponent("\(deviceID).json"))
@@ -298,7 +266,7 @@ final class FolderSync: ObservableObject {
         let data = try encoder.encode(file)
         if let existing = try? Data(contentsOf: url),
            let old = try? JSONDecoder.sync.decode(SyncDeviceFile.self, from: existing),
-           old.records == file.records, old.joined == file.joined { return }
+           old.records == file.records { return }
         try data.write(to: url, options: .atomic)
     }
 
@@ -315,7 +283,6 @@ final class FolderSync: ObservableObject {
     /// Forgets what this Mac synced, so turning sync on again (or choosing another folder) joins it afresh.
     func reset() {
         try? FileManager.default.removeItem(at: ledgerURL)
-        defaults.removeObject(forKey: Self.joinedKey)
         joinWaitStarted = nil
         status = .off
     }
