@@ -326,7 +326,10 @@
 "pref_export_hint" = "שמירת כל קטעי הטקסט והקבוצות לקובץ JSON.";
 "pref_export_button" = "ייצוא…";
 "pref_import" = "ייבוא קטעי טקסט";
-"pref_import_hint" = "הוספת קטעי טקסט מקובץ JSON. קיצורים שכבר קיימים מדולגים.";
+"pref_import_hint" = "הוספת קטעי טקסט מקובץ JSON של ClipFlow, מייצוא CSV של TextExpander או מקבוצת ‎.textexpander. קיצורים שכבר קיימים מדולגים.";
+"import_scripts_skipped_one" = "קטע סקריפט אחד לא יובא, כי ClipFlow לא מריץ סקריפטים:";
+"import_scripts_skipped_other" = "%d קטעי סקריפט לא יובאו, כי ClipFlow לא מריץ סקריפטים:";
+"import_unsupported_macros" = "נשארו כמו שהם, כי אין להם מקבילה ב־ClipFlow: %@";
 "pref_import_button" = "ייבוא…";
 "import_complete" = "הייבוא הסתיים";
 "import_result" = "יובאו: %d · דולגו: %d";

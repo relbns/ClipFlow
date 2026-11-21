@@ -78,9 +78,24 @@ final class SnippetExporter {
 
     /// Import snippets from JSON data
     func importFromJSON(_ data: Data, mergeStrategy: MergeStrategy = .skip) async throws -> ImportResult {
-        let decoder = JSONDecoder()
-        let groups = try decoder.decode([ExportedGroup].self, from: data)
+        try importGroups(try JSONDecoder().decode([ExportedGroup].self, from: data), mergeStrategy: mergeStrategy)
+    }
 
+    /// Adds TextExpander groups with the trigger chosen in Preferences; abbreviations already in use are skipped.
+    func importTextExpander(_ parsed: TextExpanderImport.Result, defaults: UserDefaults = .standard) throws -> ImportResult {
+        let trigger = defaults.string(forKey: "expandAfter") ?? ExpandTrigger.delimiter.rawValue
+        let groups = parsed.groups.map { group in
+            ExportedGroup(name: group.name, snippets: group.snippets.map {
+                ExportedSnippet(
+                    title: $0.label, abbreviation: $0.abbreviation, content: $0.content, expandTrigger: trigger,
+                    caseSensitive: false, playSound: false, group: group.name
+                )
+            })
+        }
+        return try importGroups(groups, mergeStrategy: .skip)
+    }
+
+    func importGroups(_ groups: [ExportedGroup], mergeStrategy: MergeStrategy) throws -> ImportResult {
         var imported = 0
         var skipped = 0
         var conflicts: [String] = []

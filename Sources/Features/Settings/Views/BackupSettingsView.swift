@@ -61,7 +61,7 @@ struct BackupSettingsView: View {
                 message = (L("export_failed"), error.localizedDescription)
             }
         }
-        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.json]) { result in
+        .fileImporter(isPresented: $showingImporter, allowedContentTypes: Self.importTypes) { result in
             switch result {
             case .success(let url): importSnippets(from: url)
             case .failure(let error): message = (L("import_failed"), error.localizedDescription)
@@ -119,14 +119,31 @@ struct BackupSettingsView: View {
         }
     }
 
+    private static let importTypes: [UTType] = [.json, .commaSeparatedText, .propertyList, .xml]
+        + [UTType(filenameExtension: "textexpander")].compactMap { $0 }
+
     private func importSnippets(from url: URL) {
         Task { @MainActor in
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             do {
                 let data = try Data(contentsOf: url)
-                let result = try await SnippetExporter(context: viewContext).importFromJSON(data, mergeStrategy: .skip)
-                message = (L("import_complete"), L("import_result", result.imported, result.skipped))
+                let exporter = SnippetExporter(context: viewContext)
+                guard TextExpanderImport.canRead(fileExtension: url.pathExtension) else {
+                    let result = try await exporter.importFromJSON(data, mergeStrategy: .skip)
+                    message = (L("import_complete"), L("import_result", result.imported, result.skipped))
+                    return
+                }
+                let parsed = try TextExpanderImport.parse(data, fileName: url.lastPathComponent)
+                let result = try exporter.importTextExpander(parsed)
+                var lines = [L("import_result", result.imported, result.skipped)]
+                if !parsed.scriptSnippets.isEmpty {
+                    lines.append(L("import_scripts_skipped", count: parsed.scriptSnippets.count) + " " + parsed.scriptSnippets.joined(separator: ", "))
+                }
+                if !parsed.unsupportedMacros.isEmpty {
+                    lines.append(L("import_unsupported_macros", parsed.unsupportedMacros.sorted().joined(separator: ", ")))
+                }
+                message = (L("import_complete"), lines.joined(separator: "\n\n"))
             } catch {
                 message = (L("import_failed"), error.localizedDescription)
             }
