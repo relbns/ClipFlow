@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -7,9 +8,42 @@ struct BackupSettingsView: View {
     @State private var showingExporter = false
     @State private var showingImporter = false
     @State private var message: (title: String, body: String)?
+    @AppStorage(FolderSync.enabledKey) private var syncEnabled = false
+    @AppStorage(FolderSync.settingsKey) private var syncSettings = true
+    @AppStorage(FolderSync.pinsKey) private var syncPins = true
+    @AppStorage(FolderSync.folderKey) private var syncFolderPath = ""
+    @ObservedObject private var sync = FolderSync.shared
+    @Environment(\.cfTheme) private var theme
 
     var body: some View {
         SettingsPage {
+            CFSettingsRow(label: L("sync_enabled"), hint: L("sync_enabled_hint")) {
+                CFToggle(isOn: Binding(get: { syncEnabled }, set: { syncEnabled = $0; sync.syncSoon() }))
+                    .accessibilityLabel(L("sync_enabled"))
+            }
+            if syncEnabled {
+                CFSettingsRow(label: L("sync_folder"), hint: L("sync_folder_hint")) {
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(displayPath)
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.textMid)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: 260, alignment: .trailing)
+                            .environment(\.layoutDirection, .leftToRight)
+                        CFToolbarBtn(label: L("sync_folder_choose")) { chooseFolder() }
+                    }
+                }
+                CFSettingsRow(label: L("sync_settings"), hint: L("sync_settings_hint")) {
+                    CFToggle(isOn: $syncSettings).accessibilityLabel(L("sync_settings"))
+                }
+                CFSettingsRow(label: L("sync_pins"), hint: L("sync_pins_hint")) {
+                    CFToggle(isOn: $syncPins).accessibilityLabel(L("sync_pins"))
+                }
+                CFSettingsRow(label: L("sync_status"), hint: statusText) {
+                    CFToolbarBtn(label: L("sync_now")) { Task { await sync.sync() } }
+                }
+            }
             CFSettingsRow(label: L("pref_export"), hint: L("pref_export_hint")) {
                 CFToolbarBtn(label: L("pref_export_button")) { export() }
             }
@@ -38,6 +72,40 @@ struct BackupSettingsView: View {
         } message: {
             Text(message?.body ?? "")
         }
+    }
+
+    /// "iCloud Drive/ClipFlow" or "GoogleDrive-…/My Drive/ClipFlow" rather than the Library path behind them.
+    private var displayPath: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return sync.folder.path
+            .replacingOccurrences(of: "\(home)/Library/Mobile Documents/com~apple~CloudDocs", with: "iCloud Drive")
+            .replacingOccurrences(of: "\(home)/Library/CloudStorage/", with: "")
+            .replacingOccurrences(of: home, with: "~")
+    }
+
+    private var statusText: String {
+        switch sync.status {
+        case .off: return L("sync_status_waiting")
+        case .syncing: return L("sync_status_syncing")
+        case .synced(let date, let otherMacs):
+            let others = otherMacs == 0 ? L("sync_other_macs_none") : L("sync_other_macs", count: otherMacs)
+            return L("sync_status_synced", date.formatted(date: .omitted, time: .shortened)) + " · " + others
+        case .failed(let reason): return L("sync_status_failed", reason)
+        }
+    }
+
+    /// A different folder holds a different set of Macs, so this Mac joins it afresh.
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = sync.folder.deletingLastPathComponent()
+        panel.prompt = L("sync_folder_choose")
+        guard panel.runModal() == .OK, let url = panel.url, url.path != sync.folder.path else { return }
+        syncFolderPath = url.path
+        sync.reset()
+        sync.syncSoon()
     }
 
     private func export() {

@@ -72,6 +72,7 @@ enum SnapshotRenderer {
             PopoverNavigation.shared.searchText = "sig"
             save("mb-search", MenuBarPopover(clipboardMonitor: monitor, isPresented: .constant(true)), size: nil)
             PopoverNavigation.shared.searchText = ""
+            defaults.set(true, forKey: FolderSync.enabledKey)
             save("prefs-exp", SettingsView(initialTab: 2), size: CGSize(width: 760, height: 620))
             save("onboarding", WelcomeView(isPresented: .constant(true), onGetStarted: {}), size: CGSize(width: 780, height: 520))
             save("about", AboutView(), size: CGSize(width: 560, height: 680))

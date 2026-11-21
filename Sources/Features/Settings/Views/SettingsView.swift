@@ -155,4 +155,6 @@ struct GeneralSettingsView: View {
 
 extension Notification.Name {
     static let clearClipboardHistory = Notification.Name("ClearClipboardHistory")
+    /// A clip was pinned, unpinned or deleted while pinned; sync of pins follows it.
+    static let clipPinsChanged = Notification.Name("ClipPinsChanged")
 }

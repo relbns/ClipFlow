@@ -98,7 +98,14 @@ final class CoreDataStack {
         }
     }
 
-    private lazy var statsContext = makeServiceContext()
+    /// Saves from here only count uses, which sync ignores.
+    nonisolated static let statsContextName = "stats"
+
+    private lazy var statsContext: NSManagedObjectContext = {
+        let context = makeServiceContext()
+        context.name = Self.statsContextName
+        return context
+    }()
 
     func save() {
         guard viewContext.hasChanges else { return }
@@ -124,21 +131,15 @@ final class CoreDataStack {
         guard groupCount == 0, snippetCount == 0, !defaults.bool(forKey: "hasCreatedDefaultSnippets") else { return }
 
         let group = SnippetGroup(context: viewContext)
-        group.id = UUID()
+        group.id = StarterSnippets.groupID
         group.name = SnippetLibraryRepair.starterGroupName
         group.isEnabled = true
         group.createdAt = Date()
         group.sortOrder = 0
 
-        let starters: [(title: String, abbreviation: String, content: String)] = [
-            ("Today's Date", ".dd", "{date:EEEE, MMM d}"),
-            ("Current Time", ".time", "{time:HH:mm}"),
-            ("Date and Time", ".now", "{date:EEEE, MMM d} at {time:HH:mm}"),
-            ("Email Signature", ".sig", "Best regards,\n{cursor}")
-        ]
-        for starter in starters {
+        for starter in StarterSnippets.all {
             let snippet = Snippet(context: viewContext)
-            snippet.id = UUID()
+            snippet.id = starter.id
             snippet.title = starter.title
             snippet.abbreviation = starter.abbreviation
             snippet.content = starter.content
@@ -252,6 +253,76 @@ enum StoreMigrator {
         for extensionSuffix in ["", "-wal", "-shm"] {
             try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + extensionSuffix))
         }
+    }
+}
+
+/// The snippets every Mac starts with. Their ids are fixed, so on Macs that sync they are the same snippets,
+/// not copies to reconcile.
+enum StarterSnippets {
+    struct Starter {
+        let id: UUID
+        let title: String
+        let abbreviation: String
+        let content: String
+    }
+
+    static let groupID = UUID(uuidString: "C1F10A00-0000-4000-8000-000000000001")!
+    static let all = [
+        Starter(id: UUID(uuidString: "C1F10A00-0000-4000-8000-000000000011")!, title: "Today's Date", abbreviation: ".dd",
+                content: "{date:EEEE, MMM d}"),
+        Starter(id: UUID(uuidString: "C1F10A00-0000-4000-8000-000000000012")!, title: "Current Time", abbreviation: ".time",
+                content: "{time:HH:mm}"),
+        Starter(id: UUID(uuidString: "C1F10A00-0000-4000-8000-000000000013")!, title: "Date and Time", abbreviation: ".now",
+                content: "{date:EEEE, MMM d} at {time:HH:mm}"),
+        Starter(id: UUID(uuidString: "C1F10A00-0000-4000-8000-000000000014")!, title: "Email Signature", abbreviation: ".sig",
+                content: "Best regards,\n{cursor}")
+    ]
+
+    /// The starter this snippet still is exactly as created, in every field (title, abbreviation, text, trigger,
+    /// options, no app rules, in a group with the starter group's name), whatever its id.
+    static func unchangedStarter(_ snippet: Snippet) -> Starter? {
+        guard let starter = all.first(where: { $0.abbreviation == snippet.abbreviation }),
+              snippet.title == starter.title, snippet.content == starter.content, snippet.isEnabled,
+              snippet.expandTrigger == ExpandTrigger.delimiter.rawValue, !snippet.caseSensitive, !snippet.playSound,
+              !snippet.restrictToApps, !snippet.isFavorite, (snippet.appRules ?? []).isEmpty,
+              snippet.group?.name == SnippetLibraryRepair.starterGroupName else { return nil }
+        return starter
+    }
+
+    /// A starter with its fixed id, still exactly as created: it carries nothing of the user's, so when a Mac
+    /// joins sync it counts as older than any edit or deletion made on another Mac. Which "Personal" group holds it
+    /// does not matter: an old install's group may hold the user's own snippets and keep its own id.
+    static func isPristine(_ snippet: Snippet) -> Bool {
+        unchangedStarter(snippet)?.id == snippet.id
+    }
+
+    /// Installs from before the fixed ids created the starters with random ones. Before a Mac first syncs, each
+    /// starter it still has exactly as created takes the fixed id, so it meets the other Macs' starters as the same
+    /// snippet; changed or missing starters keep their ids. The starter group takes the fixed group id only when it
+    /// holds nothing but starters, so a group the user filled with their own snippets is never tied to it.
+    /// Returns whether anything changed.
+    @discardableResult
+    static func adoptFixedIDs(in context: NSManagedObjectContext) -> Bool {
+        let snippets = (try? context.fetch(Snippet.fetchRequest())) ?? []
+        let groups = (try? context.fetch(SnippetGroup.fetchRequest())) ?? []
+        let takenSnippetIDs = Set(snippets.map(\.id))
+        let starterIDs = Set(all.map(\.id))
+        var changed = false
+        for starter in all where !takenSnippetIDs.contains(starter.id) {
+            guard let snippet = snippets.first(where: { unchangedStarter($0)?.id == starter.id && !starterIDs.contains($0.id) })
+            else { continue }
+            snippet.id = starter.id
+            changed = true
+        }
+        if !groups.contains(where: { $0.id == groupID }),
+           let group = groups.first(where: { group in
+               group.name == SnippetLibraryRepair.starterGroupName && group.isEnabled && !group.snippets.isEmpty
+                   && group.snippets.allSatisfy { starterIDs.contains($0.id) }
+           }) {
+            group.id = groupID
+            changed = true
+        }
+        return changed
     }
 }
 

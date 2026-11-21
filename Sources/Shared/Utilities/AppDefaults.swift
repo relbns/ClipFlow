@@ -17,6 +17,9 @@ enum AppDefaults {
             "layoutFixSwitchesKeyboard": true,
             "alwaysPastePlainText": false,
             "ocrSaveScreenshots": true,
+            "syncEnabled": false,
+            "syncSettings": true,
+            "syncPins": true,
             "ocrIndexImages": true,
             "excludedApps": "[]"
         ])
