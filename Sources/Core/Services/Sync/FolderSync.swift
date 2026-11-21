@@ -156,7 +156,7 @@ final class FolderSync: ObservableObject {
     }
 
     func sync() async {
-        guard isEnabled, let store, !isSyncing else { return }
+        guard isEnabled, !stopped, let store, !isSyncing else { return }
         isSyncing = true
         defer {
             isSyncing = false
@@ -194,12 +194,17 @@ final class FolderSync: ObservableObject {
                 let all = store.export(kinds: kinds)
                 return scope.map { SyncMerge.scoped(all, toGroup: $0) } ?? all
             }
-            /// Changes another channel applied that are still as applied: published at the time they were made.
+            /// Changes another channel applied that are still as applied: published at the time they were made. One edited
+            /// here since is forgotten, so undoing back to it later counts as a new edit.
             func appliedTimes(_ local: [String: JSONValue]) -> [String: Date] {
                 var times: [String: Date] = [:]
                 for (key, entry) in SyncStore.applied {
                     let expected = entry.payload.map { scope == nil ? $0 : SyncMerge.teamPayload(key: key, $0) }
-                    if expected?.stableHash == local[key]?.stableHash { times[key] = entry.time }
+                    if expected?.stableHash == local[key]?.stableHash {
+                        times[key] = entry.time
+                    } else if scope == nil || local[key] != nil {
+                        SyncStore.applied[key] = nil
+                    }
                 }
                 return times
             }
@@ -343,8 +348,11 @@ final class FolderSync: ObservableObject {
         try JSONEncoder.sync.encode(ledger).write(to: ledgerURL, options: .atomic)
     }
 
-    /// Stops syncing for good: a shared group this Mac no longer shares.
+    private var stopped = false
+
+    /// Stops syncing for good, a sync already queued included: a shared group this Mac no longer shares.
     func stop() {
+        stopped = true
         timer?.invalidate()
         timer = nil
         cancellables = []

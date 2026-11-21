@@ -1782,6 +1782,29 @@ final class SharedGroupTests: XCTestCase {
         let published = try XCTUnwrap(try deviceRecords(in: library).first { $0.key == key })
         XCTAssertEqual(published.payload?["content"]?.string, "Hello from the team")
         XCTAssertEqual(published.modifiedAt, madeAt, "not stamped as a new edit, so a later edit elsewhere still wins")
+
+        let onA = try XCTUnwrap(try context(0).fetch(Snippet.fetchRequest()).first { $0.abbreviation == ";hi" })
+        onA.content = "Mine for a moment"
+        try context(0).save()
+        await personal.sync()
+        let interim = try XCTUnwrap(try deviceRecords(in: library).first { $0.key == key }).modifiedAt
+        try await Task.sleep(nanoseconds: 100_000_000)
+        onA.content = "Hello from the team"
+        try context(0).save()
+        await personal.sync()
+        let reverted = try XCTUnwrap(try deviceRecords(in: library).first { $0.key == key })
+        XCTAssertGreaterThan(reverted.modifiedAt, interim.addingTimeInterval(0.05), "undoing back to it is a new edit, stamped now")
+    }
+
+    func testAStoppedChannelDoesNotSyncAgain() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        await channels[0]?.sync()
+        channels[1]?.stop()
+        await channels[1]?.sync()
+        XCTAssertNil(group("Support", on: 1))
     }
 
     func testOnOffFavoriteAndAppRulesStayEachPersons() async throws {
