@@ -342,7 +342,7 @@
 "sensitive_expire" = "למחוק אחרי זמן";
 "sensitive_skip" = "לא לשמור";
 "pref_sensitive_kinds" = "לזהות";
-"pref_sensitive_kinds_hint" = "קוד הוא 6 עד 8 ספרות. מספר כרטיס ו־IBAN מזוהים רק כשספרות הביקורת שלהם תקינות.";
+"pref_sensitive_kinds_hint" = "קוד הוא 6 ספרות. מספר כרטיס ו־IBAN מזוהים רק כשספרות הביקורת שלהם תקינות.";
 "sensitive_kind_codes" = "קודים חד־פעמיים";
 "sensitive_kind_cards" = "מספרי כרטיסים";
 "sensitive_kind_ibans" = "מספרי IBAN";

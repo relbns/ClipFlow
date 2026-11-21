@@ -342,7 +342,7 @@
 "sensitive_expire" = "Remove later";
 "sensitive_skip" = "Don't save";
 "pref_sensitive_kinds" = "Detect";
-"pref_sensitive_kinds_hint" = "Codes are 6 to 8 digits. Card numbers and IBANs must pass their check digits.";
+"pref_sensitive_kinds_hint" = "Codes are 6 digits. Card numbers and IBANs must pass their check digits.";
 "sensitive_kind_codes" = "One-time codes";
 "sensitive_kind_cards" = "Card numbers";
 "sensitive_kind_ibans" = "IBANs";

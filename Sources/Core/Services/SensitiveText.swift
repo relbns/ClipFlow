@@ -17,10 +17,12 @@ enum SensitiveText {
     static let handlingKey = "sensitiveClips"
     static let minutesKey = "sensitiveClipsMinutes"
     static let clearClipboardKey = "sensitiveClipsClearClipboard"
+    /// This Mac's first launch with the feature; history copied before it is never removed.
+    static let sinceKey = "sensitiveClipsSince"
     static let minuteChoices = [1, 5, 15, 60]
 
     static func kind(of text: String) -> SensitiveKind? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = text.replacingOccurrences(of: "\u{00A0}", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count <= 64 else { return nil }
         if isOneTimeCode(trimmed) { return .oneTimeCode }
         if isCardNumber(trimmed) { return .cardNumber }
@@ -28,17 +30,19 @@ enum SensitiveText {
         return nil
     }
 
-    /// 6 to 8 digits, also split in two by a space or a dash, optionally after a letter prefix like `G-`.
-    /// Four digits are left out: years and short numbers are copied far more often than four-digit codes.
+    /// 6 digits, also as 3 and 3 split by a space or a dash, optionally after a letter prefix like `G-`. Other lengths
+    /// are left out: postcodes, dates, years and phone numbers are copied far more often than such codes.
     static func isOneTimeCode(_ text: String) -> Bool {
-        text.range(of: "^(?:[A-Z]-)?(?:[0-9]{6,8}|[0-9]{3,4}[ -][0-9]{3,4})$", options: .regularExpression) != nil
+        text.range(of: "^(?:[A-Z]-)?(?:[0-9]{6}|[0-9]{3}[ -][0-9]{3})$", options: .regularExpression) != nil
     }
 
     /// 13 to 19 digits, single spaces or dashes allowed between them, starting with 2-6 and passing the Luhn check.
+    /// 15 digits only with the Amex prefix, since IMEIs are 15 Luhn-valid digits too.
     static func isCardNumber(_ text: String) -> Bool {
         guard text.range(of: "^[0-9](?:[ -]?[0-9]){12,18}$", options: .regularExpression) != nil else { return false }
         let digits = text.compactMap(\.wholeNumberValue)
         guard let first = digits.first, (2...6).contains(first) else { return false }
+        if digits.count == 15, !(digits[0] == 3 && [4, 7].contains(digits[1])) { return false }
         let sum = digits.reversed().enumerated().reduce(0) { total, entry in
             guard entry.offset % 2 == 1 else { return total + entry.element }
             let doubled = entry.element * 2
@@ -49,7 +53,7 @@ enum SensitiveText {
 
     /// A country code, two check digits and 11 to 30 letters or digits, spaces allowed, passing the mod-97 check.
     static func isIBAN(_ text: String) -> Bool {
-        let compact = text.replacingOccurrences(of: " ", with: "").uppercased()
+        let compact = text.filter { !$0.isWhitespace }.uppercased()
         guard compact.range(of: "^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$", options: .regularExpression) != nil else { return false }
         var remainder = 0
         for character in compact.dropFirst(4) + compact.prefix(4) {
@@ -62,8 +66,12 @@ enum SensitiveText {
 
     /// The kind of this clip when the user asked to detect it.
     static func detectedKind(of capture: ClipCapture, defaults: UserDefaults) -> SensitiveKind? {
-        guard capture.kind == .text || capture.kind == .rtf, let kind = kind(of: capture.text),
-              defaults.bool(forKey: kind.defaultsKey) else { return nil }
+        guard capture.kind == .text || capture.kind == .rtf else { return nil }
+        return detectedKind(of: capture.text, defaults: defaults)
+    }
+
+    static func detectedKind(of text: String, defaults: UserDefaults) -> SensitiveKind? {
+        guard let kind = kind(of: text), defaults.bool(forKey: kind.defaultsKey) else { return nil }
         return kind
     }
 

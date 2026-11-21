@@ -1261,10 +1261,10 @@ final class PreviousBundleIDTests: XCTestCase {
 
 final class SensitiveTextTests: XCTestCase {
     func testOneTimeCodes() {
-        for code in ["482913", "48291375", "482 913", "4829-1375", "G-482913", " 482913\n"] {
+        for code in ["482913", "482 913", "482-913", "G-482913", " 482913\n"] {
             XCTAssertEqual(SensitiveText.kind(of: code), .oneTimeCode, code)
         }
-        for text in ["2026", "12345", "123456789", "code 482913", "48 2913"] {
+        for text in ["2026", "12345", "6100000", "20261121", "123-4567", "123456789", "code 482913", "48 2913"] {
             XCTAssertNil(SensitiveText.kind(of: text), text)
         }
     }
@@ -1276,11 +1276,14 @@ final class SensitiveTextTests: XCTestCase {
         XCTAssertNil(SensitiveText.kind(of: "4242424242424241"), "fails Luhn")
         XCTAssertNil(SensitiveText.kind(of: "1234567812345670"), "passes Luhn, no card starts with 1")
         XCTAssertNil(SensitiveText.kind(of: "4242  4242 4242 4242"), "two spaces in a row")
+        XCTAssertNil(SensitiveText.kind(of: "352099001761481"), "a Luhn-valid IMEI")
+        XCTAssertEqual(SensitiveText.kind(of: "4242\u{00A0}4242\u{00A0}4242\u{00A0}4242"), .cardNumber)
     }
 
     func testIBANsNeedTheMod97Check() {
         XCTAssertEqual(SensitiveText.kind(of: "IL62 0108 0000 0009 9999 999"), .iban)
         XCTAssertEqual(SensitiveText.kind(of: "gb82west12345698765432"), .iban)
+        XCTAssertEqual(SensitiveText.kind(of: "IL62\u{00A0}0108\u{00A0}0000\u{00A0}0009\u{00A0}9999\u{00A0}999"), .iban)
         XCTAssertNil(SensitiveText.kind(of: "GB82 WEST 1234 5698 7654 33"))
         XCTAssertNil(SensitiveText.kind(of: "Pay to IL620108000000099999999"))
     }
@@ -1332,8 +1335,23 @@ final class SensitiveClipTests: XCTestCase {
         XCTAssertEqual(history, [])
         defaults.set(SensitiveHandling.keep.rawValue, forKey: SensitiveText.handlingKey)
         copy("IL62 0108 0000 0009 9999 999")
+        defaults.set(SensitiveHandling.expire.rawValue, forKey: SensitiveText.handlingKey)
         monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(24 * 3600))
-        XCTAssertEqual(history, ["IL62 0108 0000 0009 9999 999"])
+        XCTAssertEqual(history, ["IL62 0108 0000 0009 9999 999"], "kept while Keep was on, so never scheduled")
+    }
+
+    func testTextClipFlowPutsOnTheClipboardIsCheckedToo() {
+        defaults.set(SensitiveHandling.skip.rawValue, forKey: SensitiveText.handlingKey)
+        monitor.copy("482913")
+        XCTAssertEqual(history, [])
+        XCTAssertEqual(pasteboard.string(forType: .string), "482913")
+    }
+
+    func testSwitchingToDontSaveRemovesWaitingCodesAtOnce() {
+        copy("482913")
+        defaults.set(SensitiveHandling.skip.rawValue, forKey: SensitiveText.handlingKey)
+        monitor.removeExpiredSensitiveClips()
+        XCTAssertEqual(history, [])
     }
 
     func testAKindThatIsNotDetectedIsKept() {
@@ -1357,6 +1375,12 @@ final class SensitiveClipTests: XCTestCase {
         XCTAssertNil(pasteboard.string(forType: .string))
 
         copy("553311")
+        pasteboard.clearContents()
+        pasteboard.setString("553311", forType: .string)
+        monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(3600))
+        XCTAssertNil(pasteboard.string(forType: .string), "picked again from history, so still the same code")
+
+        copy("661122")
         copy("later text")
         monitor.removeExpiredSensitiveClips(now: Date().addingTimeInterval(3600))
         XCTAssertEqual(history, ["later text"])
@@ -1368,7 +1392,12 @@ final class SensitiveClipTests: XCTestCase {
         let fresh = PasteboardSnapshot.text("553311", transient: false)
         monitor.record(ClipCapture.classify(snapshot)!, snapshot: snapshot, sourceName: nil, sourceBundleID: nil, at: Date().addingTimeInterval(-600))
         monitor.record(ClipCapture.classify(fresh)!, snapshot: fresh, sourceName: nil, sourceBundleID: nil, at: Date().addingTimeInterval(-60))
+        XCTAssertEqual(
+            ClipboardMonitor(context: stack.viewContext, pasteboard: pasteboard, defaults: defaults).clipHistory.map(\.content),
+            ["553311", "482913"], "history copied before the feature arrived is left alone"
+        )
 
+        defaults.set(Date.distantPast, forKey: SensitiveText.sinceKey)
         let relaunched = ClipboardMonitor(context: stack.viewContext, pasteboard: pasteboard, defaults: defaults)
         XCTAssertEqual(relaunched.clipHistory.map(\.content), ["553311"])
         relaunched.removeExpiredSensitiveClips(now: Date().addingTimeInterval(5 * 60))
