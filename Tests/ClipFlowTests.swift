@@ -1529,3 +1529,98 @@ final class OwnPasteboardWritesTests: XCTestCase {
         XCTAssertEqual(monitor.clipHistory.map(\.content), ["a real copy"])
     }
 }
+
+final class TextExpanderImportTests: XCTestCase {
+    func testMacrosBecomeClipFlowVariables() {
+        let converted = TextExpanderImport.convertMacros("Hi %filltext:name=First name:default=Ann%, on %A %1d.%1m.%Y at %H:%M%| (%clipboard) 100%% sure")
+        XCTAssertEqual(converted.content, "Hi {prompt:First name}, on {date:EEEE} {date:d}.{date:M}.{date:yyyy} at {date:HH}:{date:mm}{cursor} ({clipboard}) 100% sure")
+        XCTAssertEqual(converted.unsupported, [])
+    }
+
+    func testUnknownMacrosStayAsTypedAndAreReported() {
+        let converted = TextExpanderImport.convertMacros("%snippet:sig% then %key:tab% and 50% off%fillpartend%")
+        XCTAssertEqual(converted.content, "%snippet:sig% then %key:tab% and 50% off%fillpartend%")
+        XCTAssertEqual(converted.unsupported, ["%snippet", "%key", "%fillpartend"])
+    }
+
+    func testDateMathKeepsTheSnippetsDatesAsTypedRatherThanShowingToday() {
+        let converted = TextExpanderImport.convertMacros("Due %@+1D%A, %clipboard")
+        XCTAssertEqual(converted.content, "Due %@+1D%A, {clipboard}")
+        XCTAssertEqual(converted.unsupported, ["%@"])
+    }
+
+    func testAPercentWordIsTextAndAMultiLineFillIsAPrompt() {
+        XCTAssertEqual(TextExpanderImport.convertMacros("50%off: ends %Y").content, "50%off: ends {date:yyyy}")
+        XCTAssertEqual(TextExpanderImport.convertMacros("%fillarea:name=Notes:default=a\nb%").content, "{prompt:Notes}")
+    }
+
+    func testWindowsLineBreaksBecomeNewlines() throws {
+        let result = try TextExpanderImport.parse(Data("abbreviation,snippet\r\n;a,\"one\r\ntwo\"\r\n".utf8), fileName: "W.csv")
+        XCTAssertEqual(result.groups.first?.snippets.first?.content, "one\ntwo")
+    }
+
+    func testBracesThatLookLikeClipFlowVariablesStayLiteral() {
+        let converted = TextExpanderImport.convertMacros("Use {date} and {\"a\": 1} on %Y")
+        let rendered = SnippetTemplate.render(converted.content, context: TemplateContext(
+            now: Date(timeIntervalSince1970: 0), timeZone: TimeZone(identifier: "UTC")!, locale: Locale(identifier: "en_US_POSIX"), clipboard: ""
+        ))
+        XCTAssertEqual(rendered.text, "Use {date} and {\"a\": 1} on 1970")
+    }
+
+    func testCSVWithHeadersQuotesAndLineBreaks() throws {
+        let csv = "label,abbreviation,snippet\r\n\"Sign-off\",;sig,\"Thanks,\nAriel\"\r\n,;q,\"He said \"\"hi\"\"\"\r\n"
+        let result = try TextExpanderImport.parse(Data(csv.utf8), fileName: "Work Snippets.csv")
+        XCTAssertEqual(result.groups, [.init(name: "Work Snippets", snippets: [
+            .init(abbreviation: ";sig", label: "Sign-off", content: "Thanks,\nAriel"),
+            .init(abbreviation: ";q", label: ";q", content: "He said \"hi\"")
+        ])])
+    }
+
+    func testCSVWithoutHeaders() throws {
+        let result = try TextExpanderImport.parse(Data(";a,first\n;b,second,Second one\n".utf8), fileName: "Mine.csv")
+        XCTAssertEqual(result.groups.first?.snippets.map(\.abbreviation), [";a", ";b"])
+        XCTAssertEqual(result.groups.first?.snippets.last?.label, "Second one")
+    }
+
+    func testTextExpanderGroupFileSkipsScripts() throws {
+        let plist: [String: Any] = [
+            "groupInfo": ["groupName": "Support"],
+            "snippetsTE2": [
+                ["abbreviation": ";hi", "label": "Greeting", "plainText": "Hello %clipboard", "snippetType": 0],
+                ["abbreviation": ";rt", "label": "Rich", "plainText": "Bold text", "snippetType": 1],
+                ["abbreviation": ";as", "label": "Script", "plainText": "tell app", "snippetType": 2]
+            ]
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        let result = try TextExpanderImport.parse(data, fileName: "Support.textexpander")
+        XCTAssertEqual(result.groups, [.init(name: "Support", snippets: [
+            .init(abbreviation: ";hi", label: "Greeting", content: "Hello {clipboard}"),
+            .init(abbreviation: ";rt", label: "Rich", content: "Bold text")
+        ])])
+        XCTAssertEqual(result.scriptSnippets, [";as"])
+    }
+
+    func testAFileThatIsNeither() {
+        XCTAssertThrowsError(try TextExpanderImport.parse(Data("just one column\nnothing else".utf8), fileName: "notes.csv"))
+    }
+
+    @MainActor
+    func testImportAddsTheGroupAndSkipsAbbreviationsInUse() throws {
+        let stack = CoreDataStack(storeURL: nil)
+        let context = stack.viewContext
+        _ = Snippet.insert(title: "Mine", abbreviation: ";sig", content: "keep me", group: nil, in: context)
+        try context.save()
+        let parsed = try TextExpanderImport.parse(Data("abbreviation,snippet\n;SIG,theirs\n;new,%Y\n;New,again\n".utf8), fileName: "TE.csv")
+        let result = try SnippetExporter(context: context).importTextExpander(parsed, defaults: makeTestDefaults("clipflow-tests-te"))
+        XCTAssertEqual(result.imported, 1)
+        XCTAssertEqual(result.skipped, 2, "abbreviations are matched ignoring case, as the editor does")
+        let snippets = try context.fetch(Snippet.fetchRequest())
+        XCTAssertEqual(snippets.first { $0.abbreviation == ";sig" }?.content, "keep me")
+        XCTAssertEqual(snippets.first { $0.abbreviation == ";new" }?.content, "{date:yyyy}")
+        XCTAssertEqual(snippets.first { $0.abbreviation == ";new" }?.group?.name, "TE")
+
+        let empty = try TextExpanderImport.parse(Data("abbreviation,snippet\n".utf8), fileName: "Empty.csv")
+        _ = try SnippetExporter(context: context).importTextExpander(empty, defaults: makeTestDefaults("clipflow-tests-te"))
+        XCTAssertFalse(try context.fetch(SnippetGroup.fetchRequest()).contains { $0.name == "Empty" })
+    }
+}
