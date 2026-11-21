@@ -68,6 +68,8 @@ struct SyncDeviceFile: Codable {
     var deviceID: String
     var deviceName: String
     var writtenAt: Date
+    /// The Mac has once synced with the other Macs' files present; a Mac joining later yields to its copies.
+    var joined: Bool?
     var records: [SyncRecord]
 }
 
@@ -150,8 +152,10 @@ enum SyncMerge {
     /// app rules and the group's name). A group folds into another Mac's group of the same name. Only another Mac's
     /// copy can replace one here; two of this Mac's own are never touched, and a record this Mac already deleted
     /// does not count, however stale another Mac's file is.
+    /// `joinedDevices` are Macs that have joined already: a joining Mac yields to their copies whatever the ids, so
+    /// a Mac joining late folds into what the others settled on; between Macs still joining, the smaller id wins.
     static func duplicates(
-        local: [String: JSONValue], remote: [SyncRecord], ledger: [String: SyncLedgerEntry]
+        local: [String: JSONValue], remote: [SyncRecord], ledger: [String: SyncLedgerEntry], joinedDevices: Set<String> = []
     ) -> (dropSnippets: Set<String>, groupMap: [String: String]) {
         // Another Mac's live copies, with the Mac each comes from; one this Mac already deleted does not count.
         var remoteLive: [String: (payload: JSONValue, device: String)] = [:]
@@ -181,10 +185,16 @@ enum SyncMerge {
             default: break
             }
         }
-        /// The smallest key among copies from a Mac other than `key`'s own, if it is smaller than `key`.
+        /// The copy `key` yields to, among copies from a Mac other than `key`'s own: one from a joined Mac when `key`'s
+        /// own Mac has not joined, else the smallest key when it is smaller than `key` and as settled.
         func keeper(for key: String, among copies: [(key: String, device: String)]?) -> String? {
             let mine = origin(key)
-            return copies?.filter { $0.device != mine && $0.key < key }.map(\.key).min()
+            let mineJoined = joinedDevices.contains(mine)
+            let others = copies?.filter { $0.device != mine } ?? []
+            if !mineJoined, let settled = others.filter({ joinedDevices.contains($0.device) }).map(\.key).min() {
+                return settled
+            }
+            return others.filter { joinedDevices.contains($0.device) == mineJoined && $0.key < key }.map(\.key).min()
         }
 
         var drop: Set<String> = []

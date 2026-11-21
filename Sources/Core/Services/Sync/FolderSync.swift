@@ -189,8 +189,10 @@ final class FolderSync: ObservableObject {
             // Until this Mac has seen the other Macs' files once, its copies of their snippets and groups fold into
             // theirs. The fold is not an edit: it is stamped just after the version it replaces, so a newer edit made
             // on another Mac still wins.
+            var movedByFold: Set<String> = []
             if !hasJoined, !remoteFiles.isEmpty {
-                let duplicates = SyncMerge.duplicates(local: store.export(kinds: kinds), remote: remote, ledger: ledger)
+                let joinedDevices = Set(remoteFiles.filter { $0.joined == true }.map(\.deviceID))
+                let duplicates = SyncMerge.duplicates(local: store.export(kinds: kinds), remote: remote, ledger: ledger, joinedDevices: joinedDevices)
                 guard store.dropSnippets(duplicates.dropSnippets) else { throw SyncError.saveFailed }
                 let fold = store.foldGroups(duplicates.groupMap)
                 guard fold.saved else { throw SyncError.saveFailed }
@@ -198,18 +200,27 @@ final class FolderSync: ObservableObject {
                     guard let entry = ledger[key], !entry.deleted else { continue }
                     ledger[key] = SyncLedgerEntry(hash: "", modifiedAt: entry.modifiedAt.addingTimeInterval(0.001), deleted: true, device: deviceID)
                 }
-                keepTime.formUnion(fold.movedSnippets)
-                defaults.set(true, forKey: Self.joinedKey)
+                movedByFold = fold.movedSnippets
+                // Joined only once every other Mac's file was here; a file still downloading may hold more copies.
+                if downloading == 0 { defaults.set(true, forKey: Self.joinedKey) }
             }
 
             let local = store.export(kinds: kinds)
-            for key in keepTime {
+            for key in keepTime.subtracting(movedByFold) {
                 if let payload = local[key] { ledger[key]?.hash = payload.stableHash }
+            }
+            // A snippet the fold moved into the other Mac's group is published just after its previous version, so
+            // every Mac takes the move, while a real edit made elsewhere since still wins.
+            for key in movedByFold {
+                guard let payload = local[key], let entry = ledger[key] else { continue }
+                ledger[key] = SyncLedgerEntry(
+                    hash: payload.stableHash, modifiedAt: entry.modifiedAt.addingTimeInterval(0.001), deleted: false, device: deviceID
+                )
             }
             ledger = SyncMerge.stamp(local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, skip: result.deferred)
 
             let file = SyncDeviceFile(
-                deviceID: deviceID, deviceName: computerName, writtenAt: Date(),
+                deviceID: deviceID, deviceName: computerName, writtenAt: Date(), joined: hasJoined,
                 records: SyncMerge.records(ledger: ledger, local: store.export(kinds: kinds))
             )
             try write(file, to: devices.appendingPathComponent("\(deviceID).json"))
@@ -286,7 +297,8 @@ final class FolderSync: ObservableObject {
         let encoder = JSONEncoder.sync
         let data = try encoder.encode(file)
         if let existing = try? Data(contentsOf: url),
-           let old = try? JSONDecoder.sync.decode(SyncDeviceFile.self, from: existing), old.records == file.records { return }
+           let old = try? JSONDecoder.sync.decode(SyncDeviceFile.self, from: existing),
+           old.records == file.records, old.joined == file.joined { return }
         try data.write(to: url, options: .atomic)
     }
 

@@ -921,6 +921,44 @@ final class FolderSyncTests: XCTestCase {
         }
     }
 
+    private func layout(on mac: Int) throws -> [String] {
+        try macs[mac].stack.viewContext.fetch(Snippet.fetchRequest())
+            .map { "\($0.abbreviation) in \($0.group?.name ?? "no group")" }
+            .sorted()
+    }
+
+    func testAMacJoiningLaterFoldsIntoWhatTheOthersSettledOn() async throws {
+        for mac in 0..<2 {
+            try addSnippet(".sig", content: "Best", group: "Personal", on: mac)
+            try addSnippet(".dd", content: "{date}", group: "Personal", on: mac)
+        }
+        for _ in 0..<2 { for mac in 0..<2 { await macs[mac].sync.sync() } }
+
+        try addSnippet(".sig", content: "Best", group: "Personal", on: 2)
+        try addSnippet(".dd", content: "{date}", group: "Personal", on: 2)
+        await syncAll()
+        await syncAll()
+
+        for mac in 0..<3 {
+            XCTAssertEqual(try layout(on: mac), [".dd in Personal", ".sig in Personal"], "Mac \(mac)")
+            XCTAssertEqual(SnippetGroup.ordered(in: macs[mac].stack.viewContext).map(\.name), ["Personal"], "Mac \(mac)")
+        }
+    }
+
+    func testTwoNewMacsEndWithEverySnippetInTheSameGroup() async throws {
+        for mac in 0..<2 {
+            try addSnippet(".sig", content: "Best", group: "Personal", on: mac)
+        }
+        try addSnippet(".mine", content: "only on A", group: "Personal", on: 0)
+        await macs[0].sync.sync()
+        for _ in 0..<3 { for mac in 0..<2 { await macs[mac].sync.sync() } }
+
+        for mac in 0..<2 {
+            XCTAssertEqual(try layout(on: mac), [".mine in Personal", ".sig in Personal"], "Mac \(mac)")
+            XCTAssertEqual(SnippetGroup.ordered(in: macs[mac].stack.viewContext).count, 1, "Mac \(mac)")
+        }
+    }
+
     func testJoiningAFolderAgainKeepsAnEditMadeSince() async throws {
         let snippet = try addSnippet(".s", content: "old", group: "G", on: 0)
         await syncAll()
