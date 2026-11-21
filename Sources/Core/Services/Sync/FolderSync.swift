@@ -83,7 +83,12 @@ final class FolderSync: ObservableObject {
             }
         }
         if defaults.string(forKey: Self.deviceIDKey) != nil {
-            try? FileManager.default.removeItem(at: ledgerURL)
+            // Every channel's ledger belongs to the old id, not only this one's.
+            let directory = ledgerURL.deletingLastPathComponent()
+            for name in (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+            where name == "sync-ledger.json" || (name.hasPrefix("shared-") && name.hasSuffix(".json")) {
+                try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
+            }
         }
         let id = UUID().uuidString
         defaults.set(id, forKey: Self.deviceIDKey)
@@ -189,6 +194,15 @@ final class FolderSync: ObservableObject {
                 let all = store.export(kinds: kinds)
                 return scope.map { SyncMerge.scoped(all, toGroup: $0) } ?? all
             }
+            /// Changes another channel applied that are still as applied: published at the time they were made.
+            func appliedTimes(_ local: [String: JSONValue]) -> [String: Date] {
+                var times: [String: Date] = [:]
+                for (key, entry) in SyncStore.applied {
+                    let expected = entry.payload.map { scope == nil ? $0 : SyncMerge.teamPayload(key: key, $0) }
+                    if expected?.stableHash == local[key]?.stableHash { times[key] = entry.time }
+                }
+                return times
+            }
             if let scope {
                 if let entry = ledger["group:\(scope)"], !entry.deleted, localRecords()["group:\(scope)"] == nil {
                     onGroupGone()
@@ -213,7 +227,8 @@ final class FolderSync: ObservableObject {
                 ledger = SyncMerge.stamp(local: localRecords(), ledger: [:], kinds: kinds, now: .distantPast, device: deviceID)
                 for (key, time) in store.snippetEditTimes() where ledger[key] != nil { ledger[key]?.modifiedAt = time }
             } else {
-                ledger = SyncMerge.stamp(local: localRecords(), ledger: ledger, kinds: kinds, now: Date(), device: deviceID)
+                let local = localRecords()
+                ledger = SyncMerge.stamp(local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, times: appliedTimes(local))
             }
             joinWaitStarted = nil
 
@@ -225,7 +240,9 @@ final class FolderSync: ObservableObject {
             for key in result.detached {
                 if let payload = local[key] { ledger[key]?.hash = payload.stableHash }
             }
-            ledger = SyncMerge.stamp(local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, skip: result.deferred)
+            ledger = SyncMerge.stamp(
+                local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, skip: result.deferred, times: appliedTimes(local)
+            )
 
             let file = SyncDeviceFile(
                 deviceID: deviceID, deviceName: computerName, writtenAt: Date(),
@@ -324,6 +341,14 @@ final class FolderSync: ObservableObject {
     private func writeLedger(_ ledger: [String: SyncLedgerEntry]) throws {
         try FileManager.default.createDirectory(at: ledgerURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder.sync.encode(ledger).write(to: ledgerURL, options: .atomic)
+    }
+
+    /// Stops syncing for good: a shared group this Mac no longer shares.
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        cancellables = []
+        observers = []
     }
 
     /// Forgets what this Mac synced, so turning sync on again (or choosing another folder) joins it afresh.

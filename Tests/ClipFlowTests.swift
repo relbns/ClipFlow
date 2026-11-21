@@ -1756,6 +1756,78 @@ final class SharedGroupTests: XCTestCase {
         XCTAssertThrowsError(try groups.join(team), "the same folder twice")
     }
 
+    func testATeammatesEditGoesToMyOtherMacsAtTheTimeItWasMade() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        _ = Snippet.insert(title: "Hi", abbreviation: ";hi", content: "Hello", group: support, in: context(0))
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        let library = root.appendingPathComponent("library")
+        macs[0].defaults.set(true, forKey: FolderSync.enabledKey)
+        macs[0].defaults.set(library.path, forKey: FolderSync.folderKey)
+        let personal = FolderSync(ledgerDirectory: root.appendingPathComponent("personal0"), hardwareID: "mac0")
+        personal.configure(store: SyncStore(context: context(0), monitor: macs[0].monitor, defaults: macs[0].defaults), defaults: macs[0].defaults)
+        await syncBoth()
+        await personal.sync()
+
+        let onB = try XCTUnwrap(try context(1).fetch(Snippet.fetchRequest()).first { $0.abbreviation == ";hi" })
+        onB.content = "Hello from the team"
+        try context(1).save()
+        await channels[1]?.sync()
+        let key = "snippet:\(onB.id.uuidString)"
+        let madeAt = try XCTUnwrap(try deviceRecords(in: team).first { $0.key == key && $0.payload?["content"]?.string == "Hello from the team" }).modifiedAt
+        try await Task.sleep(nanoseconds: 50_000_000)
+        await channels[0]?.sync()
+        await personal.sync()
+        let published = try XCTUnwrap(try deviceRecords(in: library).first { $0.key == key })
+        XCTAssertEqual(published.payload?["content"]?.string, "Hello from the team")
+        XCTAssertEqual(published.modifiedAt, madeAt, "not stamped as a new edit, so a later edit elsewhere still wins")
+    }
+
+    func testOnOffFavoriteAndAppRulesStayEachPersons() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        let hi = Snippet.insert(title: "Hi", abbreviation: ";hi", content: "Hello", group: support, in: context(0))
+        let rule = AppRule.create(in: context(0), bundleID: "com.apple.mail", appName: "Mail", isDeny: false)
+        rule.snippet = hi
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        await syncBoth()
+
+        let onB = try XCTUnwrap(try context(1).fetch(Snippet.fetchRequest()).first { $0.abbreviation == ";hi" })
+        XCTAssertEqual(onB.appRules?.count ?? 0, 0)
+        onB.isEnabled = false
+        onB.isFavorite = true
+        onB.content = "Hello again"
+        try context(1).save()
+        await syncBoth()
+        XCTAssertEqual(hi.content, "Hello again")
+        XCTAssertTrue(hi.isEnabled)
+        XCTAssertFalse(hi.isFavorite)
+        XCTAssertEqual(hi.appRules?.map(\.bundleIdentifier), ["com.apple.mail"])
+    }
+
+    func testAFolderWithSeveralGroupsOrTheLibraryFolderIsRefused() throws {
+        let devices = team.appendingPathComponent("devices")
+        try FileManager.default.createDirectory(at: devices, withIntermediateDirectories: true)
+        let file = SyncDeviceFile(deviceID: "x", deviceName: "x", writtenAt: Date(), records: [
+            SyncRecord(key: "group:A", modifiedAt: Date(), deleted: false, payload: .object(["name": .string("A")]), device: "x"),
+            SyncRecord(key: "group:B", modifiedAt: Date(), deleted: false, payload: .object(["name": .string("B")]), device: "x")
+        ])
+        try JSONEncoder.sync.encode(file).write(to: devices.appendingPathComponent("x.json"))
+        let groups = SharedGroups()
+        XCTAssertThrowsError(try groups.share(UUID(), in: team))
+        XCTAssertThrowsError(try groups.share(UUID(), in: FolderSync.shared.folder))
+    }
+
+    private func deviceRecords(in folder: URL) throws -> [SyncRecord] {
+        let devices = folder.appendingPathComponent("devices")
+        return try FileManager.default.contentsOfDirectory(atPath: devices.path).flatMap { name -> [SyncRecord] in
+            let data = try Data(contentsOf: devices.appendingPathComponent(name))
+            return try JSONDecoder.sync.decode(SyncDeviceFile.self, from: data).records
+        }
+    }
+
     func testScopedRecordsCarryOnlyTheGroupNameAndItsSnippets() {
         let local: [String: JSONValue] = [
             "group:G": .object(["name": .string("Support"), "isEnabled": .bool(false), "sortOrder": .number(3)]),

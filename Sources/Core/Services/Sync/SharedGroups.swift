@@ -17,11 +17,13 @@ final class SharedGroups: ObservableObject {
     enum ShareError: LocalizedError {
         case alreadyShared
         case folderHoldsAnotherGroup
+        case librarySyncFolder
 
         var errorDescription: String? {
             switch self {
             case .alreadyShared: return "This group or folder is already shared."
             case .folderHoldsAnotherGroup: return "This folder already holds a shared group. Join it, or choose an empty folder."
+            case .librarySyncFolder: return "This is the folder that syncs your whole library between your Macs. Choose a folder of its own."
             }
         }
     }
@@ -54,19 +56,34 @@ final class SharedGroups: ObservableObject {
 
     /// Starts sharing a group of this Mac in `folder`, which must not hold another group.
     func share(_ groupID: UUID, in folder: URL) throws {
-        guard !groups.contains(where: { $0.groupID == groupID.uuidString || $0.folder == folder.path }) else { throw ShareError.alreadyShared }
-        if let other = Self.groupInFolder(folder), other != groupID.uuidString { throw ShareError.folderHoldsAnotherGroup }
-        add(SharedGroup(folder: folder.path, groupID: groupID.uuidString))
+        let path = Self.normalized(folder)
+        try checkNotLibraryFolder(path)
+        guard !groups.contains(where: { $0.groupID == groupID.uuidString || $0.folder == path }) else { throw ShareError.alreadyShared }
+        let found = Self.groupsInFolder(folder)
+        if found.several || (found.id.map { $0 != groupID.uuidString } ?? false) { throw ShareError.folderHoldsAnotherGroup }
+        add(SharedGroup(folder: path, groupID: groupID.uuidString))
     }
 
     /// Joins a group someone shared in `folder`; it appears here on the first sync.
     func join(_ folder: URL) throws {
-        guard !groups.contains(where: { $0.folder == folder.path }) else { throw ShareError.alreadyShared }
-        add(SharedGroup(folder: folder.path, groupID: nil))
+        let path = Self.normalized(folder)
+        try checkNotLibraryFolder(path)
+        guard !groups.contains(where: { $0.folder == path }) else { throw ShareError.alreadyShared }
+        add(SharedGroup(folder: path, groupID: nil))
+    }
+
+    /// The library channel writes this Mac's file under the same device id, so the two would overwrite each other.
+    private func checkNotLibraryFolder(_ path: String) throws {
+        if path == Self.normalized(FolderSync.shared.folder) { throw ShareError.librarySyncFolder }
+    }
+
+    static func normalized(_ folder: URL) -> String {
+        folder.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     /// Stops syncing the group here; the folder and the other Macs keep it, and so does this Mac's copy.
     func stopSharing(folder: String) {
+        channels[folder]?.stop()
         channels[folder]?.reset()
         channels[folder] = nil
         statuses[folder] = nil
@@ -99,7 +116,10 @@ final class SharedGroups: ObservableObject {
         }
         channel.$status
             .receive(on: RunLoop.main)
-            .sink { [weak self] status in self?.statuses[folder] = status }
+            .sink { [weak self, weak channel] status in
+                guard let self, let channel, self.channels[folder] === channel else { return }
+                self.statuses[folder] = status
+            }
             .store(in: &channel.observers)
         channels[folder] = channel
         channel.start(context: context, monitor: monitor, defaults: defaults)
@@ -117,12 +137,16 @@ final class SharedGroups: ObservableObject {
 
     /// The group already published in `folder`, if any.
     static func groupInFolder(_ folder: URL) -> String? {
+        groupsInFolder(folder).id
+    }
+
+    static func groupsInFolder(_ folder: URL) -> (id: String?, several: Bool) {
         let devices = folder.appendingPathComponent("devices", isDirectory: true)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: devices.path)) ?? []
         let records = names.filter { $0.hasSuffix(".json") }.compactMap { name -> [SyncRecord]? in
             guard let data = try? Data(contentsOf: devices.appendingPathComponent(name)) else { return nil }
             return (try? JSONDecoder.sync.decode(SyncDeviceFile.self, from: data))?.records
         }.flatMap { $0 }
-        return SyncMerge.sharedGroupID(in: records).id
+        return SyncMerge.sharedGroupID(in: records)
     }
 }

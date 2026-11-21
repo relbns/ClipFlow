@@ -85,16 +85,16 @@ enum SyncMerge {
     /// `skip` holds keys whose remote change could not be applied yet; they are left for the next pass.
     static func stamp(
         local: [String: JSONValue], ledger: [String: SyncLedgerEntry], kinds: Set<String>, now: Date, device: String,
-        skip: Set<String> = []
+        skip: Set<String> = [], times: [String: Date] = [:]
     ) -> [String: SyncLedgerEntry] {
         var result = ledger
         for (key, payload) in local where !skip.contains(key) {
             let hash = payload.stableHash
             if let entry = ledger[key], !entry.deleted, entry.hash == hash { continue }
-            result[key] = SyncLedgerEntry(hash: hash, modifiedAt: after(ledger[key], now), deleted: false, device: device)
+            result[key] = SyncLedgerEntry(hash: hash, modifiedAt: after(ledger[key], times[key] ?? now), deleted: false, device: device)
         }
         for (key, entry) in ledger where !entry.deleted && local[key] == nil && kinds.contains(kind(of: key)) && !skip.contains(key) {
-            result[key] = SyncLedgerEntry(hash: "", modifiedAt: after(entry, now), deleted: true, device: device)
+            result[key] = SyncLedgerEntry(hash: "", modifiedAt: after(entry, times[key] ?? now), deleted: true, device: device)
         }
         return result
     }
@@ -160,13 +160,22 @@ enum SyncMerge {
     /// person's own, and the snippets filed in it. A snippet moved out drops from this set and is deleted for the others.
     static func scoped(_ local: [String: JSONValue], toGroup groupID: String) -> [String: JSONValue] {
         var result: [String: JSONValue] = [:]
-        if let name = local["group:\(groupID)"]?["name"] {
-            result["group:\(groupID)"] = .object(["name": name])
+        if let group = local["group:\(groupID)"] {
+            result["group:\(groupID)"] = teamPayload(key: "group:\(groupID)", group)
         }
         for (key, payload) in local where kind(of: key) == "snippet" && payload["group"]?.string == groupID {
-            result[key] = payload
+            result[key] = teamPayload(key: key, payload)
         }
         return result
+    }
+
+    /// The part of a record a team shares: a group's name, and a snippet without its on/off switch, favorite, sound
+    /// and app rules, which stay each person's own.
+    static func teamPayload(key: String, _ payload: JSONValue) -> JSONValue {
+        guard case .object(var fields) = payload else { return payload }
+        if kind(of: key) == "group" { return .object(fields["name"].map { ["name": $0] } ?? [:]) }
+        for personal in ["isEnabled", "isFavorite", "playSound", "restrictToApps", "appRules"] { fields[personal] = nil }
+        return .object(fields)
     }
 
     /// Remote records that belong to the shared group: its group record and its snippets. A deletion carries no
