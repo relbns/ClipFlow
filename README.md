@@ -70,6 +70,7 @@
 ### 📦 Export
 - **JSON export and import** of snippet libraries, with skip, overwrite or rename on conflicts.
 - **XML export** in a TextExpander-compatible plist format.
+- **Import from TextExpander**: Preferences → Backup → Import snippets also takes the CSV that TextExpander's web app exports and the Mac app's `.textexpander` group files. Clipboard, cursor, date and fill-in macros become ClipFlow variables; script and picture snippets, and macros ClipFlow has no equivalent for (such as `%snippet:` or date math), are listed in the import summary.
 
 ### 🧭 Not yet
 - ClipFlow is not on the Mac App Store or notarized yet. The preparation plan is in [docs/app-store.md](docs/app-store.md).
