@@ -325,6 +325,17 @@
 "pref_export" = "Export snippets";
 "pref_export_hint" = "Save all snippets and groups to a JSON file.";
 "pref_export_button" = "Export…";
+"editor_share_group" = "Share in a folder…";
+"editor_stop_sharing" = "Stop sharing";
+"group_shared" = "shared";
+"shared_groups" = "Shared groups";
+"shared_groups_hint" = "A group kept in a folder your team also has, such as a shared Dropbox or Google Drive folder or a file server. Everyone who joins edits the same snippets; your other groups stay yours. Share a group from its menu in the Snippet Editor.";
+"shared_none" = "No shared groups yet.";
+"shared_join" = "Join a shared group…";
+"shared_join_prompt" = "Join";
+"shared_share_prompt" = "Share here";
+"shared_waiting" = "Waiting for the group to arrive";
+"shared_failed" = "Could not share the group";
 "pref_import" = "Import snippets";
 "pref_import_hint" = "Add snippets from a ClipFlow JSON file, a TextExpander CSV export or a .textexpander group. Abbreviations you already have are skipped.";
 "import_scripts_skipped_one" = "%d script or picture snippet was not imported:";

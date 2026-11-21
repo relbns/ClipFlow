@@ -172,10 +172,12 @@ final class SyncStore {
             let created = SnippetGroup(context: context)
             created.id = uuid
             created.createdAt = record.modifiedAt
+            created.isEnabled = true
+            created.sortOrder = Int32(SnippetGroup.ordered(in: context).count)
             return created
         }()
         group.name = payload["name"]?.string ?? group.name
-        group.isEnabled = payload["isEnabled"]?.bool ?? true
+        group.isEnabled = payload["isEnabled"]?.bool ?? group.isEnabled
         group.sortOrder = Int32(payload["sortOrder"]?.number ?? Double(group.sortOrder))
         return []
     }

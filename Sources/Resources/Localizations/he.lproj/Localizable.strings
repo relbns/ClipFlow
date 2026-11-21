@@ -325,6 +325,17 @@
 "pref_export" = "ייצוא קטעי טקסט";
 "pref_export_hint" = "שמירת כל קטעי הטקסט והקבוצות לקובץ JSON.";
 "pref_export_button" = "ייצוא…";
+"editor_share_group" = "שיתוף בתיקייה…";
+"editor_stop_sharing" = "הפסקת שיתוף";
+"group_shared" = "משותפת";
+"shared_groups" = "קבוצות משותפות";
+"shared_groups_hint" = "קבוצה שנשמרת בתיקייה שיש גם לצוות שלך, כמו תיקייה משותפת ב־Dropbox או ב־Google Drive, או שרת קבצים. כל מי שמצטרף עורך את אותם קטעים, והקבוצות האחרות שלך נשארות שלך. משתפים קבוצה מהתפריט שלה בעורך הקטעים.";
+"shared_none" = "אין עדיין קבוצות משותפות.";
+"shared_join" = "הצטרפות לקבוצה משותפת…";
+"shared_join_prompt" = "הצטרפות";
+"shared_share_prompt" = "שיתוף כאן";
+"shared_waiting" = "ממתין שהקבוצה תגיע";
+"shared_failed" = "שיתוף הקבוצה נכשל";
 "pref_import" = "ייבוא קטעי טקסט";
 "pref_import_hint" = "הוספת קטעי טקסט מקובץ JSON של ClipFlow, מייצוא CSV של TextExpander או מקבוצת ‎.textexpander. קיצורים שכבר קיימים מדולגים.";
 "import_scripts_skipped_one" = "קטע אחד של סקריפט או תמונה לא יובא:";

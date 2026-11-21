@@ -156,6 +156,37 @@ enum SyncMerge {
         .sorted { $0.key < $1.key }
     }
 
+    /// What a shared group's folder carries: the group by name only, since its order and on/off switch stay each
+    /// person's own, and the snippets filed in it. A snippet moved out drops from this set and is deleted for the others.
+    static func scoped(_ local: [String: JSONValue], toGroup groupID: String) -> [String: JSONValue] {
+        var result: [String: JSONValue] = [:]
+        if let name = local["group:\(groupID)"]?["name"] {
+            result["group:\(groupID)"] = .object(["name": name])
+        }
+        for (key, payload) in local where kind(of: key) == "snippet" && payload["group"]?.string == groupID {
+            result[key] = payload
+        }
+        return result
+    }
+
+    /// Remote records that belong to the shared group: its group record and its snippets. A deletion carries no
+    /// group, so it counts only for a snippet this Mac knows to be in the group.
+    static func inScope(_ remote: [SyncRecord], group groupID: String, known: Set<String>) -> [SyncRecord] {
+        remote.filter { record in
+            switch kind(of: record.key) {
+            case "group": return id(of: record.key) == groupID
+            case "snippet": return record.deleted ? known.contains(record.key) : record.payload?["group"]?.string == groupID
+            default: return false
+            }
+        }
+    }
+
+    /// The one live group a shared folder holds, for a Mac that joins it; nil while it has none or holds several.
+    static func sharedGroupID(in remote: [SyncRecord]) -> (id: String?, several: Bool) {
+        let ids = Set(remote.filter { kind(of: $0.key) == "group" && !$0.deleted }.map { id(of: $0.key) })
+        return (ids.count == 1 ? ids.first : nil, ids.count > 1)
+    }
+
     static func kind(of key: String) -> String { String(key.prefix { $0 != ":" }) }
     static func id(of key: String) -> String { String(key.drop { $0 != ":" }.dropFirst()) }
 
