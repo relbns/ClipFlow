@@ -65,9 +65,15 @@ struct PasteboardSnapshot: Codable, Equatable {
     }
 
     /// The text of every item, one per line: several copied files or a multi-selection paste as plain text whole,
-    /// not just the first item.
+    /// not just the first item. A file is its full path, as the clip shows it, not the name Finder puts as text.
     var allText: String? {
-        let texts = items.compactMap { $0[NSPasteboard.PasteboardType.string.rawValue].flatMap { String(data: $0, encoding: .utf8) } }
+        let texts = items.compactMap { item -> String? in
+            if let data = item[NSPasteboard.PasteboardType.fileURL.rawValue],
+               let url = String(data: data, encoding: .utf8).flatMap(URL.init(string:)), url.isFileURL {
+                return url.path
+            }
+            return item[NSPasteboard.PasteboardType.string.rawValue].flatMap { String(data: $0, encoding: .utf8) }
+        }
         return texts.isEmpty ? nil : texts.joined(separator: "\n")
     }
 

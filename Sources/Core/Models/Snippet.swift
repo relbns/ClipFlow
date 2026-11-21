@@ -57,7 +57,9 @@ extension Snippet {
     /// the "any character" trigger typing it never fires a shorter snippet first. When an existing abbreviation
     /// makes that impossible (say a `.clip` snippet), any unused one is returned.
     static func freshAbbreviation(prefix: String, in context: NSManagedObjectContext) -> String {
-        let existing = ((try? context.fetch(fetchRequest())) ?? []).map { $0.abbreviation.lowercased() }
+        let existing = ((try? context.fetch(fetchRequest())) ?? [])
+            .map { $0.abbreviation.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
         let letters = Array("abcdefghijkmnpqrstuvwxyz")
         var candidate = prefix
         for _ in 0..<200 {

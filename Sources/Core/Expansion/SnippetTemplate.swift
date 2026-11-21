@@ -20,40 +20,43 @@ struct RenderedSnippet: Equatable {
 }
 
 /// Variables: {date}, {date:FORMAT}, {date:hebrew}, {time}, {time:FORMAT}, {clipboard}, {cursor},
-/// {year}, {month}, {day}, {prompt:Label}, and the legacy {name:prompt="Label"}. `{{` and `}}` are literal braces.
+/// {year}, {month}, {day}, {prompt:Label}, and the legacy {name:prompt="Label"}. {lbrace} and {rbrace} type a
+/// literal brace. Anything else in braces is left as written.
 enum SnippetTemplate {
     private static let tokenPattern = try! NSRegularExpression(pattern: #"\{([^{}:]+)(?::([^{}]*))?\}"#)
     private static let legacyPromptPattern = try! NSRegularExpression(pattern: #"^prompt="([^"]*)"$"#)
     private static let cursorMarker = "\u{E000}"
-    private static let openBrace = "\u{E001}"
-    private static let closeBrace = "\u{E002}"
+    private static let variableNames: Set<String> = ["date", "time", "clipboard", "cursor", "year", "month", "day", "lbrace", "rbrace"]
 
-    /// Text that expands to itself: every brace doubled, so `{date}` in it stays `{date}`.
+    /// Text that expands to itself: only braces that would start a variable become `{lbrace}`, so `{date}` stays
+    /// `{date}` while other braces (JSON, `{{name}}`) are kept as they are.
     static func escaped(_ text: String) -> String {
-        text.replacingOccurrences(of: "{", with: "{{").replacingOccurrences(of: "}", with: "}}")
+        var result = ""
+        var cursor = text.startIndex
+        for token in tokens(in: text) where isVariable(token) {
+            result += text[cursor..<token.range.lowerBound]
+            result += "{lbrace}" + token.raw.dropFirst()
+            cursor = token.range.upperBound
+        }
+        result += text[cursor...]
+        return result
     }
 
-    /// Doubled braces become placeholders before variables are read, so `{{date}}` is never a variable.
-    private static func shielded(_ content: String) -> String {
-        content.replacingOccurrences(of: "{{", with: openBrace).replacingOccurrences(of: "}}", with: closeBrace)
-    }
-
-    private static func unshielded(_ text: String) -> String {
-        text.replacingOccurrences(of: openBrace, with: "{").replacingOccurrences(of: closeBrace, with: "}")
+    private static func isVariable(_ token: Token) -> Bool {
+        prompt(for: token) != nil || variableNames.contains(token.name.lowercased())
     }
 
     static func prompts(in content: String) -> [SnippetPrompt] {
         var seen = Set<String>()
         var result: [SnippetPrompt] = []
-        for token in tokens(in: shielded(content)) {
+        for token in tokens(in: content) {
             guard let prompt = prompt(for: token), seen.insert(prompt.key).inserted else { continue }
             result.append(prompt)
         }
         return result
     }
 
-    static func render(_ original: String, context: TemplateContext) -> RenderedSnippet {
-        let content = shielded(original)
+    static func render(_ content: String, context: TemplateContext) -> RenderedSnippet {
         var result = ""
         var cursor = content.startIndex
         for token in tokens(in: content) {
@@ -62,7 +65,6 @@ enum SnippetTemplate {
             cursor = token.range.upperBound
         }
         result += content[cursor...]
-        result = unshielded(result)
 
         guard let markerRange = result.range(of: cursorMarker) else {
             return RenderedSnippet(text: result, cursorOffsetFromEnd: 0)
@@ -123,6 +125,10 @@ enum SnippetTemplate {
             return format(context, pattern: "MM", dateStyle: .none, timeStyle: .none)
         case "day":
             return format(context, pattern: "dd", dateStyle: .none, timeStyle: .none)
+        case "lbrace":
+            return "{"
+        case "rbrace":
+            return "}"
         default:
             return token.raw
         }
