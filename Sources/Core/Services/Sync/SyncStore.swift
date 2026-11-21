@@ -12,11 +12,12 @@ final class SyncStore {
         "closePopoverOnOutsideClick", "layoutFixSwitchesKeyboard", "alwaysPastePlainText", "maxHistoryItems",
         "removeDuplicates", "moveUsedToTop", AppExclusions.defaultsKey, TextRecognizer.languagesKey,
         ImageTextIndexer.enabledKey, ScreenCapture.saveScreenshotsKey, LanguageManager.choiceKey,
-        SensitiveText.handlingKey, SensitiveText.minutesKey, SensitiveText.clearClipboardKey
+        SensitiveText.handlingKey, SensitiveText.minutesKey, SensitiveText.clearClipboardKey,
+        PasteStack.orderKey, PasteStack.endsWhenEmptyKey
     ] + SensitiveKind.allCases.map(\.defaultsKey)
     static let shortcutNames: [KeyboardShortcuts.Name] = [
         .showHistoryMenu, .fixKeyboardLayout, .pastePlainText, .captureScreenText, .captureScreenImage,
-        .showSnippetEditor, .clearHistory
+        .togglePasteStack, .pasteNextFromStack, .showSnippetEditor, .clearHistory
     ]
 
     private let context: NSManagedObjectContext
