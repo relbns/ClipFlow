@@ -278,25 +278,47 @@ enum StarterSnippets {
                 content: "Best regards,\n{cursor}")
     ]
 
+    /// The starter this snippet still is exactly as created, in every field (title, abbreviation, text, trigger,
+    /// options, no app rules, in a group with the starter group's name), whatever its id.
+    static func unchangedStarter(_ snippet: Snippet) -> Starter? {
+        guard let starter = all.first(where: { $0.abbreviation == snippet.abbreviation }),
+              snippet.title == starter.title, snippet.content == starter.content, snippet.isEnabled,
+              snippet.expandTrigger == ExpandTrigger.delimiter.rawValue, !snippet.caseSensitive, !snippet.playSound,
+              !snippet.restrictToApps, !snippet.isFavorite, (snippet.appRules ?? []).isEmpty,
+              snippet.group?.name == SnippetLibraryRepair.starterGroupName else { return nil }
+        return starter
+    }
+
+    /// A starter with its fixed id, still exactly as created: it carries nothing of the user's, so when a Mac
+    /// joins sync it counts as older than any edit or deletion made on another Mac.
+    static func isPristine(_ snippet: Snippet) -> Bool {
+        guard let starter = unchangedStarter(snippet) else { return false }
+        return snippet.id == starter.id && snippet.group?.id == groupID
+    }
+
     /// Installs from before the fixed ids created the starters with random ones. Before a Mac first syncs, each
-    /// starter it still has exactly as created (title, abbreviation and text) takes the fixed id, and the starter
-    /// group the fixed group id, so they meet the other Macs' starters as the same snippets. Changed or missing
-    /// starters keep their ids. Returns whether anything changed.
+    /// starter it still has exactly as created takes the fixed id, so it meets the other Macs' starters as the same
+    /// snippet; changed or missing starters keep their ids. The starter group takes the fixed group id only when it
+    /// holds nothing but starters, so a group the user filled with their own snippets is never tied to it.
+    /// Returns whether anything changed.
     @discardableResult
     static func adoptFixedIDs(in context: NSManagedObjectContext) -> Bool {
         let snippets = (try? context.fetch(Snippet.fetchRequest())) ?? []
         let groups = (try? context.fetch(SnippetGroup.fetchRequest())) ?? []
         let takenSnippetIDs = Set(snippets.map(\.id))
+        let starterIDs = Set(all.map(\.id))
         var changed = false
         for starter in all where !takenSnippetIDs.contains(starter.id) {
-            guard let snippet = snippets.first(where: {
-                $0.title == starter.title && $0.abbreviation == starter.abbreviation && $0.content == starter.content
-            }) else { continue }
+            guard let snippet = snippets.first(where: { unchangedStarter($0)?.id == starter.id && !starterIDs.contains($0.id) })
+            else { continue }
             snippet.id = starter.id
             changed = true
         }
         if !groups.contains(where: { $0.id == groupID }),
-           let group = groups.first(where: { $0.name == SnippetLibraryRepair.starterGroupName && $0.snippets.contains { s in all.contains { $0.id == s.id } } }) {
+           let group = groups.first(where: { group in
+               group.name == SnippetLibraryRepair.starterGroupName && group.isEnabled && !group.snippets.isEmpty
+                   && group.snippets.allSatisfy { starterIDs.contains($0.id) }
+           }) {
             group.id = groupID
             changed = true
         }

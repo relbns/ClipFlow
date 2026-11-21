@@ -724,8 +724,13 @@ final class SyncMergeTests: XCTestCase {
             XCTAssertEqual(ids[starter.abbreviation], starter.id)
         }
         XCTAssertNotEqual(ids[".sig"], StarterSnippets.all.last?.id, "an edited starter keeps its own id")
-        XCTAssertEqual(group.id, StarterSnippets.groupID)
+        XCTAssertNotEqual(group.id, StarterSnippets.groupID, "a group holding anything but starters keeps its own id")
         XCTAssertFalse(StarterSnippets.adoptFixedIDs(in: context), "nothing left to adopt")
+
+        context.delete(edited)
+        try context.save()
+        XCTAssertTrue(StarterSnippets.adoptFixedIDs(in: context))
+        XCTAssertEqual(group.id, StarterSnippets.groupID, "a group of starters only takes the fixed id")
     }
 
     func testALocalEditIsNewerThanWhatItReplacesEvenWithAFastClockElsewhere() {
@@ -800,7 +805,6 @@ final class FolderSyncTests: XCTestCase {
 
         let expected = starterContents.merging([".hi": "Hello"]) { $1 }
         XCTAssertEqual(try snippets(on: 1), expected, "the starters of two old installs meet as the same snippets")
-        XCTAssertEqual(SnippetGroup.ordered(in: macs[1].stack.viewContext).map(\.name), ["Personal"])
         XCTAssertEqual(try snippets(on: 0), expected)
 
         let hi = try XCTUnwrap(try macs[1].stack.viewContext.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".hi" })
@@ -902,6 +906,49 @@ final class FolderSyncTests: XCTestCase {
             _ = Snippet.insert(title: starter.title, abbreviation: starter.abbreviation, content: starter.content, group: group, in: context)
         }
         try context.save()
+    }
+
+    func testANewMacJoiningLaterNeitherUndoesStarterEditsNorBringsBackDeletedOnes() async throws {
+        macs[0].stack.prepareDefaultData(defaults: macs[0].defaults)
+        await macs[0].sync.sync()
+        let contextA = macs[0].stack.viewContext
+        let sig = try XCTUnwrap(try contextA.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".sig" })
+        sig.content = "Cheers,\nAriel"
+        sig.updatedAt = Date()
+        let dd = try XCTUnwrap(try contextA.fetch(Snippet.fetchRequest()).first { $0.abbreviation == ".dd" })
+        contextA.delete(dd)
+        try contextA.save()
+        await macs[0].sync.sync()
+
+        try await Task.sleep(nanoseconds: 5_000_000)
+        macs[1].stack.prepareDefaultData(defaults: macs[1].defaults)
+        await syncAll()
+
+        for mac in 0..<2 {
+            let all = try snippets(on: mac)
+            XCTAssertEqual(all[".sig"], "Cheers,\nAriel", "Mac \(mac) keeps the edited signature")
+            XCTAssertNil(all[".dd"], "Mac \(mac) does not get the deleted starter back")
+        }
+    }
+
+    func testTheUsersOwnPersonalGroupIsNotTiedToTheStarterGroup() async throws {
+        try addLegacyStarters(on: 1)
+        try addSnippet(".mine", content: "mine", group: SnippetLibraryRepair.starterGroupName, on: 1)
+        try await Task.sleep(nanoseconds: 5_000_000)
+
+        macs[0].stack.prepareDefaultData(defaults: macs[0].defaults)
+        await macs[0].sync.sync()
+        let contextA = macs[0].stack.viewContext
+        let starterGroup = try XCTUnwrap(SnippetGroup.ordered(in: contextA).first)
+        for snippet in starterGroup.snippets { contextA.delete(snippet) }
+        contextA.delete(starterGroup)
+        try contextA.save()
+        await macs[0].sync.sync()
+        await syncAll()
+
+        for mac in 0..<2 {
+            XCTAssertEqual(try layout(on: mac), [".mine in Personal"], "Mac \(mac): the deleted starters stay deleted, the user's group stays")
+        }
     }
 
     func testAMacJoiningLaterMeetsTheSameStarters() async throws {

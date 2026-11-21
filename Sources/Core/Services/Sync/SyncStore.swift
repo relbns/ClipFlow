@@ -102,10 +102,12 @@ final class SyncStore {
 
     // MARK: - Joining
 
-    /// The snippets' edit times, so a Mac joining a folder again keeps edits made since it last synced.
+    /// The snippets' edit times, so a Mac joining a folder again keeps edits made since it last synced. A starter
+    /// still exactly as created has none: its install time would otherwise beat edits and deletions made on the
+    /// other Macs long before.
     func snippetEditTimes() -> [String: Date] {
         var times: [String: Date] = [:]
-        for snippet in (try? context.fetch(Snippet.fetchRequest())) ?? [] {
+        for snippet in (try? context.fetch(Snippet.fetchRequest())) ?? [] where !StarterSnippets.isPristine(snippet) {
             times["snippet:\(snippet.id.uuidString)"] = snippet.updatedAt
         }
         return times
