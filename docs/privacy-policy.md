@@ -6,7 +6,7 @@ ClipFlow is a clipboard manager and text expander for macOS. It works entirely o
 
 ## What ClipFlow keeps
 
-- **Clipboard history.** The text, links, images, colors and file paths you copy are stored on your Mac, in `~/Library/Application Support/ClipFlow/`, with every format the copying app offered (such as rich text and HTML) and the name of the app that was in front when you copied. The history keeps the number of items you choose in Preferences, plus the items you pin. ClipFlow skips items that other apps mark as confidential or transient, such as passwords copied from a password manager, and what you copy while an app you excluded in Preferences is in front.
+- **Clipboard history.** The text, links, images, colors and file paths you copy are stored on your Mac, in `~/Library/Application Support/ClipFlow/`, with every format the copying app offered (such as rich text and HTML) and the name of the app that was in front when you copied. The history keeps the number of items you choose in Preferences, plus the items you pin. ClipFlow skips items that other apps mark as confidential or transient, such as passwords copied from a password manager, and what you copy while an app you excluded in Preferences is in front. A copy that is only a one-time code, a card number or an IBAN is removed from the history after 5 minutes unless you pin it; Preferences lets you change the time, keep it, or not save it at all.
 - **Snippets.** Your snippets, groups and their usage counts are stored in the same place.
 - **Settings.** Your preferences are stored in the standard macOS preferences file for ClipFlow.
 

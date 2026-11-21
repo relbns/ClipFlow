@@ -11,8 +11,9 @@ final class SyncStore {
         "textExpansionEnabled", "expandAfter", "playSoundOnExpand", "viewMode", "appearanceMode",
         "closePopoverOnOutsideClick", "layoutFixSwitchesKeyboard", "alwaysPastePlainText", "maxHistoryItems",
         "removeDuplicates", "moveUsedToTop", AppExclusions.defaultsKey, TextRecognizer.languagesKey,
-        ImageTextIndexer.enabledKey, ScreenCapture.saveScreenshotsKey, LanguageManager.choiceKey
-    ]
+        ImageTextIndexer.enabledKey, ScreenCapture.saveScreenshotsKey, LanguageManager.choiceKey,
+        SensitiveText.handlingKey, SensitiveText.minutesKey, SensitiveText.clearClipboardKey
+    ] + SensitiveKind.allCases.map(\.defaultsKey)
     static let shortcutNames: [KeyboardShortcuts.Name] = [
         .showHistoryMenu, .fixKeyboardLayout, .pastePlainText, .captureScreenText, .captureScreenImage,
         .showSnippetEditor, .clearHistory

@@ -28,6 +28,7 @@
 - **Paste on pick**: choose a clip and it is pasted straight into the app you were in, and stays on the clipboard.
 - **Keyboard first**: `⌃⌘V` opens the history. Arrows and Return pick, `1`-`9` and `0` paste directly, typing filters, Esc closes.
 - **Private by default**: password-manager copies (concealed or transient pasteboard data) and excluded apps are never recorded.
+- **Codes, cards and IBANs leave the history**: a copy that is only a one-time code, a card number or an IBAN is removed after 5 minutes by default. In **Preferences → Privacy** you can keep it, remove it after 1 to 60 minutes, or not save it at all, choose which kinds to detect, and empty the clipboard too. Pinned clips are kept.
 - **Duplicates**: copying something again moves it to the top instead of adding a second row.
 - **Two views**: Simple (a flat numbered list) and Organized (Recent, Images, Links, Colors, Text), with your most-used snippets and All Snippets by group.
 - **Search**: finds clips, snippets and the text inside screenshots; letters in order are enough (`esig` finds Email signature).
