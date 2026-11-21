@@ -44,6 +44,7 @@ struct BackupSettingsView: View {
                     CFToolbarBtn(label: L("sync_now")) { Task { await sync.sync() } }
                 }
             }
+            SharedGroupsSettingsRow()
             CFSettingsRow(label: L("pref_export"), hint: L("pref_export_hint")) {
                 CFToolbarBtn(label: L("pref_export_button")) { export() }
             }

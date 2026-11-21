@@ -132,6 +132,11 @@ final class SyncStore {
         let detached: Set<String>
     }
 
+    /// Snippets and groups that sync applied, as they stand afterwards, with the time they were made. Every channel
+    /// (this Mac's library, each shared group) sees them: another channel publishes such a change at that time, not
+    /// as a new edit, so a newer edit elsewhere still wins.
+    static var applied: [String: (payload: JSONValue?, time: Date)] = [:]
+
     /// Snippets and groups are saved first; pins and settings, which are written elsewhere, only after that save
     /// succeeds, so a failed sync leaves nothing half applied.
     func apply(_ records: [SyncRecord], deletedGroups: Set<String>) -> ApplyResult {
@@ -151,6 +156,10 @@ final class SyncStore {
             }
         }
         guard save() else { return ApplyResult(saved: false, deferred: deferred, detached: detached) }
+        let local = export(kinds: ["group", "snippet"])
+        for record in records where (record.kind == "group" || record.kind == "snippet") && !deferred.contains(record.key) {
+            Self.applied[record.key] = (local[record.key], record.modifiedAt)
+        }
         for record in records where record.kind == "pin" { applyPin(record) }
         for record in records where record.kind == "setting" { applySetting(key: SyncMerge.id(of: record.key), record: record) }
         return ApplyResult(saved: true, deferred: deferred, detached: detached)
@@ -172,10 +181,12 @@ final class SyncStore {
             let created = SnippetGroup(context: context)
             created.id = uuid
             created.createdAt = record.modifiedAt
+            created.isEnabled = true
+            created.sortOrder = Int32(SnippetGroup.ordered(in: context).count)
             return created
         }()
         group.name = payload["name"]?.string ?? group.name
-        group.isEnabled = payload["isEnabled"]?.bool ?? true
+        group.isEnabled = payload["isEnabled"]?.bool ?? group.isEnabled
         group.sortOrder = Int32(payload["sortOrder"]?.number ?? Double(group.sortOrder))
         return []
     }
@@ -191,7 +202,8 @@ final class SyncStore {
         let groupID = payload["group"]?.string
         let targetGroup = groupID.flatMap { group(id: $0) }
         if let groupID, targetGroup == nil, !deletedGroups.contains(groupID) { return false }
-        let snippet = snippet(id: id) ?? {
+        let existing = snippet(id: id)
+        let snippet = existing ?? {
             let created = Snippet(context: context)
             created.id = uuid
             created.createdAt = record.modifiedAt
@@ -200,16 +212,17 @@ final class SyncStore {
         snippet.title = payload["title"]?.string ?? ""
         snippet.abbreviation = payload["abbreviation"]?.string ?? ""
         snippet.content = payload["content"]?.string ?? ""
-        snippet.isEnabled = payload["isEnabled"]?.bool ?? true
+        // A shared group's records leave out what stays each person's own; then the value here is kept.
+        snippet.isEnabled = payload["isEnabled"]?.bool ?? existing?.isEnabled ?? true
         snippet.expandTrigger = payload["expandTrigger"]?.string ?? ExpandTrigger.delimiter.rawValue
         snippet.caseSensitive = payload["caseSensitive"]?.bool ?? false
-        snippet.playSound = payload["playSound"]?.bool ?? false
-        snippet.restrictToApps = payload["restrictToApps"]?.bool ?? false
-        snippet.isFavorite = payload["isFavorite"]?.bool ?? false
+        snippet.playSound = payload["playSound"]?.bool ?? existing?.playSound ?? false
+        snippet.restrictToApps = payload["restrictToApps"]?.bool ?? existing?.restrictToApps ?? false
+        snippet.isFavorite = payload["isFavorite"]?.bool ?? existing?.isFavorite ?? false
         snippet.updatedAt = record.modifiedAt
         snippet.group = targetGroup
-        for rule in snippet.appRules ?? [] { context.delete(rule) }
         if case .array(let rules)? = payload["appRules"] {
+            for rule in snippet.appRules ?? [] { context.delete(rule) }
             for rule in rules {
                 let created = AppRule.create(
                     in: context, bundleID: rule["bundleID"]?.string ?? "", appName: rule["appName"]?.string ?? "",

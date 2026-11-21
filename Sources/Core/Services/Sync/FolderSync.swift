@@ -26,10 +26,19 @@ final class FolderSync: ObservableObject {
 
     @Published private(set) var status: Status = .off
 
+    /// Set for a group shared through a folder of its own; nil for this Mac's whole library.
+    private(set) var sharedGroup: SharedGroup?
+    /// A Mac that joined a shared folder learns its group on the first sync.
+    var onGroupLearned: (String) -> Void = { _ in }
+    /// The shared group was deleted on this Mac: sharing stops here and the others keep it.
+    var onGroupGone: () -> Void = {}
+
     private var store: SyncStore?
     private var defaults: UserDefaults = .standard
     private var timer: Timer?
     private var cancellables: Set<AnyCancellable> = []
+    /// Subscriptions others keep on this sync's status.
+    var observers: Set<AnyCancellable> = []
     private var isSyncing = false
     private var pending = false
     private var joinWaitStarted: Date?
@@ -40,16 +49,18 @@ final class FolderSync: ObservableObject {
     }
 
     var folder: URL {
-        defaults.string(forKey: Self.folderKey).map { URL(fileURLWithPath: $0, isDirectory: true) } ?? Self.defaultFolder
+        if let sharedGroup { return URL(fileURLWithPath: sharedGroup.folder, isDirectory: true) }
+        return defaults.string(forKey: Self.folderKey).map { URL(fileURLWithPath: $0, isDirectory: true) } ?? Self.defaultFolder
     }
 
-    var isEnabled: Bool { defaults.bool(forKey: Self.enabledKey) }
+    var isEnabled: Bool { sharedGroup != nil || defaults.bool(forKey: Self.enabledKey) }
 
     /// This Mac's file in `devices/`, once it has an id.
     var deviceFileName: String? { defaults.string(forKey: Self.deviceIDKey).map { "\($0).json" } }
 
     private var kinds: Set<String> {
         var kinds: Set<String> = ["group", "snippet"]
+        if sharedGroup != nil { return kinds }
         if defaults.bool(forKey: Self.settingsKey) { kinds.insert("setting") }
         if defaults.bool(forKey: Self.pinsKey) { kinds.insert("pin") }
         return kinds
@@ -72,7 +83,12 @@ final class FolderSync: ObservableObject {
             }
         }
         if defaults.string(forKey: Self.deviceIDKey) != nil {
-            try? FileManager.default.removeItem(at: ledgerURL)
+            // Every channel's ledger belongs to the old id, not only this one's.
+            let directory = ledgerURL.deletingLastPathComponent()
+            for name in (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+            where name == "sync-ledger.json" || (name.hasPrefix("shared-") && name.hasSuffix(".json")) {
+                try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
+            }
         }
         let id = UUID().uuidString
         defaults.set(id, forKey: Self.deviceIDKey)
@@ -87,9 +103,10 @@ final class FolderSync: ObservableObject {
     }()
 
     init(ledgerDirectory: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("ClipFlow"), hardwareID: String = FolderSync.platformUUID()) {
-        ledgerURL = ledgerDirectory.appendingPathComponent("sync-ledger.json")
+        .appendingPathComponent("ClipFlow"), hardwareID: String = FolderSync.platformUUID(), sharedGroup: SharedGroup? = nil) {
+        ledgerURL = ledgerDirectory.appendingPathComponent(sharedGroup.map { "shared-\($0.folder.sha256Hash.prefix(16)).json" } ?? "sync-ledger.json")
         self.hardwareID = hardwareID
+        self.sharedGroup = sharedGroup
     }
 
     nonisolated static func platformUUID() -> String {
@@ -139,7 +156,7 @@ final class FolderSync: ObservableObject {
     }
 
     func sync() async {
-        guard isEnabled, let store, !isSyncing else { return }
+        guard isEnabled, !stopped, let store, !isSyncing else { return }
         isSyncing = true
         defer {
             isSyncing = false
@@ -154,9 +171,51 @@ final class FolderSync: ObservableObject {
             let devices = folder.appendingPathComponent("devices", isDirectory: true)
             try FileManager.default.createDirectory(at: devices, withIntermediateDirectories: true)
             let (remoteFiles, downloading) = try readOtherDevices(in: devices, deviceID: deviceID)
-            let remote = remoteFiles.flatMap(\.records)
+            var remote = remoteFiles.flatMap(\.records)
             let kinds = self.kinds
             var ledger = readLedger()
+
+            var scope: String?
+            if var shared = sharedGroup {
+                if shared.groupID == nil {
+                    let found = SyncMerge.sharedGroupID(in: remote)
+                    if found.several { throw SyncError.severalGroups }
+                    guard let id = found.id else {
+                        status = .synced(Date(), otherMacs: remoteFiles.count)
+                        return
+                    }
+                    shared.groupID = id
+                    sharedGroup = shared
+                    onGroupLearned(id)
+                }
+                scope = shared.groupID
+            }
+            func localRecords() -> [String: JSONValue] {
+                let all = store.export(kinds: kinds)
+                return scope.map { SyncMerge.scoped(all, toGroup: $0) } ?? all
+            }
+            /// Changes another channel applied that are still as applied: published at the time they were made. One edited
+            /// here since is forgotten, so undoing back to it later counts as a new edit.
+            func appliedTimes(_ local: [String: JSONValue]) -> [String: Date] {
+                var times: [String: Date] = [:]
+                for (key, entry) in SyncStore.applied {
+                    let expected = entry.payload.map { scope == nil ? $0 : SyncMerge.teamPayload(key: key, $0) }
+                    if expected?.stableHash == local[key]?.stableHash {
+                        times[key] = entry.time
+                    } else if scope == nil || local[key] != nil {
+                        SyncStore.applied[key] = nil
+                    }
+                }
+                return times
+            }
+            if let scope {
+                if let entry = ledger["group:\(scope)"], !entry.deleted, localRecords()["group:\(scope)"] == nil {
+                    onGroupGone()
+                    status = .off
+                    return
+                }
+                remote = SyncMerge.inScope(remote, group: scope, known: Set(ledger.keys).union(localRecords().keys))
+            }
 
             if ledger.isEmpty {
                 // Joining: give the other Macs' files up to two minutes to download before this Mac's state counts.
@@ -167,13 +226,14 @@ final class FolderSync: ObservableObject {
                 }
                 // Starters from an install before their ids were fixed take the fixed ids, so they meet the other
                 // Macs' starters as the same snippets.
-                guard store.adoptStarterIDs() else { throw SyncError.saveFailed }
+                guard scope != nil || store.adoptStarterIDs() else { throw SyncError.saveFailed }
                 // What this Mac has counts as old, except snippet edits, which keep their own time, so joining a
                 // folder again neither spreads stale copies nor reverts edits made since.
-                ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: [:], kinds: kinds, now: .distantPast, device: deviceID)
+                ledger = SyncMerge.stamp(local: localRecords(), ledger: [:], kinds: kinds, now: .distantPast, device: deviceID)
                 for (key, time) in store.snippetEditTimes() where ledger[key] != nil { ledger[key]?.modifiedAt = time }
             } else {
-                ledger = SyncMerge.stamp(local: store.export(kinds: kinds), ledger: ledger, kinds: kinds, now: Date(), device: deviceID)
+                let local = localRecords()
+                ledger = SyncMerge.stamp(local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, times: appliedTimes(local))
             }
             joinWaitStarted = nil
 
@@ -181,15 +241,17 @@ final class FolderSync: ObservableObject {
                 SyncMerge.incoming(remote: remote, ledger: ledger, kinds: kinds), to: &ledger, store: store,
                 deletedGroups: SyncMerge.deletedGroups(remote: remote, ledger: ledger)
             )
-            let local = store.export(kinds: kinds)
+            let local = localRecords()
             for key in result.detached {
                 if let payload = local[key] { ledger[key]?.hash = payload.stableHash }
             }
-            ledger = SyncMerge.stamp(local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, skip: result.deferred)
+            ledger = SyncMerge.stamp(
+                local: local, ledger: ledger, kinds: kinds, now: Date(), device: deviceID, skip: result.deferred, times: appliedTimes(local)
+            )
 
             let file = SyncDeviceFile(
                 deviceID: deviceID, deviceName: computerName, writtenAt: Date(),
-                records: SyncMerge.records(ledger: ledger, local: store.export(kinds: kinds))
+                records: SyncMerge.records(ledger: ledger, local: localRecords())
             )
             try write(file, to: devices.appendingPathComponent("\(deviceID).json"))
             try writeLedger(ledger)
@@ -202,7 +264,13 @@ final class FolderSync: ObservableObject {
 
     enum SyncError: LocalizedError {
         case saveFailed
-        var errorDescription: String? { "The changes from the other Macs could not be saved." }
+        case severalGroups
+        var errorDescription: String? {
+            switch self {
+            case .saveFailed: return "The changes from the other Macs could not be saved."
+            case .severalGroups: return "This folder holds more than one group. Choose the folder of a single shared group."
+            }
+        }
     }
 
     /// Applies remote winners and records them in the ledger as already seen, so they are not echoed as local edits.
@@ -278,6 +346,17 @@ final class FolderSync: ObservableObject {
     private func writeLedger(_ ledger: [String: SyncLedgerEntry]) throws {
         try FileManager.default.createDirectory(at: ledgerURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder.sync.encode(ledger).write(to: ledgerURL, options: .atomic)
+    }
+
+    private var stopped = false
+
+    /// Stops syncing for good, a sync already queued included: a shared group this Mac no longer shares.
+    func stop() {
+        stopped = true
+        timer?.invalidate()
+        timer = nil
+        cancellables = []
+        observers = []
     }
 
     /// Forgets what this Mac synced, so turning sync on again (or choosing another folder) joins it afresh.

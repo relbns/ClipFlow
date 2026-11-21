@@ -90,6 +90,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ImageTextIndexer.shared.start(monitor: clipboardMonitor)
         FolderSync.shared.start(context: stack.makeServiceContext(), monitor: clipboardMonitor)
+        SharedGroups.shared.start(context: stack.makeServiceContext(), monitor: clipboardMonitor)
 
         permissions.startWatching()
         permissions.$canListen

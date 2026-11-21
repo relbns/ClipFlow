@@ -48,6 +48,7 @@
 
 ### 🔄 Sync between Macs
 - Snippets, groups, settings and pinned text stay the same on your Macs through a folder in the cloud: iCloud Drive, or a shared folder (iCloud, Google Drive, Dropbox) for Macs on different Apple IDs. Clipboard history stays on each Mac. Turn it on in Preferences → Backup.
+- **Shared groups for teams**: share one group in a folder your team also has (a shared Dropbox or Google Drive folder, a file server) from the group's menu in the Snippet Editor; teammates choose **Join a shared group…** in Preferences → Backup. Everyone edits the same snippets in that group, and only that group leaves your Mac. Each person keeps their own group order, and their own on/off switches, favorites and app rules. A snippet moved out of the group leaves it for everyone. Deleting the group on your Mac only stops sharing it there.
 
 ### ⚡ Text expansion
 - **Real-time expansion**: type an abbreviation such as `.sig` and a trigger, and it is replaced in any app.

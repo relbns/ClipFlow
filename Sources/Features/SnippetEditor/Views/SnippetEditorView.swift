@@ -123,7 +123,20 @@ private struct EditorTitleBar: View {
 
 private struct EditorSidebar: View {
     @ObservedObject var model: SnippetEditorModel
+    @ObservedObject private var sharedGroups = SharedGroups.shared
     @Environment(\.cfTheme) private var theme
+
+    private func share(_ group: SnippetGroup) {
+        guard let folder = SharedGroupsSettingsRow.chooseFolder(prompt: L("shared_share_prompt")) else { return }
+        do {
+            try sharedGroups.share(group.id, in: folder)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = L("shared_failed")
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -203,7 +216,7 @@ private struct EditorSidebar: View {
                 Button { model.toggleCollapsed(group) } label: {
                     SidebarRow(
                         icon: AnyView(Image(systemName: collapsed ? "chevron.forward" : "chevron.down").font(.system(size: 10, weight: .semibold))),
-                        label: group.name,
+                        label: sharedGroups.isShared(group.id) ? "\(group.name) · \(L("group_shared"))" : group.name,
                         count: nil,
                         active: false,
                         dimmed: !group.isEnabled
@@ -214,6 +227,11 @@ private struct EditorSidebar: View {
                 .contextMenu {
                     Button(L("editor_rename_group")) { model.renamingGroupID = group.objectID }
                     Button(group.isEnabled ? L("editor_disable_group") : L("editor_enable_group")) { model.toggleEnabled(group) }
+                    if let folder = sharedGroups.folder(of: group.id) {
+                        Button(L("editor_stop_sharing")) { sharedGroups.stopSharing(folder: folder) }
+                    } else {
+                        Button(L("editor_share_group")) { share(group) }
+                    }
                     Divider()
                     Button(L("editor_delete_group"), role: .destructive) { model.confirmingGroupDelete = group }
                 }

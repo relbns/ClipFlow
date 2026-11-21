@@ -1624,3 +1624,250 @@ final class TextExpanderImportTests: XCTestCase {
         XCTAssertFalse(try context.fetch(SnippetGroup.fetchRequest()).contains { $0.name == "Empty" })
     }
 }
+
+@MainActor
+final class SharedGroupTests: XCTestCase {
+    private var root: URL!
+    private var team: URL { root.appendingPathComponent("team") }
+    private var macs: [(stack: CoreDataStack, defaults: UserDefaults, monitor: ClipboardMonitor)] = []
+    private var channels: [FolderSync?] = []
+    private var gone: [Bool] = []
+
+    override func setUp() async throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("clipflow-shared-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: team, withIntermediateDirectories: true)
+        macs = []
+        for index in 0..<2 {
+            let stack = CoreDataStack(storeURL: nil)
+            let defaults = makeTestDefaults("clipflow-tests-shared-\(index)")
+            AppDefaults.register(in: defaults)
+            let monitor = ClipboardMonitor(context: stack.viewContext, pasteboard: NSPasteboard(name: .init("clipflow-tests-shared")), defaults: defaults)
+            macs.append((stack, defaults, monitor))
+        }
+        channels = [nil, nil]
+        gone = [false, false]
+    }
+
+    override func tearDown() async throws {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    private func connect(_ mac: Int, groupID: String?) {
+        let channel = FolderSync(
+            ledgerDirectory: root.appendingPathComponent("ledger\(mac)"), hardwareID: "mac\(mac)",
+            sharedGroup: SharedGroup(folder: team.path, groupID: groupID)
+        )
+        channel.configure(store: SyncStore(context: macs[mac].stack.viewContext, monitor: macs[mac].monitor, defaults: macs[mac].defaults), defaults: macs[mac].defaults)
+        channel.onGroupGone = { [weak self] in self?.gone[mac] = true }
+        channels[mac] = channel
+    }
+
+    private func syncBoth() async {
+        for _ in 0..<2 {
+            for channel in channels { await channel?.sync() }
+        }
+    }
+
+    private func context(_ mac: Int) -> NSManagedObjectContext { macs[mac].stack.viewContext }
+
+    private func group(_ name: String, on mac: Int) -> SnippetGroup? {
+        SnippetGroup.ordered(in: context(mac)).first { $0.name == name }
+    }
+
+    private func contents(on mac: Int, in name: String) throws -> [String: String] {
+        let snippets = try context(mac).fetch(Snippet.fetchRequest()).filter { $0.group?.name == name }
+        return Dictionary(uniqueKeysWithValues: snippets.map { ($0.abbreviation, $0.content) })
+    }
+
+    func testATeamSharesOneGroupAndNothingElse() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        let mine = SnippetGroup.insert(named: "Mine", in: context(0))
+        _ = Snippet.insert(title: "Hi", abbreviation: ";hi", content: "Hello", group: support, in: context(0))
+        _ = Snippet.insert(title: "Me", abbreviation: ";me", content: "private", group: mine, in: context(0))
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        await syncBoth()
+
+        XCTAssertEqual(try contents(on: 1, in: "Support"), [";hi": "Hello"])
+        XCTAssertNil(group("Mine", on: 1), "only the shared group reaches the team")
+        XCTAssertEqual(channels[1]?.sharedGroup?.groupID, support.id.uuidString, "the joining Mac learns the group")
+
+        let onB = try XCTUnwrap(try context(1).fetch(Snippet.fetchRequest()).first { $0.abbreviation == ";hi" })
+        onB.content = "Hello there"
+        _ = Snippet.insert(title: "Bye", abbreviation: ";bye", content: "Goodbye", group: onB.group, in: context(1))
+        try context(1).save()
+        await syncBoth()
+        XCTAssertEqual(try contents(on: 0, in: "Support"), [";hi": "Hello there", ";bye": "Goodbye"])
+    }
+
+    func testMovingASnippetOutRemovesItForTheOthersAndOrderAndSwitchStayPersonal() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        let mine = SnippetGroup.insert(named: "Mine", in: context(0))
+        let hi = Snippet.insert(title: "Hi", abbreviation: ";hi", content: "Hello", group: support, in: context(0))
+        _ = Snippet.insert(title: "Q", abbreviation: ";q", content: "Question", group: support, in: context(0))
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        await syncBoth()
+
+        hi.group = mine
+        try context(0).save()
+        let supportOnB = try XCTUnwrap(group("Support", on: 1))
+        supportOnB.isEnabled = false
+        supportOnB.sortOrder = 99
+        try context(1).save()
+        await syncBoth()
+
+        XCTAssertEqual(try contents(on: 1, in: "Support"), [";q": "Question"])
+        XCTAssertEqual(try contents(on: 0, in: "Mine"), [";hi": "Hello"], "the one who moved it keeps it")
+        XCTAssertTrue(try XCTUnwrap(group("Support", on: 0)).isEnabled)
+        XCTAssertNotEqual(group("Support", on: 0)?.sortOrder, 99)
+    }
+
+    func testDeletingTheGroupStopsSharingWithoutDeletingItForTheTeam() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        _ = Snippet.insert(title: "Hi", abbreviation: ";hi", content: "Hello", group: support, in: context(0))
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        await syncBoth()
+
+        let onB = try XCTUnwrap(group("Support", on: 1))
+        for snippet in onB.snippets { context(1).delete(snippet) }
+        context(1).delete(onB)
+        try context(1).save()
+        await channels[1]?.sync()
+        XCTAssertTrue(gone[1])
+        channels[1] = nil
+        await syncBoth()
+        XCTAssertEqual(try contents(on: 0, in: "Support"), [";hi": "Hello"])
+    }
+
+    func testAFolderHoldsOneGroup() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        await syncBoth()
+        XCTAssertEqual(SharedGroups.groupInFolder(team), support.id.uuidString)
+        let groups = SharedGroups()
+        XCTAssertThrowsError(try groups.share(UUID(), in: team))
+        XCTAssertNoThrow(try groups.join(team))
+        XCTAssertThrowsError(try groups.join(team), "the same folder twice")
+    }
+
+    func testATeammatesEditGoesToMyOtherMacsAtTheTimeItWasMade() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        _ = Snippet.insert(title: "Hi", abbreviation: ";hi", content: "Hello", group: support, in: context(0))
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        let library = root.appendingPathComponent("library")
+        macs[0].defaults.set(true, forKey: FolderSync.enabledKey)
+        macs[0].defaults.set(library.path, forKey: FolderSync.folderKey)
+        let personal = FolderSync(ledgerDirectory: root.appendingPathComponent("personal0"), hardwareID: "mac0")
+        personal.configure(store: SyncStore(context: context(0), monitor: macs[0].monitor, defaults: macs[0].defaults), defaults: macs[0].defaults)
+        await syncBoth()
+        await personal.sync()
+
+        let onB = try XCTUnwrap(try context(1).fetch(Snippet.fetchRequest()).first { $0.abbreviation == ";hi" })
+        onB.content = "Hello from the team"
+        try context(1).save()
+        await channels[1]?.sync()
+        let key = "snippet:\(onB.id.uuidString)"
+        let madeAt = try XCTUnwrap(try deviceRecords(in: team).first { $0.key == key && $0.payload?["content"]?.string == "Hello from the team" }).modifiedAt
+        try await Task.sleep(nanoseconds: 50_000_000)
+        await channels[0]?.sync()
+        await personal.sync()
+        let published = try XCTUnwrap(try deviceRecords(in: library).first { $0.key == key })
+        XCTAssertEqual(published.payload?["content"]?.string, "Hello from the team")
+        XCTAssertEqual(published.modifiedAt, madeAt, "not stamped as a new edit, so a later edit elsewhere still wins")
+
+        let onA = try XCTUnwrap(try context(0).fetch(Snippet.fetchRequest()).first { $0.abbreviation == ";hi" })
+        onA.content = "Mine for a moment"
+        try context(0).save()
+        await personal.sync()
+        let interim = try XCTUnwrap(try deviceRecords(in: library).first { $0.key == key }).modifiedAt
+        try await Task.sleep(nanoseconds: 100_000_000)
+        onA.content = "Hello from the team"
+        try context(0).save()
+        await personal.sync()
+        let reverted = try XCTUnwrap(try deviceRecords(in: library).first { $0.key == key })
+        XCTAssertGreaterThan(reverted.modifiedAt, interim.addingTimeInterval(0.05), "undoing back to it is a new edit, stamped now")
+    }
+
+    func testAStoppedChannelDoesNotSyncAgain() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        await channels[0]?.sync()
+        channels[1]?.stop()
+        await channels[1]?.sync()
+        XCTAssertNil(group("Support", on: 1))
+    }
+
+    func testOnOffFavoriteAndAppRulesStayEachPersons() async throws {
+        let support = SnippetGroup.insert(named: "Support", in: context(0))
+        let hi = Snippet.insert(title: "Hi", abbreviation: ";hi", content: "Hello", group: support, in: context(0))
+        let rule = AppRule.create(in: context(0), bundleID: "com.apple.mail", appName: "Mail", isDeny: false)
+        rule.snippet = hi
+        try context(0).save()
+        connect(0, groupID: support.id.uuidString)
+        connect(1, groupID: nil)
+        await syncBoth()
+
+        let onB = try XCTUnwrap(try context(1).fetch(Snippet.fetchRequest()).first { $0.abbreviation == ";hi" })
+        XCTAssertEqual(onB.appRules?.count ?? 0, 0)
+        onB.isEnabled = false
+        onB.isFavorite = true
+        onB.content = "Hello again"
+        try context(1).save()
+        await syncBoth()
+        XCTAssertEqual(hi.content, "Hello again")
+        XCTAssertTrue(hi.isEnabled)
+        XCTAssertFalse(hi.isFavorite)
+        XCTAssertEqual(hi.appRules?.map(\.bundleIdentifier), ["com.apple.mail"])
+    }
+
+    func testAFolderWithSeveralGroupsOrTheLibraryFolderIsRefused() throws {
+        let devices = team.appendingPathComponent("devices")
+        try FileManager.default.createDirectory(at: devices, withIntermediateDirectories: true)
+        let file = SyncDeviceFile(deviceID: "x", deviceName: "x", writtenAt: Date(), records: [
+            SyncRecord(key: "group:A", modifiedAt: Date(), deleted: false, payload: .object(["name": .string("A")]), device: "x"),
+            SyncRecord(key: "group:B", modifiedAt: Date(), deleted: false, payload: .object(["name": .string("B")]), device: "x")
+        ])
+        try JSONEncoder.sync.encode(file).write(to: devices.appendingPathComponent("x.json"))
+        let groups = SharedGroups()
+        XCTAssertThrowsError(try groups.share(UUID(), in: team))
+        XCTAssertThrowsError(try groups.share(UUID(), in: FolderSync.shared.folder))
+    }
+
+    private func deviceRecords(in folder: URL) throws -> [SyncRecord] {
+        let devices = folder.appendingPathComponent("devices")
+        return try FileManager.default.contentsOfDirectory(atPath: devices.path).flatMap { name -> [SyncRecord] in
+            let data = try Data(contentsOf: devices.appendingPathComponent(name))
+            return try JSONDecoder.sync.decode(SyncDeviceFile.self, from: data).records
+        }
+    }
+
+    func testScopedRecordsCarryOnlyTheGroupNameAndItsSnippets() {
+        let local: [String: JSONValue] = [
+            "group:G": .object(["name": .string("Support"), "isEnabled": .bool(false), "sortOrder": .number(3)]),
+            "group:H": .object(["name": .string("Mine")]),
+            "snippet:1": .object(["group": .string("G"), "content": .string("a")]),
+            "snippet:2": .object(["group": .string("H"), "content": .string("b")]),
+            "pin:x": .object(["content": .string("c")])
+        ]
+        XCTAssertEqual(SyncMerge.scoped(local, toGroup: "G"), [
+            "group:G": .object(["name": .string("Support")]),
+            "snippet:1": .object(["group": .string("G"), "content": .string("a")])
+        ])
+        let remote = [
+            SyncRecord(key: "snippet:3", modifiedAt: Date(), deleted: true, payload: nil, device: "b"),
+            SyncRecord(key: "snippet:1", modifiedAt: Date(), deleted: true, payload: nil, device: "b"),
+            SyncRecord(key: "snippet:4", modifiedAt: Date(), deleted: false, payload: .object(["group": .string("H")]), device: "b")
+        ]
+        XCTAssertEqual(SyncMerge.inScope(remote, group: "G", known: ["snippet:1"]).map(\.key), ["snippet:1"])
+    }
+}
