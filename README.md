@@ -29,7 +29,23 @@
 - **Keyboard first**: `⌃⌘V` opens the history. Arrows and Return pick, `1`-`9` and `0` paste directly, typing filters, Esc closes.
 - **Private by default**: password-manager copies (concealed or transient pasteboard data) and excluded apps are never recorded.
 - **Duplicates**: copying something again moves it to the top instead of adding a second row.
-- **Two views**: Simple (a flat numbered list) and Organized (Recent, Images, Links, Colors, Text).
+- **Two views**: Simple (a flat numbered list) and Organized (Recent, Images, Links, Colors, Text), with your most-used snippets and All Snippets by group.
+- **Search**: finds clips, snippets and the text inside screenshots; letters in order are enough (`esig` finds Email signature).
+- **Pins**: pinned clips are marked in every list and pasted with `⌘1`-`⌘9`. Any clip can be saved as a snippet.
+
+### 📝 Paste as plain text and transforms
+- **Plain text**: `⌥`+pick in the history, `⌃⇧⌘V` anywhere, or always (Preferences).
+- **Paste as…**: UPPERCASE, lowercase, Title Case, Sentence case, whitespace cleanup, camelCase / snake_case / kebab-case, URL and Base64 encode and decode, pretty JSON, remove niqqud.
+
+### ⌨️ Wrong keyboard layout
+- `⌃⌘L` retypes the selection, or what you just typed, in your other keyboard layout (`akuo` → `שלום`) and can switch the keyboard for you.
+
+### 🖼 Text from the screen and from images
+- `⌃⇧⌘T` reads the text in any area you select; `⌃⇧⌘I` captures the area as an image. Right-click an image in the history for Copy Text.
+- Recognition runs on your Mac with Apple's text recognition. Hebrew is not among the languages macOS can read yet; it appears in Preferences once Apple adds it.
+
+### 🔄 Sync between Macs
+- Snippets, groups, settings and pinned text stay the same on your Macs through a folder in the cloud: iCloud Drive, or a shared folder (iCloud, Google Drive, Dropbox) for Macs on different Apple IDs. Clipboard history stays on each Mac. Turn it on in Preferences → Backup.
 
 ### ⚡ Text expansion
 - **Real-time expansion**: type an abbreviation such as `.sig` and a trigger, and it is replaced in any app.
@@ -46,16 +62,14 @@
 - **Statistics**: use count and last used, per snippet.
 
 ### 🌐 Hebrew
-- Hebrew abbreviations (`;חת`), `{date:hebrew}` for the Hebrew calendar, and an English and Hebrew interface.
+- Hebrew abbreviations (`;חת`), `{date:hebrew}` for the Hebrew calendar, and a full English and Hebrew interface, right to left in Hebrew.
 
 ### 📦 Export
 - **JSON export and import** of snippet libraries, with skip, overwrite or rename on conflicts.
 - **XML export** in a TextExpander-compatible plist format.
 
-### 🧭 In progress
-- The interface is being aligned with the full design (`design_handoff_clipflow/`): theme, popover, preferences, snippet editor, onboarding and full right-to-left layout.
-- iCloud sync is planned and not built yet.
-- ClipFlow is not on the Mac App Store yet. The preparation plan is in [docs/app-store.md](docs/app-store.md).
+### 🧭 Not yet
+- ClipFlow is not on the Mac App Store or notarized yet. The preparation plan is in [docs/app-store.md](docs/app-store.md).
 
 ---
 
